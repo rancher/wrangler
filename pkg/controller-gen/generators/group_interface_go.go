@@ -3,7 +3,6 @@ package generators
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
 	"k8s.io/gengo/args"
@@ -33,12 +32,11 @@ type interfaceGo struct {
 
 func (f *interfaceGo) Imports(*generator.Context) []string {
 	group := f.customArgs.Options.Groups[f.group]
-	groupName := groupPath(f.group)
 
 	packages := []string{
 		GenericPackage,
 		fmt.Sprintf("clientset \"%s\"", group.ClientSetPackage),
-		fmt.Sprintf("informers \"%s/%s\"", group.InformersPackage, groupName),
+		fmt.Sprintf("informers \"%s/%s\"", group.InformersPackage, f.group),
 	}
 
 	for gv := range f.customArgs.TypesByGroup {
@@ -46,7 +44,7 @@ func (f *interfaceGo) Imports(*generator.Context) []string {
 			continue
 		}
 
-		packages = append(packages, fmt.Sprintf("%s/controllers/%s/%s", f.customArgs.Package, groupPath(gv.Group), gv.Version))
+		packages = append(packages, fmt.Sprintf("%s/controllers/%s/%s", f.customArgs.Package, gv.Group, gv.Version))
 	}
 
 	return packages
@@ -77,7 +75,7 @@ func (f *interfaceGo) Init(c *generator.Context, w io.Writer) error {
 		}
 
 		m := map[string]interface{}{
-			"upperGroup":   namer.IC(strings.ToLower(groupPath(f.group))),
+			"upperGroup":   upperLowercase(f.group),
 			"upperVersion": namer.IC(gv.Version),
 			"version":      gv.Version,
 		}

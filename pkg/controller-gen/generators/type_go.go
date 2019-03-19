@@ -37,7 +37,6 @@ type typeGo struct {
 
 func (f *typeGo) Imports(*generator.Context) []string {
 	group := f.customArgs.Options.Groups[f.gv.Group]
-	groupPath := groupPath(f.gv.Group)
 
 	packages := []string{
 		"metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"",
@@ -50,9 +49,9 @@ func (f *typeGo) Imports(*generator.Context) []string {
 		"k8s.io/client-go/tools/cache",
 		f.name.Package,
 		GenericPackage,
-		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, groupPath, f.gv.Version),
-		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, groupPath, f.gv.Version),
-		fmt.Sprintf("listers \"%s/%s/%s\"", group.ListersPackage, groupPath, f.gv.Version),
+		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, f.gv.Group, f.gv.Version),
+		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, f.gv.Group, f.gv.Version),
+		fmt.Sprintf("listers \"%s/%s/%s\"", group.ListersPackage, f.gv.Group, f.gv.Version),
 	}
 
 	return packages

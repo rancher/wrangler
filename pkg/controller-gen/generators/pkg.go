@@ -14,7 +14,7 @@ func Package(arguments *args.GeneratorArgs, name string, generators func(context
 
 	parts := strings.Split(name, "/")
 	return &generator.DefaultPackage{
-		PackageName:   parts[len(parts)-1],
+		PackageName:   groupPath(parts[len(parts)-1]),
 		PackagePath:   name,
 		HeaderText:    boilerplate,
 		GeneratorFunc: generators,

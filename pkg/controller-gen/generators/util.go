@@ -2,6 +2,8 @@ package generators
 
 import (
 	"strings"
+
+	"k8s.io/gengo/namer"
 )
 
 const (
@@ -9,9 +11,13 @@ const (
 )
 
 func groupPath(group string) string {
-	g := strings.Split(group, ".")[0]
+	g := strings.Replace(strings.Split(group, ".")[0], "-", "", -1)
 	if g == "" {
 		return "core"
 	}
 	return g
+}
+
+func upperLowercase(name string) string {
+	return namer.IC(strings.ToLower(groupPath(name)))
 }

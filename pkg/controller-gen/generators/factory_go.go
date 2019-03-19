@@ -3,12 +3,10 @@ package generators
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
 )
 
 func FactoryGo(group string, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
@@ -52,7 +50,7 @@ func (f *factory) Init(c *generator.Context, w io.Writer) error {
 
 	sw := generator.NewSnippetWriter(w, c, "{{", "}}")
 	m := map[string]interface{}{
-		"groupName": namer.IC(strings.ToLower(groupPath(f.group))),
+		"groupName": upperLowercase(f.group),
 	}
 
 	sw.Do("func (c *Factory) {{.groupName}}() Interface {\n", m)

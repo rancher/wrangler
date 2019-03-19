@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/types"
@@ -106,7 +106,7 @@ func typesGroupVersionPackage(name *types.Name, gv schema.GroupVersion, generato
 }
 
 func groupPackage(group string, generatorArgs *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Package {
-	packagePath := filepath.Join(customArgs.Package, "controllers", groupPath(group))
+	packagePath := filepath.Join(customArgs.Package, "controllers", group)
 	return Package(generatorArgs, packagePath, func(context *generator.Context) []generator.Generator {
 		return []generator.Generator{
 			FactoryGo(group, generatorArgs, customArgs),
@@ -116,7 +116,7 @@ func groupPackage(group string, generatorArgs *args.GeneratorArgs, customArgs *a
 }
 
 func groupVersionPackage(gv schema.GroupVersion, generatorArgs *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Package {
-	packagePath := filepath.Join(customArgs.Package, "controllers", groupPath(gv.Group), gv.Version)
+	packagePath := filepath.Join(customArgs.Package, "controllers", gv.Group, gv.Version)
 
 	return Package(generatorArgs, packagePath, func(context *generator.Context) []generator.Generator {
 		generators := []generator.Generator{

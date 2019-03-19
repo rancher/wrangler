@@ -35,13 +35,12 @@ type registerGroupVersionGo struct {
 func (f *registerGroupVersionGo) Imports(*generator.Context) []string {
 	firstType := f.customArgs.TypesByGroup[f.gv][0]
 	typeGroupPath := strings.TrimSuffix(firstType.Package, "/"+f.gv.Version)
-	groupPath := groupPath(f.gv.Group)
 
 	packages := []string{
 		"metav1 \"k8s.io/apimachinery/pkg/apis/meta/v1\"",
 		"k8s.io/apimachinery/pkg/runtime",
 		"k8s.io/apimachinery/pkg/runtime/schema",
-		fmt.Sprintf("%s \"%s\"", groupPath, typeGroupPath),
+		fmt.Sprintf("%s \"%s\"", groupPath(f.gv.Group), typeGroupPath),
 	}
 
 	return packages
@@ -58,11 +57,10 @@ func (f *registerGroupVersionGo) Init(c *generator.Context, w io.Writer) error {
 		types = append(types, c.Universe.Type(*name))
 	}
 	types = orderer.OrderTypes(types)
-	groupPath := groupPath(f.gv.Group)
 
 	m := map[string]interface{}{
 		"version":   f.gv.Version,
-		"groupPath": groupPath,
+		"groupPath": groupPath(f.gv.Group),
 	}
 	sw.Do(registerGroupVersionBody, m)
 

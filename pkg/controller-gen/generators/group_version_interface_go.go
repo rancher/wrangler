@@ -3,7 +3,6 @@ package generators
 import (
 	"fmt"
 	"io"
-	"strings"
 
 	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,13 +34,12 @@ type groupInterfaceGo struct {
 func (f *groupInterfaceGo) Imports(*generator.Context) []string {
 	firstType := f.customArgs.TypesByGroup[f.gv][0]
 	group := f.customArgs.Options.Groups[f.gv.Group]
-	groupPath := groupPath(f.gv.Group)
 
 	packages := []string{
 		GenericPackage,
 		firstType.Package,
-		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, groupPath, f.gv.Version),
-		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, groupPath, f.gv.Version),
+		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, f.gv.Group, f.gv.Version),
+		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, f.gv.Group, f.gv.Version),
 	}
 
 	return packages
@@ -64,7 +62,6 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 		types = append(types, c.Universe.Type(*name))
 	}
 	types = orderer.OrderTypes(types)
-	groupPath := groupPath(f.gv.Group)
 
 	sw.Do("type Interface interface {\n", nil)
 	for _, t := range types {
@@ -78,7 +75,7 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 	m := map[string]interface{}{
 		"version":      f.gv.Version,
 		"versionUpper": namer.IC(f.gv.Version),
-		"groupUpper":   namer.IC(strings.ToLower(groupPath)),
+		"groupUpper":   upperLowercase(f.gv.Group),
 	}
 	sw.Do(groupInterfaceBody, m)
 
@@ -88,7 +85,7 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 			"plural":       plural.Name(t),
 			"version":      f.gv.Version,
 			"versionUpper": namer.IC(f.gv.Version),
-			"groupUpper":   namer.IC(strings.ToLower(groupPath)),
+			"groupUpper":   upperLowercase(f.gv.Group),
 		}
 
 		sw.Do("func (c *version) {{.type}}() {{.type}}Controller {\n", m)
