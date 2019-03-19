@@ -6,7 +6,7 @@ import (
 	"context"
 	"flag"
 
-	"github.com/rancher/wrangler/pkg/generic/signals"
+	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/rancher/wrangler/pkg/start"
 	"github.com/rancher/wrangler/sample/pkg/generated/controllers/apps"
 	"github.com/rancher/wrangler/sample/pkg/generated/controllers/samplecontroller"
