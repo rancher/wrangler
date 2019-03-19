@@ -20,9 +20,9 @@ require (
 	golang.org/x/tools v0.0.0-20190318200714-bb1270c20edf // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.2.2 // indirect
-	k8s.io/api v0.0.0-20190313115550-3c12c96769cc // indirect
-	k8s.io/apimachinery v0.0.0-20190313115320-c9defaaddf6f
-	k8s.io/client-go v10.0.0+incompatible
+	k8s.io/api v0.0.0-20190222213804-5cb15d344471 // indirect
+	k8s.io/apimachinery v0.0.0-20190221213512-86fb29eff628
+	k8s.io/client-go v2.0.0-alpha.0.0.20190228174230-b40b2a5939e4+incompatible
 	k8s.io/code-generator v0.0.0-20190311155051-e4c2b1329cf7
 	k8s.io/gengo v0.0.0-20190308184658-b90029ef6cd8
 	k8s.io/klog v0.2.0
