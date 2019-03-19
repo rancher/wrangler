@@ -94,8 +94,8 @@ type {{.type}}Controller interface {
 
 	Cache() {{.type}}ControllerCache
 
-	OnChange(name string, sync {{.type}}Handler)
-	OnRemove(name string, sync {{.type}}Handler)
+	OnChange(ctx context.Context, name string, sync {{.type}}Handler)
+	OnRemove(ctx context.Context, name string, sync {{.type}}Handler)
 	Enqueue({{ if .namespaced}}namespace, {{end}}name string)
 }
 
@@ -145,17 +145,17 @@ func (c *{{.lowerName}}Controller) updater() generic.Updater {
 	}
 }
 
-func (c *{{.lowerName}}Controller) addHandler(name string, handler generic.Handler) {
-	c.controllerManager.AddHandler(c.gvk, c.informer.Informer(), name, handler)
+func (c *{{.lowerName}}Controller) addHandler(ctx context.Context, name string, handler generic.Handler) {
+	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
 }
 
-func (c *{{.lowerName}}Controller) OnChange(name string, sync {{.type}}Handler) {
-	c.addHandler(name, from{{.type}}HandlerToHandler(sync))
+func (c *{{.lowerName}}Controller) OnChange(ctx context.Context, name string, sync {{.type}}Handler) {
+	c.addHandler(ctx, name, from{{.type}}HandlerToHandler(sync))
 }
 
-func (c *{{.lowerName}}Controller) OnRemove(name string, sync {{.type}}Handler) {
+func (c *{{.lowerName}}Controller) OnRemove(ctx context.Context, name string, sync {{.type}}Handler) {
 	removeHandler := generic.NewRemoveHandler(name, c.updater(), from{{.type}}HandlerToHandler(sync))
-	c.addHandler(name, removeHandler)
+	c.addHandler(ctx, name, removeHandler)
 }
 
 func (c *{{.lowerName}}Controller) Enqueue({{ if .namespaced}}namespace, {{end}}name string) {

@@ -8,8 +8,9 @@ import (
 )
 
 type handlerEntry struct {
-	name    string
-	handler Handler
+	generation int
+	name       string
+	handler    Handler
 }
 
 type Handlers struct {

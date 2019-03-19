@@ -40,6 +40,11 @@ type Controller struct {
 	handler   Handler
 }
 
+type generationKey struct {
+	generation int
+	key        string
+}
+
 // NewController returns a new sample controller
 func NewController(name string, informer cache.SharedIndexInformer, workqueue workqueue.RateLimitingInterface, handler Handler) *Controller {
 	controller := &Controller{
