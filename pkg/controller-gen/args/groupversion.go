@@ -41,7 +41,6 @@ func toVersionType(obj interface{}) (string, *types.Name) {
 }
 
 func CheckType(passedType *types.Type) {
-	return
 	tags := util.MustParseClientGenTags(passedType.SecondClosestCommentLines)
 	if !tags.GenerateClient {
 		panic("Type " + passedType.String() + " is missing comment " + needsComment)
