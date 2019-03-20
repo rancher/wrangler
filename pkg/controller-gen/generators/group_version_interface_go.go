@@ -38,8 +38,8 @@ func (f *groupInterfaceGo) Imports(*generator.Context) []string {
 	packages := []string{
 		GenericPackage,
 		firstType.Package,
-		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, f.gv.Group, f.gv.Version),
-		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, f.gv.Group, f.gv.Version),
+		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, handleCore(f.gv.Group), f.gv.Version),
+		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, handleCore(f.gv.Group), f.gv.Version),
 	}
 
 	return packages

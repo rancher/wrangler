@@ -36,7 +36,7 @@ func (f *interfaceGo) Imports(*generator.Context) []string {
 	packages := []string{
 		GenericPackage,
 		fmt.Sprintf("clientset \"%s\"", group.ClientSetPackage),
-		fmt.Sprintf("informers \"%s/%s\"", group.InformersPackage, f.group),
+		fmt.Sprintf("informers \"%s/%s\"", group.InformersPackage, handleCore(f.group)),
 	}
 
 	for gv := range f.customArgs.TypesByGroup {
@@ -44,7 +44,7 @@ func (f *interfaceGo) Imports(*generator.Context) []string {
 			continue
 		}
 
-		packages = append(packages, fmt.Sprintf("%s/controllers/%s/%s", f.customArgs.Package, gv.Group, gv.Version))
+		packages = append(packages, fmt.Sprintf("%s \"%s/controllers/%s/%s\"", gv.Version, f.customArgs.Package, handleCore(gv.Group), gv.Version))
 	}
 
 	return packages

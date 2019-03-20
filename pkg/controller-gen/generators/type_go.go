@@ -49,9 +49,9 @@ func (f *typeGo) Imports(*generator.Context) []string {
 		"k8s.io/client-go/tools/cache",
 		f.name.Package,
 		GenericPackage,
-		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, f.gv.Group, f.gv.Version),
-		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, f.gv.Group, f.gv.Version),
-		fmt.Sprintf("listers \"%s/%s/%s\"", group.ListersPackage, f.gv.Group, f.gv.Version),
+		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, handleCore(f.gv.Group), f.gv.Version),
+		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, handleCore(f.gv.Group), f.gv.Version),
+		fmt.Sprintf("listers \"%s/%s/%s\"", group.ListersPackage, handleCore(f.gv.Group), f.gv.Version),
 	}
 
 	return packages

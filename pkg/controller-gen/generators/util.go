@@ -12,10 +12,14 @@ const (
 
 func groupPath(group string) string {
 	g := strings.Replace(strings.Split(group, ".")[0], "-", "", -1)
-	if g == "" {
+	return handleCore(g)
+}
+
+func handleCore(group string) string {
+	if group == "" {
 		return "core"
 	}
-	return g
+	return group
 }
 
 func upperLowercase(name string) string {
