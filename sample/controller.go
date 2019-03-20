@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	samplev1alpha1 "github.com/rancher/wrangler/sample/pkg/apis/samplecontroller/v1alpha1"
+	samplev1alpha1 "github.com/rancher/wrangler/sample/pkg/apis/samplecontroller.k8s.io/v1alpha1"
 	samplescheme "github.com/rancher/wrangler/sample/pkg/generated/clientset/versioned/scheme"
 	v1 "github.com/rancher/wrangler/sample/pkg/generated/controllers/apps/v1"
-	"github.com/rancher/wrangler/sample/pkg/generated/controllers/samplecontroller/v1alpha1"
+	"github.com/rancher/wrangler/sample/pkg/generated/controllers/samplecontroller.k8s.io/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

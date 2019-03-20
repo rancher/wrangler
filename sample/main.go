@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/rancher/wrangler/pkg/start"
 	"github.com/rancher/wrangler/sample/pkg/generated/controllers/apps"
-	"github.com/rancher/wrangler/sample/pkg/generated/controllers/samplecontroller"
+	"github.com/rancher/wrangler/sample/pkg/generated/controllers/samplecontroller.k8s.io"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"

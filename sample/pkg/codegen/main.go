@@ -3,7 +3,7 @@ package main
 import (
 	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
 	"github.com/rancher/wrangler/pkg/controller-gen/args"
-	"github.com/rancher/wrangler/sample/pkg/apis/samplecontroller/v1alpha1"
+	"github.com/rancher/wrangler/sample/pkg/apis/samplecontroller.k8s.io/v1alpha1"
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 )
