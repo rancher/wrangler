@@ -2,7 +2,6 @@ package controllergen
 
 import (
 	"path/filepath"
-	"strings"
 
 	cgargs "github.com/rancher/wrangler/pkg/controller-gen/args"
 	"github.com/rancher/wrangler/pkg/controller-gen/generators"
@@ -104,7 +103,7 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 		}
 		args.InputDirs = append(args.InputDirs, names[0].Package)
 		clientSetArgs.Groups = append(clientSetArgs.Groups, types2.GroupVersions{
-			PackageName: strings.Split(gv.Group, ".")[0],
+			PackageName: gv.Group,
 			Group:       types2.Group(gv.Group),
 			Versions: []types2.PackageVersion{
 				{

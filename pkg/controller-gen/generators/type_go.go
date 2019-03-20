@@ -96,6 +96,9 @@ type {{.type}}Controller interface {
 	OnChange(ctx context.Context, name string, sync {{.type}}Handler)
 	OnRemove(ctx context.Context, name string, sync {{.type}}Handler)
 	Enqueue({{ if .namespaced}}namespace, {{end}}name string)
+
+	Informer() cache.SharedIndexInformer
+	GroupVersionKind() schema.GroupVersionKind
 }
 
 type {{.type}}ControllerCache interface {
@@ -159,6 +162,14 @@ func (c *{{.lowerName}}Controller) OnRemove(ctx context.Context, name string, sy
 
 func (c *{{.lowerName}}Controller) Enqueue({{ if .namespaced}}namespace, {{end}}name string) {
 	c.controllerManager.Enqueue(c.gvk, {{ if .namespaced }}namespace, {{else}}"", {{end}}name)
+}
+
+func (c *{{.lowerName}}Controller) Informer() cache.SharedIndexInformer {
+	return c.informer.Informer()
+}
+
+func (c *{{.lowerName}}Controller) GroupVersionKind() schema.GroupVersionKind {
+	return c.gvk
 }
 
 func (c *{{.lowerName}}Controller) Cache() {{.type}}ControllerCache {
