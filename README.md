@@ -1,4 +1,4 @@
-Wrangler [ALPHA]
+Wrangler [In Development - Does Not Work]
 --------
 Framework for wrapping clients, informers, listers into a simple
 usable controller pattern that promotes some good practices.
@@ -13,7 +13,7 @@ Sample Project
 The sample project does the same things as the standard Kubernetes [sample controller](https://github.com/kubernetes/sample-controller) but
 just using this framework and patterns.
 
-To use the sample clone this project to a proper GOPATH and then. [ALPHA - MIGHT NOT WORK ATM]
+To use the sample clone this project to a proper GOPATH and then
 
 ```bash
 cd $GOPATH/src/github.com/rancher/wrangler/sample
