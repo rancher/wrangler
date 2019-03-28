@@ -73,13 +73,9 @@ func NewController(name string, informer cache.SharedIndexInformer, workqueue wo
 	return controller
 }
 
-func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
+func (c *Controller) run(threadiness int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.workqueue.ShutDown()
-
-	if ok := cache.WaitForCacheSync(stopCh, c.informer.HasSynced); !ok {
-		return fmt.Errorf("failed to wait for caches to sync")
-	}
 
 	// Start the informer factories to begin populating the informer caches
 	klog.Infof("Starting %s controller", c.name)
@@ -91,6 +87,15 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 
 	<-stopCh
 	klog.Infof("Shutting down %s workers", c.name)
+}
+
+func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
+	if ok := cache.WaitForCacheSync(stopCh, c.informer.HasSynced); !ok {
+		c.workqueue.ShutDown()
+		return fmt.Errorf("failed to wait for caches to sync")
+	}
+
+	go c.run(threadiness, stopCh)
 	return nil
 }
 

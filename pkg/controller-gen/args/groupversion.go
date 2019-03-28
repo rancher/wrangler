@@ -32,6 +32,9 @@ func ObjectsToGroupVersion(group string, objs []interface{}, ret map[schema.Grou
 
 func toVersionType(obj interface{}) (string, *types.Name) {
 	t := reflect.TypeOf(obj)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
 	pkg := path.Vendorless(t.PkgPath())
 	parts := strings.Split(pkg, "/")
 	return parts[len(parts)-1], &types.Name{

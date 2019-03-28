@@ -25,7 +25,10 @@ func (h *Handlers) Handle(key string, obj runtime.Object) (runtime.Object, error
 	for _, handler := range h.handlers {
 		newObj, err := handler.handler(key, obj)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, &handlerError{
+				HandlerName: handler.name,
+				Err:         err,
+			})
 		}
 		if newObj != nil {
 			obj = newObj

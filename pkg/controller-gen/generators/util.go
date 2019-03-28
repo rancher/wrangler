@@ -12,10 +12,13 @@ const (
 
 func groupPath(group string) string {
 	g := strings.Replace(strings.Split(group, ".")[0], "-", "", -1)
-	return handleCore(g)
+	return groupPackageName(g, "")
 }
 
-func handleCore(group string) string {
+func groupPackageName(group, groupPackageName string) string {
+	if groupPackageName != "" {
+		return groupPackageName
+	}
 	if group == "" {
 		return "core"
 	}

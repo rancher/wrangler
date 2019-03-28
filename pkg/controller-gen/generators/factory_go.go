@@ -69,6 +69,14 @@ type Factory struct {
 	threadiness       map[schema.GroupVersionKind]int
 }
 
+func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
+	f, err := NewFactoryFromConfig(config)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
 func NewFactoryFromConfig(config *rest.Config) (*Factory, error) {
 	clientset, err := clientset.NewForConfig(config)
 	if err != nil {
@@ -93,6 +101,7 @@ func (c *Factory) SetThreadiness(gvk schema.GroupVersionKind, threadiness int) {
 }
 
 func (c *Factory) Sync(ctx context.Context) error {
+	c.informerFactory.Start(ctx.Done())
 	c.informerFactory.WaitForCacheSync(ctx.Done())
 	return nil
 }

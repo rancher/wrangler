@@ -106,7 +106,7 @@ func typesGroupVersionPackage(name *types.Name, gv schema.GroupVersion, generato
 }
 
 func groupPackage(group string, generatorArgs *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Package {
-	packagePath := filepath.Join(customArgs.Package, "controllers", handleCore(group))
+	packagePath := filepath.Join(customArgs.Package, "controllers", groupPackageName(group, ""))
 	return Package(generatorArgs, packagePath, func(context *generator.Context) []generator.Generator {
 		return []generator.Generator{
 			FactoryGo(group, generatorArgs, customArgs),
@@ -116,7 +116,7 @@ func groupPackage(group string, generatorArgs *args.GeneratorArgs, customArgs *a
 }
 
 func groupVersionPackage(gv schema.GroupVersion, generatorArgs *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Package {
-	packagePath := filepath.Join(customArgs.Package, "controllers", handleCore(gv.Group), gv.Version)
+	packagePath := filepath.Join(customArgs.Package, "controllers", groupPackageName(gv.Group, ""), gv.Version)
 
 	return Package(generatorArgs, packagePath, func(context *generator.Context) []generator.Generator {
 		generators := []generator.Generator{

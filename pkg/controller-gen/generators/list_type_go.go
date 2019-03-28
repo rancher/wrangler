@@ -60,4 +60,11 @@ type {{.type}}List struct {
 
 	Items []{{.type}} ` + "`" + `json:"items"` + "`" + `
 }
+
+func New{{.type}}(namespace, name string, obj {{.type}}) *{{.type}} {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("{{.type}}").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
 `
