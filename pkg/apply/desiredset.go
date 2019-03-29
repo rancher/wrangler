@@ -25,7 +25,7 @@ type desiredSet struct {
 	errs             []error
 }
 
-func (o desiredSet) err(err error) error {
+func (o *desiredSet) err(err error) error {
 	o.errs = append(o.errs, err)
 	return o.Err()
 }
