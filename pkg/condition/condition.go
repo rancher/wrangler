@@ -2,17 +2,30 @@ package condition
 
 import (
 	"reflect"
-	"regexp"
 	"time"
 
 	"github.com/pkg/errors"
-	err2 "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type Cond string
 
-var temfileRegexp = regexp.MustCompile("/tmp/[-_a-zA-Z0-9]+")
+func (c Cond) GetStatus(obj runtime.Object) string {
+	return getStatus(obj, string(c))
+}
+
+func (c Cond) SetStatus(obj runtime.Object, status string) {
+	setStatus(obj, string(c), status)
+}
+
+func (c Cond) SetStatusBool(obj runtime.Object, val bool) {
+	if val {
+		setStatus(obj, string(c), "True")
+	} else {
+		setStatus(obj, string(c), "False")
+	}
+}
 
 func (c Cond) True(obj runtime.Object) {
 	setStatus(obj, string(c), "True")
@@ -20,14 +33,6 @@ func (c Cond) True(obj runtime.Object) {
 
 func (c Cond) IsTrue(obj runtime.Object) bool {
 	return getStatus(obj, string(c)) == "True"
-}
-
-func (c Cond) LastUpdated(obj runtime.Object, ts string) {
-	setTS(obj, string(c), ts)
-}
-
-func (c Cond) GetLastUpdated(obj runtime.Object) string {
-	return getTS(obj, string(c))
 }
 
 func (c Cond) False(obj runtime.Object) {
@@ -38,16 +43,20 @@ func (c Cond) IsFalse(obj runtime.Object) bool {
 	return getStatus(obj, string(c)) == "False"
 }
 
-func (c Cond) GetStatus(obj runtime.Object) string {
-	return getStatus(obj, string(c))
-}
-
-func (c Cond) SetStatus(obj runtime.Object, status string) {
-	setStatus(obj, string(c), status)
-}
-
 func (c Cond) Unknown(obj runtime.Object) {
 	setStatus(obj, string(c), "Unknown")
+}
+
+func (c Cond) IsUnknown(obj runtime.Object) bool {
+	return getStatus(obj, string(c)) == "Unknown"
+}
+
+func (c Cond) LastUpdated(obj runtime.Object, ts string) {
+	setTS(obj, string(c), ts)
+}
+
+func (c Cond) GetLastUpdated(obj runtime.Object) string {
+	return getTS(obj, string(c))
 }
 
 func (c Cond) CreateUnknownIfNotExists(obj runtime.Object) {
@@ -58,13 +67,17 @@ func (c Cond) CreateUnknownIfNotExists(obj runtime.Object) {
 	}
 }
 
-func (c Cond) IsUnknown(obj runtime.Object) bool {
-	return getStatus(obj, string(c)) == "Unknown"
-}
-
 func (c Cond) Reason(obj runtime.Object, reason string) {
 	cond := findOrCreateCond(obj, string(c))
 	getFieldValue(cond, "Reason").SetString(reason)
+}
+
+func (c Cond) GetReason(obj runtime.Object) string {
+	cond := findOrNotCreateCond(obj, string(c))
+	if cond == nil {
+		return ""
+	}
+	return getFieldValue(*cond, "Reason").String()
 }
 
 func (c Cond) SetMessageIfBlank(obj runtime.Object, message string) {
@@ -86,28 +99,6 @@ func (c Cond) GetMessage(obj runtime.Object) string {
 	return getFieldValue(*cond, "Message").String()
 }
 
-func (c Cond) ReasonAndMessageFromError(obj runtime.Object, err error) {
-	if err2.IsConflict(err) {
-		return
-	}
-	cond := findOrCreateCond(obj, string(c))
-	setValue(cond, "Message", err.Error())
-	switch ce := err.(type) {
-	case *conditionError:
-		setValue(cond, "Reason", ce.reason)
-	default:
-		setValue(cond, "Reason", "Error")
-	}
-}
-
-func (c Cond) GetReason(obj runtime.Object) string {
-	cond := findOrNotCreateCond(obj, string(c))
-	if cond == nil {
-		return ""
-	}
-	return getFieldValue(*cond, "Reason").String()
-}
-
 func (c Cond) Once(obj runtime.Object, f func() (runtime.Object, error)) error {
 	if c.IsFalse(obj) {
 		return errors.New(c.GetReason(obj))
@@ -124,88 +115,33 @@ func (c Cond) DoUntilTrue(obj runtime.Object, f func() (runtime.Object, error)) 
 	return c.Do(f)
 }
 
+func messageAndReason(err error) (string, string) {
+	if err == nil {
+		return "", ""
+	}
+
+	switch ce := err.(type) {
+	case *conditionError:
+		return err.Error(), ce.reason
+	default:
+		return err.Error(), "Error"
+	}
+}
+
 func (c Cond) Do(f func() (runtime.Object, error)) error {
-	//return c.do(obj, f)
-	return nil
-}
-
-type ObjectClientGetter interface {
-	//ObjectClient() *objectclient.ObjectClient
-}
-
-func (c Cond) do(obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, error) {
-	retObj, err := c.doInternal(setReturned, obj, f)
-	if setReturned {
-		checkObj = retObj
-	}
-
-	// This is to prevent non stop flapping of states and update
-	if status == c.GetStatus(checkObj) &&
-		reason == c.GetReason(checkObj) {
-		if message != c.GetMessage(checkObj) {
-			replaced := temfileRegexp.ReplaceAllString(c.GetMessage(checkObj), "file_path_redacted")
-			c.Message(checkObj, replaced)
-		}
-		if message == c.GetMessage(checkObj) {
-			c.LastUpdated(checkObj, ts)
-		}
-	}
-
-	changed := status != c.GetStatus(checkObj) ||
-		ts != c.GetLastUpdated(checkObj) ||
-		reason != c.GetReason(checkObj) ||
-		message != c.GetMessage(checkObj)
-
-	return retObj, changed, err
-}
-
-func (c Cond) do2(setReturned bool, obj runtime.Object, f func() (runtime.Object, error)) (runtime.Object, bool, error) {
-	status := c.GetStatus(obj)
-	ts := c.GetLastUpdated(obj)
-	reason := c.GetReason(obj)
-	message := c.GetMessage(obj)
-
-	checkObj := obj
-	retObj, err := c.doInternal(setReturned, obj, f)
-	if setReturned {
-		checkObj = retObj
-	}
-
-	// This is to prevent non stop flapping of states and update
-	if status == c.GetStatus(checkObj) &&
-		reason == c.GetReason(checkObj) {
-		if message != c.GetMessage(checkObj) {
-			replaced := temfileRegexp.ReplaceAllString(c.GetMessage(checkObj), "file_path_redacted")
-			c.Message(checkObj, replaced)
-		}
-		if message == c.GetMessage(checkObj) {
-			c.LastUpdated(checkObj, ts)
-		}
-	}
-
-	changed := status != c.GetStatus(checkObj) ||
-		ts != c.GetLastUpdated(checkObj) ||
-		reason != c.GetReason(checkObj) ||
-		message != c.GetMessage(checkObj)
-
-	return retObj, changed, err
-}
-
-func (c Cond) doInternal(f func() (runtime.Object, error)) (runtime.Object, error) {
 	obj, err := f()
-	if obj == nil && reflect.ValueOf(obj).IsNil() {
-		return nil, err
+
+	if apierrors.IsConflict(err) {
+		// Don't update condition state on conflicts
+		return err
 	}
 
-	if err != nil {
-		c.False(obj)
-		c.ReasonAndMessageFromError(obj, err)
-		return obj, err
-	}
-	c.True(obj)
-	c.Reason(obj, "")
-	c.Message(obj, "")
-	return obj, nil
+	message, reason := messageAndReason(err)
+	c.SetStatusBool(obj, err == nil)
+	c.Message(obj, message)
+	c.Reason(obj, reason)
+
+	return err
 }
 
 func touchTS(value reflect.Value) {
