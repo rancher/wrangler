@@ -98,6 +98,5 @@ func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Objec
 	}
 
 	metadata.SetFinalizers(append(finalizers, finalizerKey))
-
 	return o.updater(obj)
 }
