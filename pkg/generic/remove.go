@@ -42,27 +42,33 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) (runtime.O
 
 	finalizerKey := o.constructFinalizerKey()
 	finalizers := metadata.GetFinalizers()
-	if len(finalizers) > 0 && finalizers[0] == finalizerKey {
-		return obj, nil
+
+	for k, v := range finalizers {
+		if v == finalizerKey {
+			newFinalizers := append(finalizers[:k], finalizers[k+1:]...)
+			newObj, err := o.handler(key, obj)
+			if err != nil {
+				return newObj, err
+			}
+
+			if newObj != nil {
+				obj = newObj
+			}
+
+			obj = obj.DeepCopyObject()
+			metadata, err = meta.Accessor(obj)
+
+			if err != nil {
+				return obj, err
+			}
+
+			metadata.SetFinalizers(newFinalizers)
+
+			return o.updater(obj)
+		}
 	}
 
-	newObj, err := o.handler(key, obj)
-	if err != nil {
-		return newObj, err
-	}
-
-	if newObj != nil {
-		obj = newObj
-	}
-
-	obj = obj.DeepCopyObject()
-	metadata, err = meta.Accessor(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	metadata.SetFinalizers(finalizers[1:])
-	return o.updater(obj)
+	return obj, nil
 }
 
 func (o *objectLifecycleAdapter) constructFinalizerKey() string {
@@ -70,6 +76,7 @@ func (o *objectLifecycleAdapter) constructFinalizerKey() string {
 }
 
 func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {
+
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -77,6 +84,7 @@ func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Objec
 
 	finalizerKey := o.constructFinalizerKey()
 	finalizers := metadata.GetFinalizers()
+
 	for _, finalizer := range finalizers {
 		if finalizer == finalizerKey {
 			return obj, nil
@@ -90,5 +98,6 @@ func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Objec
 	}
 
 	metadata.SetFinalizers(append(finalizers, finalizerKey))
+
 	return o.updater(obj)
 }
