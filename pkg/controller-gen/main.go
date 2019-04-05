@@ -33,10 +33,12 @@ func Run(opts cgargs.Options) {
 	genericArgs.GoHeaderFilePath = opts.Boilerplate
 	genericArgs.InputDirs = parseTypes(customArgs)
 
+	clientGen := generators.NewClientGenerator()
+
 	if err := genericArgs.Execute(
 		clientgenerators.NameSystems(),
 		clientgenerators.DefaultNameSystem(),
-		generators.Packages,
+		clientGen.Packages,
 	); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
@@ -66,6 +68,9 @@ func Run(opts cgargs.Options) {
 
 	if err := generateInformers(groups, customArgs); err != nil {
 		klog.Fatalf("informers failed: %v", err)
+	}
+	if err := clientGen.GenerateMocks(); err != nil {
+		klog.Fatalf("mocks failed: %v", err)
 	}
 }
 
