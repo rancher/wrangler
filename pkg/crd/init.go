@@ -185,6 +185,7 @@ func (f *Factory) createCRD(crdDef CRD, ready map[string]*apiext.CustomResourceD
 		},
 		Spec: apiext.CustomResourceDefinitionSpec{
 			Group: crdDef.GVK.Group,
+			Version: crdDef.GVK.Version,
 			Versions: []apiext.CustomResourceDefinitionVersion{
 				{
 					Name:    crdDef.GVK.Version,
