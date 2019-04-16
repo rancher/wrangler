@@ -44,7 +44,7 @@ func (c CRD) ToCustomResourceDefinition() apiext.CustomResourceDefinition {
 		},
 		Spec: apiext.CustomResourceDefinitionSpec{
 			Group: c.GVK.Group,
-			Version: crdDef.GVK.Version,
+			Version: c.GVK.Version,
 			Versions: []apiext.CustomResourceDefinitionVersion{
 				{
 					Name:    c.GVK.Version,
