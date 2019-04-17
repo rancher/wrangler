@@ -20,7 +20,7 @@ package v1alpha1
 
 import (
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/sample/pkg/apis/samplecontroller.k8s.io/v1alpha1"
+	v1alpha1 "github.com/rancher/wrangler/sample/pkg/apis/samplecontroller.k8s.io/v1alpha1"
 	clientset "github.com/rancher/wrangler/sample/pkg/generated/clientset/versioned/typed/samplecontroller.k8s.io/v1alpha1"
 	informers "github.com/rancher/wrangler/sample/pkg/generated/informers/externalversions/samplecontroller.k8s.io/v1alpha1"
 )
