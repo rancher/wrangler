@@ -56,7 +56,7 @@ func (o *desiredSet) delete(nsed bool, namespace, name string, client dynamic.Na
 		PropagationPolicy: &deletePolicy,
 	}
 	if nsed {
-		return client.Namespace(name).Delete(name, opts)
+		return client.Namespace(namespace).Delete(name, opts)
 	}
 
 	return client.Delete(name, opts)
