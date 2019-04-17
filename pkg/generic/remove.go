@@ -40,9 +40,7 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) (runtime.O
 		return o.addFinalizer(obj)
 	}
 
-	finalizerKey := o.constructFinalizerKey()
-	finalizers := metadata.GetFinalizers()
-	if len(finalizers) > 0 && finalizers[0] == finalizerKey {
+	if !o.hasFinalizer(obj) {
 		return obj, nil
 	}
 
@@ -55,40 +53,67 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) (runtime.O
 		obj = newObj
 	}
 
-	obj = obj.DeepCopyObject()
-	metadata, err = meta.Accessor(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	metadata.SetFinalizers(finalizers[1:])
-	return o.updater(obj)
+	return o.removeFinalizer(obj)
 }
 
 func (o *objectLifecycleAdapter) constructFinalizerKey() string {
 	return finalizerKey + o.name
 }
 
-func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {
+func (o *objectLifecycleAdapter) hasFinalizer(obj runtime.Object) bool {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, err
+		return false
 	}
 
 	finalizerKey := o.constructFinalizerKey()
 	finalizers := metadata.GetFinalizers()
 	for _, finalizer := range finalizers {
 		if finalizer == finalizerKey {
-			return obj, nil
+			return true
 		}
 	}
 
+	return false
+}
+
+func (o *objectLifecycleAdapter) removeFinalizer(obj runtime.Object) (runtime.Object, error) {
+	if !o.hasFinalizer(obj) {
+		return obj, nil
+	}
+
 	obj = obj.DeepCopyObject()
-	metadata, err = meta.Accessor(obj)
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return obj, err
+	}
+
+	finalizerKey := o.constructFinalizerKey()
+	finalizers := metadata.GetFinalizers()
+
+	var newFinalizers []string
+	for k, v := range finalizers {
+		if v != finalizerKey {
+			continue
+		}
+		newFinalizers = append(finalizers[:k], finalizers[k+1:]...)
+	}
+
+	metadata.SetFinalizers(newFinalizers)
+	return o.updater(obj)
+}
+
+func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {
+	if o.hasFinalizer(obj) {
+		return obj, nil
+	}
+
+	obj = obj.DeepCopyObject()
+	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
 	}
 
-	metadata.SetFinalizers(append(finalizers, finalizerKey))
+	metadata.SetFinalizers(append(metadata.GetFinalizers(), o.constructFinalizerKey()))
 	return o.updater(obj)
 }
