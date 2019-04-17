@@ -190,7 +190,7 @@ func (cg *ClientGenerator) GenerateMocks() error {
 				return err
 			}
 
-			filePath := path.Join(genPath, "fakes", "zz_generated_"+addUnderscore(resource)+"_mock_test.go")
+			filePath := path.Join(genPath, "fakes", "zz_generated_"+addUnderscore(resource)+"_mock.go")
 
 			// format imports - moq only uses gofmt which does not do imports
 			res, err := imports.Process(filePath, out.Bytes(), goImportOpts)
@@ -224,7 +224,7 @@ func cleanMockDir(dir string) error {
 	}
 
 	for _, file := range files {
-		if strings.HasSuffix(file.Name(), "_mock_test.go") {
+		if strings.HasSuffix(file.Name(), "_mock.go") || strings.HasSuffix(file.Name(), "_mock_test.go") {
 			if err := os.Remove(path.Join(dir, file.Name())); err != nil {
 				return errors.Wrapf(err, "failed to delete %s", path.Join(dir, file.Name()))
 			}
