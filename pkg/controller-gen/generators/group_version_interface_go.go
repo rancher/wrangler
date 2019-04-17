@@ -37,7 +37,7 @@ func (f *groupInterfaceGo) Imports(*generator.Context) []string {
 
 	packages := []string{
 		GenericPackage,
-		firstType.Package,
+		fmt.Sprintf("%s \"%s\"", f.gv.Version, firstType.Package),
 		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
 		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
 	}

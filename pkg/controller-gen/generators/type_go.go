@@ -47,7 +47,7 @@ func (f *typeGo) Imports(*generator.Context) []string {
 		"utilruntime \"k8s.io/apimachinery/pkg/util/runtime\"",
 		"k8s.io/apimachinery/pkg/watch",
 		"k8s.io/client-go/tools/cache",
-		f.name.Package,
+		fmt.Sprintf("%s \"%s\"", f.gv.Version, f.name.Package),
 		GenericPackage,
 		fmt.Sprintf("clientset \"%s/typed/%s/%s\"", group.ClientSetPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
 		fmt.Sprintf("informers \"%s/%s/%s\"", group.InformersPackage, groupPackageName(f.gv.Group, group.PackageName), f.gv.Version),
