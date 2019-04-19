@@ -88,6 +88,10 @@ func NewFactoryFromConfig(config *rest.Config) (*Factory, error) {
 }
 
 func NewFactoryFromConfigWithNamespace(config *rest.Config, namespace string) (*Factory, error) {
+	if namespace == "" {
+		return NewFactoryFromConfig(config)
+	}
+
 	cs, err := clientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
