@@ -35,6 +35,9 @@ func (o desiredSet) Err() error {
 }
 
 func (o desiredSet) Apply(set *objectset.ObjectSet) error {
+	if set == nil {
+		set = objectset.NewObjectSet()
+	}
 	o.objs = set
 	return o.apply()
 }
