@@ -1,8 +1,5 @@
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
-# github.com/docker/distribution v2.7.1+incompatible
-github.com/docker/distribution/reference
-github.com/docker/distribution/digestset
 # github.com/evanphx/json-patch v4.1.0+incompatible
 github.com/evanphx/json-patch
 # github.com/ghodss/yaml v1.0.0
@@ -39,15 +36,8 @@ github.com/matryer/moq/pkg/moq
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
-# github.com/opencontainers/go-digest v1.0.0-rc1
-github.com/opencontainers/go-digest
 # github.com/pkg/errors v0.8.1
 github.com/pkg/errors
-# github.com/rancher/mapper v0.0.0-20190329182506-3504e44bb041
-github.com/rancher/mapper
-github.com/rancher/mapper/convert
-github.com/rancher/mapper/definition
-github.com/rancher/mapper/values
 # github.com/sirupsen/logrus v1.4.1
 github.com/sirupsen/logrus
 # github.com/spf13/pflag v1.0.3
@@ -196,11 +186,11 @@ k8s.io/client-go/tools/cache
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/workqueue
 k8s.io/client-go/kubernetes
-k8s.io/client-go/kubernetes/typed/core/v1
 k8s.io/client-go/tools/leaderelection
 k8s.io/client-go/tools/leaderelection/resourcelock
-k8s.io/client-go/tools/record
+k8s.io/client-go/kubernetes/typed/core/v1
 k8s.io/client-go/tools/clientcmd
+k8s.io/client-go/tools/record
 k8s.io/client-go/discovery/fake
 k8s.io/client-go/testing
 k8s.io/client-go/informers
@@ -255,10 +245,10 @@ k8s.io/client-go/kubernetes/typed/storage/v1
 k8s.io/client-go/kubernetes/typed/storage/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1beta1
 k8s.io/client-go/tools/reference
-k8s.io/client-go/tools/record/util
 k8s.io/client-go/tools/auth
 k8s.io/client-go/tools/clientcmd/api/latest
 k8s.io/client-go/util/homedir
+k8s.io/client-go/tools/record/util
 k8s.io/client-go/informers/admissionregistration
 k8s.io/client-go/informers/auditregistration
 k8s.io/client-go/informers/autoscaling
@@ -368,18 +358,9 @@ k8s.io/gengo/examples/set-gen/sets
 k8s.io/klog
 # k8s.io/kube-openapi v0.0.0-20190401085232-94e1e7b7574c
 k8s.io/kube-openapi/pkg/util/proto
-# k8s.io/kubernetes v1.13.5 => k8s.io/kubernetes v1.14.1
-k8s.io/kubernetes/pkg/api/legacyscheme
-k8s.io/kubernetes/pkg/apis/core/install
-k8s.io/kubernetes/pkg/apis/core
-k8s.io/kubernetes/pkg/apis/core/v1
-k8s.io/kubernetes/pkg/apis/apps
-k8s.io/kubernetes/pkg/util/parsers
-k8s.io/kubernetes/pkg/apis/autoscaling
 # k8s.io/utils v0.0.0-20190308190857-21c4ce38f2a7
 k8s.io/utils/buffer
 k8s.io/utils/trace
 k8s.io/utils/integer
-k8s.io/utils/pointer
 # sigs.k8s.io/yaml v1.1.0
 sigs.k8s.io/yaml
