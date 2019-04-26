@@ -6,16 +6,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
-	// ensure that core is loaded into legacyschema
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 type Callback func(cb context.Context)
@@ -38,15 +31,13 @@ func run(ctx context.Context, namespace, name string, client kubernetes.Interfac
 		return err
 	}
 
-	recorder := createRecorder(name, client)
-
 	rl, err := resourcelock.New(resourcelock.ConfigMapsResourceLock,
 		namespace,
 		name,
 		client.CoreV1(),
+		client.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
-			EventRecorder: recorder,
 		})
 	if err != nil {
 		logrus.Fatalf("error creating leader lock for %s: %v", name, err)
@@ -74,9 +65,3 @@ func run(ctx context.Context, namespace, name string, client kubernetes.Interfac
 	panic("unreachable")
 }
 
-func createRecorder(name string, kubeClient kubernetes.Interface) record.EventRecorder {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(logrus.Debugf)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
-	return eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: name})
-}
