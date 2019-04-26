@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/mapper"
+	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/rancher/wrangler/pkg/objectset"
 	"github.com/sirupsen/logrus"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
@@ -222,7 +222,7 @@ func list(informer cache.SharedIndexInformer, client dynamic.NamespaceableResour
 			}
 		}
 
-		return objs, mapper.NewErrors(errs...)
+		return objs, merr.NewErrors(errs...)
 	}
 
 	err := cache.ListAllByNamespace(informer.GetIndexer(), "", selector, func(obj interface{}) {
@@ -234,5 +234,5 @@ func list(informer cache.SharedIndexInformer, client dynamic.NamespaceableResour
 		errs = append(errs, err)
 	}
 
-	return objs, mapper.NewErrors(errs...)
+	return objs, merr.NewErrors(errs...)
 }

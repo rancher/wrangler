@@ -1,8 +1,8 @@
 package apply
 
 import (
-	"github.com/rancher/mapper"
 	"github.com/rancher/wrangler/pkg/apply/injectors"
+	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/rancher/wrangler/pkg/objectset"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,7 +31,7 @@ func (o *desiredSet) err(err error) error {
 }
 
 func (o desiredSet) Err() error {
-	return mapper.NewErrors(append(o.errs, o.objs.Err())...)
+	return merr.NewErrors(append(o.errs, o.objs.Err())...)
 }
 
 func (o desiredSet) Apply(set *objectset.ObjectSet) error {

@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/rancher/wrangler/pkg/apply/injectors"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/pkg/objectset"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
