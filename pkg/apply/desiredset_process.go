@@ -68,9 +68,9 @@ func (o *desiredSet) adjustNamespace(gvk schema.GroupVersionKind, objs map[objec
 func (o *desiredSet) createPatcher(client dynamic.NamespaceableResourceInterface) Patcher {
 	return func(namespace, name string, pt types2.PatchType, data []byte) (object runtime.Object, e error) {
 		if namespace != "" {
-			return client.Namespace(namespace).Patch(name, pt, data, v1.UpdateOptions{})
+			return client.Namespace(namespace).Patch(name, pt, data, v1.PatchOptions{})
 		}
-		return client.Patch(name, pt, data, v1.UpdateOptions{})
+		return client.Patch(name, pt, data, v1.PatchOptions{})
 	}
 }
 
