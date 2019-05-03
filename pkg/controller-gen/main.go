@@ -116,6 +116,10 @@ func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
 	}
 
 	for pkg, _ := range pathsToCopy {
+		if _, err := os.Stat(pkg); os.IsNotExist(err) {
+			continue
+		}
+
 		return filepath.Walk(pkg, func(path string, info os.FileInfo, err error) error {
 			newPath := strings.Replace(path, pkg, ".", 1)
 			if _, err := os.Stat(newPath); os.IsNotExist(err) {
