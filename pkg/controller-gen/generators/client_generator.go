@@ -117,7 +117,6 @@ func (cg *ClientGenerator) typesGroupVersionDocPackage(name *types.Name, gv sche
 
 // +k8s:deepcopy-gen=package
 // +groupName=%s
-
 `, gv.Group))...)
 
 	return p
