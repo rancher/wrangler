@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/json-iterator/go v1.1.6 // indirect
-	github.com/matryer/moq v0.0.0-00010101000000-000000000000
+	github.com/matryer/moq v0.0.0-20190312154309-6cfb0558e1bd
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.1
