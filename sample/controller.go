@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/sirupsen/logrus"
+
 	samplev1alpha1 "github.com/rancher/wrangler/sample/pkg/apis/samplecontroller.k8s.io/v1alpha1"
 	samplescheme "github.com/rancher/wrangler/sample/pkg/generated/clientset/versioned/scheme"
 	v1 "github.com/rancher/wrangler/sample/pkg/generated/controllers/apps/v1"
@@ -18,7 +20,6 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
 )
 
 const controllerAgentName = "sample-controller"
@@ -56,9 +57,9 @@ func Register(
 	// Add sample-controller types to the default Kubernetes Scheme so Events can be
 	// logged for sample-controller types.
 	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
-	klog.V(4).Info("Creating event broadcaster")
+	logrus.Info("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster.StartLogging(logrus.Infof)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
 
@@ -113,7 +114,7 @@ func (c *Controller) OnFooChanged(key string, foo *samplev1alpha1.Foo) (*samplev
 	// number does not equal the current desired replicas on the Deployment, we
 	// should update the Deployment resource.
 	if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
-		klog.V(4).Infof("Foo %s replicas: %d, deployment replicas: %d", foo.Name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
+		logrus.Infof("Foo %s replicas: %d, deployment replicas: %d", foo.Name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
 		deployment, err = c.deployments.Update(newDeployment(foo))
 	}
 
@@ -163,7 +164,7 @@ func (c *Controller) OnDeploymentChanged(key string, deployment *appsv1.Deployme
 
 		foo, err := c.foos.Cache().Get(deployment.Namespace, ownerRef.Name)
 		if err != nil {
-			klog.V(4).Infof("ignoring orphaned object '%s' of foo '%s'", deployment.GetSelfLink(), ownerRef.Name)
+			logrus.Infof("ignoring orphaned object '%s' of foo '%s'", deployment.GetSelfLink(), ownerRef.Name)
 			return nil, nil
 		}
 

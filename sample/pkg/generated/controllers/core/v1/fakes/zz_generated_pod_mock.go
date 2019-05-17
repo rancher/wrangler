@@ -8,7 +8,7 @@ import (
 	sync "sync"
 
 	generic "github.com/rancher/wrangler/pkg/generic"
-	v1 "github.com/rancher/wrangler/sample/pkg/generated/controllers/core/v1"
+	v1 "github.com/rancher/wrangler/sample/pkg/generatedllers/core/v1"
 	v1a "k8s.io/api/core/v1"
 	v1b "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"

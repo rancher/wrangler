@@ -10,9 +10,9 @@ import (
 	"github.com/rancher/wrangler/pkg/start"
 	"github.com/rancher/wrangler/sample/pkg/generated/controllers/apps"
 	"github.com/rancher/wrangler/sample/pkg/generated/controllers/samplecontroller.k8s.io"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
 )
 
 var (
@@ -28,28 +28,28 @@ func main() {
 
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		klog.Fatalf("Error building kubeconfig: %s", err.Error())
+		logrus.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building kubernetes clientset: %s", err.Error())
+		logrus.Fatalf("Error building kubernetes clientset: %s", err.Error())
 	}
 
 	apps, err := apps.NewFactoryFromConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building apps controllers: %s", err.Error())
+		logrus.Fatalf("Error building apps controllers: %s", err.Error())
 	}
 
 	sample, err := samplecontroller.NewFactoryFromConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error building sample controllers: %s", err.Error())
+		logrus.Fatalf("Error building sample controllers: %s", err.Error())
 	}
 
 	Register(ctx, kubeClient, apps.Apps().V1().Deployment(), sample.Samplecontroller().V1alpha1().Foo())
 
 	if err := start.All(ctx, 2, apps, sample); err != nil {
-		klog.Fatalf("Error starting: %s", err.Error())
+		logrus.Fatalf("Error starting: %s", err.Error())
 	}
 
 	<-ctx.Done()

@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2019 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,5 +18,4 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +groupName=samplecontroller.k8s.io
-
 package v1alpha1

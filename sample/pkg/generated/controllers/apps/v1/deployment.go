@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2019 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -130,8 +130,8 @@ func UpdateDeploymentOnChange(updater generic.Updater, handler DeploymentHandler
 			copyObj = newObj
 		}
 		if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-			newObj, _ := updater(copyObj)
-			if newObj != nil {
+			newObj, err := updater(copyObj)
+			if newObj != nil && err == nil {
 				copyObj = newObj.(*v1.Deployment)
 			}
 		}

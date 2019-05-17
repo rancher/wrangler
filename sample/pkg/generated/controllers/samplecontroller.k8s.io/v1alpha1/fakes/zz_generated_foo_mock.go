@@ -9,7 +9,7 @@ import (
 
 	generic "github.com/rancher/wrangler/pkg/generic"
 	v1alpha1a "github.com/rancher/wrangler/sample/pkg/apis/samplecontroller.k8s.io/v1alpha1"
-	v1alpha1 "github.com/rancher/wrangler/sample/pkg/generated/controllers/samplecontroller.k8s.io/v1alpha1"
+	v1alpha1 "github.com/rancher/wrangler/sample/pkg/generatedllers/samplecontroller.k8s.io/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	cgargs "github.com/rancher/wrangler/pkg/controller-gen/args"
 	"github.com/rancher/wrangler/pkg/controller-gen/generators"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -22,7 +24,6 @@ import (
 	"k8s.io/gengo/args"
 	dp "k8s.io/gengo/examples/deepcopy-gen/generators"
 	"k8s.io/gengo/types"
-	"k8s.io/klog"
 )
 
 func Run(opts cgargs.Options) {
@@ -56,7 +57,7 @@ func Run(opts cgargs.Options) {
 		clientgenerators.DefaultNameSystem(),
 		clientGen.Packages,
 	); err != nil {
-		klog.Fatalf("Error: %v", err)
+		logrus.Fatalf("Error: %v", err)
 	}
 
 	groups := map[string]bool{}
@@ -71,35 +72,35 @@ func Run(opts cgargs.Options) {
 	}
 
 	if err := copyGoPathToModules(customArgs); err != nil {
-		klog.Fatalf("go modules copy failed: %v", err)
+		logrus.Fatalf("go modules copy failed: %v", err)
 	}
 
 	if err := generateDeepcopy(groups, customArgs); err != nil {
-		klog.Fatalf("deepcopy failed: %v", err)
+		logrus.Fatalf("deepcopy failed: %v", err)
 	}
 
 	if err := generateClientset(groups, customArgs); err != nil {
-		klog.Fatalf("clientset failed: %v", err)
+		logrus.Fatalf("clientset failed: %v", err)
 	}
 
 	if err := generateListers(groups, customArgs); err != nil {
-		klog.Fatalf("listers failed: %v", err)
+		logrus.Fatalf("listers failed: %v", err)
 	}
 
 	if err := generateInformers(groups, customArgs); err != nil {
-		klog.Fatalf("informers failed: %v", err)
+		logrus.Fatalf("informers failed: %v", err)
 	}
 
 	if err := copyGoPathToModules(customArgs); err != nil {
-		klog.Fatalf("go modules copy failed: %v", err)
+		logrus.Fatalf("go modules copy failed: %v", err)
 	}
 
 	if err := clientGen.GenerateMocks(); err != nil {
-		klog.Fatalf("mocks failed: %v", err)
+		logrus.Fatalf("mocks failed: %v", err)
 	}
 
 	if err := copyGoPathToModules(customArgs); err != nil {
-		klog.Fatalf("go modules copy failed: %v", err)
+		logrus.Fatalf("go modules copy failed: %v", err)
 	}
 }
 
@@ -108,9 +109,9 @@ func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
 
 	pathsToCopy := map[string]bool{}
 	for _, types := range customArgs.TypesByGroup {
-		 for _, names := range types {
-		 	pkgSplit := strings.Split(names.Package, string(os.PathSeparator))
-		 	pkg := filepath.Join(customArgs.OutputBase, strings.Join(pkgSplit[:3], string(os.PathSeparator)))
+		for _, names := range types {
+			pkgSplit := strings.Split(names.Package, string(os.PathSeparator))
+			pkg := filepath.Join(customArgs.OutputBase, strings.Join(pkgSplit[:3], string(os.PathSeparator)))
 			pathsToCopy[pkg] = true
 		}
 	}
