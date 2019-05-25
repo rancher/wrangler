@@ -80,6 +80,10 @@ func Run(opts cgargs.Options) {
 		return
 	}
 
+	if err := copyGoPathToModules(customArgs); err != nil {
+		logrus.Fatalf("go modules copy failed: %v", err)
+	}
+
 	if err := generateDeepcopy(groups, customArgs); err != nil {
 		logrus.Fatalf("deepcopy failed: %v", err)
 	}
