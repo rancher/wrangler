@@ -67,11 +67,16 @@ func Run(opts cgargs.Options) {
 		}
 	}
 
-	if err := copyGoPathToModules(customArgs); err != nil {
-		logrus.Fatalf("go modules copy failed: %v", err)
-	}
-
 	if len(groups) == 0 {
+		if err := copyGoPathToModules(customArgs); err != nil {
+			logrus.Fatalf("go modules copy failed: %v", err)
+		}
+
+		if err := clientGen.GenerateMocks(); err != nil {
+			logrus.Errorf("mocks failed: %v", err)
+			return
+		}
+
 		return
 	}
 
@@ -98,10 +103,6 @@ func Run(opts cgargs.Options) {
 	if err := clientGen.GenerateMocks(); err != nil {
 		logrus.Errorf("mocks failed: %v", err)
 		return
-	}
-
-	if err := copyGoPathToModules(customArgs); err != nil {
-		logrus.Fatalf("go modules copy failed: %v", err)
 	}
 }
 
