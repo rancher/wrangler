@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -45,7 +46,6 @@ func Run(opts cgargs.Options) {
 		}
 
 		genericArgs.OutputBase = tempDir
-
 		defer os.RemoveAll(tempDir)
 	}
 	customArgs.OutputBase = genericArgs.OutputBase
@@ -67,12 +67,12 @@ func Run(opts cgargs.Options) {
 		}
 	}
 
-	if len(groups) == 0 {
-		return
-	}
-
 	if err := copyGoPathToModules(customArgs); err != nil {
 		logrus.Fatalf("go modules copy failed: %v", err)
+	}
+
+	if len(groups) == 0 {
+		return
 	}
 
 	if err := generateDeepcopy(groups, customArgs); err != nil {
@@ -96,12 +96,19 @@ func Run(opts cgargs.Options) {
 	}
 
 	if err := clientGen.GenerateMocks(); err != nil {
-		logrus.Fatalf("mocks failed: %v", err)
+		logrus.Errorf("mocks failed: %v", err)
+		return
 	}
 
 	if err := copyGoPathToModules(customArgs); err != nil {
 		logrus.Fatalf("go modules copy failed: %v", err)
 	}
+}
+
+func sourcePackagePath(customArgs *cgargs.CustomArgs, pkgName string) string {
+	pkgSplit := strings.Split(pkgName, string(os.PathSeparator))
+	pkg := filepath.Join(customArgs.OutputBase, strings.Join(pkgSplit[:3], string(os.PathSeparator)))
+	return pkg
 }
 
 //until k8s code-gen supports gopath
@@ -110,11 +117,13 @@ func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
 	pathsToCopy := map[string]bool{}
 	for _, types := range customArgs.TypesByGroup {
 		for _, names := range types {
-			pkgSplit := strings.Split(names.Package, string(os.PathSeparator))
-			pkg := filepath.Join(customArgs.OutputBase, strings.Join(pkgSplit[:3], string(os.PathSeparator)))
+			pkg := sourcePackagePath(customArgs, names.Package)
 			pathsToCopy[pkg] = true
 		}
 	}
+
+	pkg := sourcePackagePath(customArgs, customArgs.Package)
+	pathsToCopy[pkg] = true
 
 	for pkg, _ := range pathsToCopy {
 		if _, err := os.Stat(pkg); os.IsNotExist(err) {
@@ -192,10 +201,20 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 	args.OutputPackagePath = filepath.Join(customArgs.Package, "clientset")
 	args.GoHeaderFilePath = customArgs.Options.Boilerplate
 
-	for gv, names := range customArgs.TypesByGroup {
+	var order []schema.GroupVersion
+
+	for gv := range customArgs.TypesByGroup {
 		if !groups[gv.Group] {
 			continue
 		}
+		order = append(order, gv)
+	}
+	sort.Slice(order, func(i, j int) bool {
+		return order[i].Group < order[j].Group
+	})
+
+	for _, gv := range order {
+		names := customArgs.TypesByGroup[gv]
 		args.InputDirs = append(args.InputDirs, names[0].Package)
 		clientSetArgs.Groups = append(clientSetArgs.Groups, types2.GroupVersions{
 			PackageName: gv.Group,
