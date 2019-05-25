@@ -1,5 +1,5 @@
 /*
-Copyright The Kubernetes Authors.
+Copyright 2019 Rancher Labs, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,13 +46,27 @@ func NewFactoryFromConfigOrDie(config *rest.Config) *Factory {
 }
 
 func NewFactoryFromConfig(config *rest.Config) (*Factory, error) {
-	clientset, err := clientset.NewForConfig(config)
+	cs, err := clientset.NewForConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
-	informerFactory := informers.NewSharedInformerFactory(clientset, 2*time.Hour)
-	return NewFactory(clientset, informerFactory), nil
+	informerFactory := informers.NewSharedInformerFactory(cs, 2*time.Hour)
+	return NewFactory(cs, informerFactory), nil
+}
+
+func NewFactoryFromConfigWithNamespace(config *rest.Config, namespace string) (*Factory, error) {
+	if namespace == "" {
+		return NewFactoryFromConfig(config)
+	}
+
+	cs, err := clientset.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(cs, 2*time.Hour, informers.WithNamespace(namespace))
+	return NewFactory(cs, informerFactory), nil
 }
 
 func NewFactory(clientset clientset.Interface, informerFactory informers.SharedInformerFactory) *Factory {
