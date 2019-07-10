@@ -23,11 +23,17 @@ import (
 	"time"
 
 	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/pkg/schemes"
 	clientset "github.com/rancher/wrangler/sample/pkg/generated/clientset/versioned"
+	scheme "github.com/rancher/wrangler/sample/pkg/generated/clientset/versioned/scheme"
 	informers "github.com/rancher/wrangler/sample/pkg/generated/informers/externalversions"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
+
+func init() {
+	scheme.AddToScheme(schemes.All)
+}
 
 type Factory struct {
 	synced            bool
