@@ -1,6 +1,9 @@
 package generic
 
 import (
+	"strings"
+
+	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -100,7 +103,12 @@ func (o *objectLifecycleAdapter) removeFinalizer(obj runtime.Object) (runtime.Ob
 	}
 
 	metadata.SetFinalizers(newFinalizers)
-	return o.updater(obj)
+
+	obj, err = o.updater(obj)
+	if errors2.IsConflict(err) && strings.Contains(err.Error(), "StorageError: invalid object") {
+		return obj, nil
+	}
+	return obj, err
 }
 
 func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {
