@@ -1,27 +1,13 @@
-Wrangler [In Development - Does Not Work]
+Wrangler [BETA - Lacks full documentation]
 --------
 Framework for wrapping clients, informers, listers into a simple
 usable controller pattern that promotes some good practices.
 
 More documentation to follow but if you want to see what it
 looks like to write a controller with this framework refer to
-[main.go](https://github.com/rancher/wrangler/blob/master/sample/main.go) and [controller.go](https://github.com/rancher/wrangler/blob/master/sample/controller.go) in
- the [sample](https://github.com/rancher/wrangler/blob/master/sample).
+[main.go](https://github.com/rancher/wrangler-sample/blob/master/main.go) and [controller.go](https://github.com/rancher/wrangler-sample/blob/master/controller.go) in
+ the [sample](https://github.com/rancher/wrangler-sample).
  
-Sample Project
-------
-The sample project does the same things as the standard Kubernetes [sample controller](https://github.com/kubernetes/sample-controller) but
-just using this framework and patterns.
-
-To use the sample clone this project to a proper GOPATH and then
-
-```bash
-cd $GOPATH/src/github.com/rancher/wrangler/sample
-go generate
-go build .
-./sample
-```
-
 How it works
 ------------
 
@@ -37,34 +23,39 @@ controller looks as follows
 
 To use the controller all one needs to do is register simple OnChange handlers.  Also in the
 interface is access to the client and caches in a simple flat API. refer to
-[main.go](https://github.com/rancher/wrangler/blob/master/sample/main.go) and [controller.go](https://github.com/rancher/wrangler/blob/master/sample/controller.go) in
- the [sample project](https://github.com/rancher/wrangler/blob/master/sample) for more complete usage.
+[main.go](https://github.com/rancher/wrangler-sample/blob/master/main.go) and [controller.go](https://github.com/rancher/wrangler-sample/blob/master/controller.go) in
+ the [sample project](https://github.com/rancher/wrangler-sample) for more complete usage.
 
 ```golang
-type FooHandler func(string, *v1alpha1.Foo) (*v1alpha1.Foo, error)
-
 type FooController interface {
-	Create(*v1alpha1.Foo) (*v1alpha1.Foo, error)
-	Update(*v1alpha1.Foo) (*v1alpha1.Foo, error)
-	UpdateStatus(*v1alpha1.Foo) (*v1alpha1.Foo, error)
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-	DeleteCollection(namespace string, options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(namespace, name string, options metav1.GetOptions) (*v1alpha1.Foo, error)
-	List(namespace string, opts metav1.ListOptions) (*v1alpha1.FooList, error)
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error)
-
-	Cache() FooControllerCache
+	FooClient
 
 	OnChange(ctx context.Context, name string, sync FooHandler)
 	OnRemove(ctx context.Context, name string, sync FooHandler)
 	Enqueue(namespace, name string)
 
+	Cache() FooCache
+
 	Informer() cache.SharedIndexInformer
 	GroupVersionKind() schema.GroupVersionKind
+
+	AddGenericHandler(ctx context.Context, name string, handler generic.Handler)
+	AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler)
+	Updater() generic.Updater
 }
 
-type FooControllerCache interface {
+type FooClient interface {
+	Create(*v1alpha1.Foo) (*v1alpha1.Foo, error)
+	Update(*v1alpha1.Foo) (*v1alpha1.Foo, error)
+	UpdateStatus(*v1alpha1.Foo) (*v1alpha1.Foo, error)
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	Get(namespace, name string, options metav1.GetOptions) (*v1alpha1.Foo, error)
+	List(namespace string, opts metav1.ListOptions) (*v1alpha1.FooList, error)
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.Foo, err error)
+}
+
+type FooCache interface {
 	Get(namespace, name string) (*v1alpha1.Foo, error)
 	List(namespace string, selector labels.Selector) ([]*v1alpha1.Foo, error)
 
