@@ -31,6 +31,7 @@ type InformerGetter interface {
 
 type Apply interface {
 	Apply(set *objectset.ObjectSet) error
+	Delete(set *objectset.ObjectSet) error
 	ApplyObjects(objs ...runtime.Object) error
 	WithKnownTypes(gvks ...schema.GroupVersionKind) Apply
 	WithCacheTypes(igs ...InformerGetter) Apply
@@ -134,6 +135,12 @@ func (a *apply) newDesiredSet() desiredSet {
 
 func (a *apply) Apply(set *objectset.ObjectSet) error {
 	return a.newDesiredSet().Apply(set)
+}
+
+func (a *apply) Delete(set *objectset.ObjectSet) error {
+	ds := a.newDesiredSet()
+	ds.remove = true
+	return ds.apply()
 }
 
 func (a *apply) ApplyObjects(objs ...runtime.Object) error {

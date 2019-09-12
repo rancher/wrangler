@@ -78,6 +78,9 @@ func (o desiredSet) WithInjectorName(injs ...string) Apply {
 }
 
 func (o desiredSet) WithKnownTypes(gvks ...schema.GroupVersionKind) Apply {
+	if o.knownGVKs == nil {
+		o.knownGVKs = map[schema.GroupVersionKind]bool{}
+	}
 	for _, gvk := range gvks {
 		o.knownGVKs[gvk] = true
 	}

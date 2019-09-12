@@ -3,6 +3,7 @@ package apply
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/pkg/merr"
@@ -77,6 +78,9 @@ func (o *desiredSet) createPatcher(client dynamic.NamespaceableResourceInterface
 func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.GroupVersionKind, objs map[objectset.ObjectKey]runtime.Object) {
 	controller, client, err := o.getControllerAndClient(debugID, gvk)
 	if err != nil {
+		if errors2.IsNotFound(err) || strings.Contains(err.Error(), "failed to discover client") {
+			return
+		}
 		o.err(err)
 		return
 	}
@@ -101,7 +105,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 		return
 	}
 
-	toCreate, toDelete, toUpdate := compareSets(existing, objs)
+	toCreate, toDelete, toUpdate := compareSets(o.remove, existing, objs)
 
 	createF := func(k objectset.ObjectKey) {
 		obj := objs[k]
