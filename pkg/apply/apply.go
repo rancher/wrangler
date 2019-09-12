@@ -32,6 +32,7 @@ type InformerGetter interface {
 type Apply interface {
 	Apply(set *objectset.ObjectSet) error
 	ApplyObjects(objs ...runtime.Object) error
+	WithKnownTypes(gvks ...schema.GroupVersionKind) Apply
 	WithCacheTypes(igs ...InformerGetter) Apply
 	WithSetID(id string) Apply
 	WithOwner(obj runtime.Object) Apply
@@ -183,4 +184,8 @@ func (a *apply) WithRateLimiting(ratelimitingQps float32) Apply {
 
 func (a *apply) WithNoDelete() Apply {
 	return a.newDesiredSet().WithNoDelete()
+}
+
+func (a *apply) WithKnownTypes(gvks ...schema.GroupVersionKind) Apply {
+	return a.newDesiredSet().WithKnownTypes(gvks...)
 }

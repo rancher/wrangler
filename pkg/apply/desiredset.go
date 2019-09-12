@@ -15,6 +15,7 @@ type desiredSet struct {
 	listerNamespace  string
 	strictCaching    bool
 	pruneTypes       map[schema.GroupVersionKind]cache.SharedIndexInformer
+	knownGVKs        map[schema.GroupVersionKind]bool
 	patchers         map[schema.GroupVersionKind]Patcher
 	remove           bool
 	noDelete         bool
@@ -35,6 +36,11 @@ func (o *desiredSet) err(err error) error {
 
 func (o desiredSet) Err() error {
 	return merr.NewErrors(append(o.errs, o.objs.Err())...)
+}
+
+func (o desiredSet) Delete(set *objectset.ObjectSet) error {
+	o.remove = true
+	return o.Apply(set)
 }
 
 func (o desiredSet) Apply(set *objectset.ObjectSet) error {
@@ -68,6 +74,13 @@ func (o desiredSet) WithInjector(injs ...injectors.ConfigInjector) Apply {
 
 func (o desiredSet) WithInjectorName(injs ...string) Apply {
 	o.injectorNames = append(o.injectorNames, injs...)
+	return o
+}
+
+func (o desiredSet) WithKnownTypes(gvks ...schema.GroupVersionKind) Apply {
+	for _, gvk := range gvks {
+		o.knownGVKs[gvk] = true
+	}
 	return o
 }
 

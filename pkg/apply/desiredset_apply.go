@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	gvk2 "github.com/rancher/wrangler/pkg/gvk"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/pkg/apply/injectors"
+	"github.com/rancher/wrangler/pkg/gvk"
 	"github.com/rancher/wrangler/pkg/objectset"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -103,7 +102,14 @@ func (o *desiredSet) apply() error {
 }
 
 func (o *desiredSet) knownGVK() (ret []schema.GroupVersionKind) {
+	allGVKs := map[schema.GroupVersionKind]bool{}
 	for k := range o.pruneTypes {
+		allGVKs[k] = true
+	}
+	for k := range o.knownGVKs {
+		allGVKs[k] = true
+	}
+	for k := range allGVKs {
 		ret = append(ret, k)
 	}
 	return
@@ -167,7 +173,7 @@ func (o *desiredSet) getLabelsAndAnnotations() (map[string]string, map[string]st
 	}
 
 	if o.owner != nil {
-		gvk, err := gvk2.Get(o.owner)
+		gvk, err := gvk.Get(o.owner)
 		if err != nil {
 			return nil, nil, err
 		}

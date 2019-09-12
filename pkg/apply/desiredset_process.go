@@ -202,11 +202,15 @@ func (o *desiredSet) list(informer cache.SharedIndexInformer, client dynamic.Nam
 	return objs, merr.NewErrors(errs...)
 }
 
-func compareSets(existingSet, newSet map[objectset.ObjectKey]runtime.Object) (toCreate, toDelete, toUpdate []objectset.ObjectKey) {
+func compareSets(remove bool, existingSet, newSet map[objectset.ObjectKey]runtime.Object) (toCreate, toDelete, toUpdate []objectset.ObjectKey) {
 	for k := range newSet {
 		if _, ok := existingSet[k]; ok {
-			toUpdate = append(toUpdate, k)
-		} else {
+			if remove {
+				toDelete = append(toDelete, k)
+			} else {
+				toUpdate = append(toUpdate, k)
+			}
+		} else if !remove {
 			toCreate = append(toCreate, k)
 		}
 	}
@@ -243,4 +247,3 @@ func addObjectToMap(objs map[objectset.ObjectKey]runtime.Object, obj interface{}
 
 	return nil
 }
-
