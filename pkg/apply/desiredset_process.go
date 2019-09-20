@@ -65,6 +65,28 @@ func (o *desiredSet) adjustNamespace(gvk schema.GroupVersionKind, objs map[objec
 	return nil
 }
 
+func (o *desiredSet) clearNamespace(objs map[objectset.ObjectKey]runtime.Object) error {
+	for k, v := range objs {
+		if k.Namespace == "" {
+			continue
+		}
+
+		v = v.DeepCopyObject()
+		meta, err := meta.Accessor(v)
+		if err != nil {
+			return err
+		}
+
+		meta.SetNamespace("")
+
+		delete(objs, k)
+		k.Namespace = ""
+		objs[k] = v
+	}
+
+	return nil
+}
+
 func (o *desiredSet) createPatcher(client dynamic.NamespaceableResourceInterface) Patcher {
 	return func(namespace, name string, pt types2.PatchType, data []byte) (object runtime.Object, e error) {
 		if namespace != "" {
@@ -85,6 +107,11 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 
 	if nsed {
 		if err := o.adjustNamespace(gvk, objs); err != nil {
+			o.err(err)
+			return
+		}
+	} else {
+		if err := o.clearNamespace(objs); err != nil {
 			o.err(err)
 			return
 		}
@@ -243,4 +270,3 @@ func addObjectToMap(objs map[objectset.ObjectKey]runtime.Object, obj interface{}
 
 	return nil
 }
-
