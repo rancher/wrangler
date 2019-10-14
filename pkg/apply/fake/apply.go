@@ -50,11 +50,31 @@ func (f *FakeApply) WithPatcher(gvk schema.GroupVersionKind, patchers apply.Patc
 	return f
 }
 
+func (f *FakeApply) WithReconciler(gvk schema.GroupVersionKind, reconciler apply.Reconciler) apply.Apply {
+	return f
+}
+
 func (f *FakeApply) WithStrictCaching() apply.Apply {
 	return f
 }
 
+func (f *FakeApply) WithDynamicLookup() apply.Apply {
+	return f
+}
+
 func (f *FakeApply) WithDefaultNamespace(ns string) apply.Apply {
+	return f
+}
+
+func (f *FakeApply) WithListerNamespace(ns string) apply.Apply {
+	return f
+}
+
+func (f *FakeApply) WithRestrictClusterScoped() apply.Apply {
+	return f
+}
+
+func (f *FakeApply) WithSetOwnerReference(controller, block bool) apply.Apply {
 	return f
 }
 
