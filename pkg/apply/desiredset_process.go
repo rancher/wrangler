@@ -166,7 +166,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 
 	nsed := o.a.clients.IsNamespaced(gvk)
 
-	if !nsed && o.restrictClusterScoped {
+	if nsed && o.restrictClusterScoped {
 		o.err(fmt.Errorf("invalid cluster scoped gvk: %v", gvk))
 		return
 	}
