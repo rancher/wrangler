@@ -30,6 +30,10 @@ func (f *FakeApply) WithCacheTypes(igs ...apply.InformerGetter) apply.Apply {
 	return f
 }
 
+func (f *FakeApply) WithGVK(gvks ...schema.GroupVersionKind) apply.Apply {
+	return f
+}
+
 func (f *FakeApply) WithSetID(id string) apply.Apply {
 	return f
 }
