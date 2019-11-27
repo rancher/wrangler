@@ -36,11 +36,11 @@ type Resolver func(namespace, name string, obj runtime.Object) ([]Key, error)
 
 func Watch(ctx context.Context, name string, resolve Resolver, enq Enqueuer, watching ...ControllerWrapper) {
 	for _, c := range watching {
-		watch(ctx, name, enq, resolve, c)
+		watch(ctx, name, resolve, enq, c)
 	}
 }
 
-func watch(ctx context.Context, name string, enq Enqueuer, resolve Resolver, controller ControllerWrapper) {
+func watch(ctx context.Context, name string, resolve Resolver, enq Enqueuer, controller ControllerWrapper) {
 	runResolve := func(ns, name string, obj runtime.Object) error {
 		keys, err := resolve(ns, name, obj)
 		if err != nil {
