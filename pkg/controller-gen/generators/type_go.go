@@ -360,6 +360,7 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 	}
 	if !equality.Semantic.DeepEqual(status, newStatus) {
 		var newErr error
+		newStatus.Conditions = obj.Status.Conditions
 		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
 		if err == nil {
