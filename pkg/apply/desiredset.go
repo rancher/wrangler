@@ -86,6 +86,11 @@ func (o desiredSet) WithSetOwnerReference(controller, block bool) Apply {
 	return o
 }
 
+func (o desiredSet) WithoutOwnerReference() Apply {
+	o.setOwnerReference = false
+	return o
+}
+
 func (o desiredSet) WithInjector(injs ...injectors.ConfigInjector) Apply {
 	o.injectors = append(o.injectors, injs...)
 	return o

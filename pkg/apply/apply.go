@@ -51,6 +51,7 @@ type Apply interface {
 	WithNoDelete() Apply
 	WithGVK(gvks ...schema.GroupVersionKind) Apply
 	WithSetOwnerReference(controller, block bool) Apply
+	WithoutOwnerReference() Apply
 }
 
 func NewForConfig(cfg *rest.Config) (Apply, error) {
@@ -213,4 +214,8 @@ func (a *apply) WithNoDelete() Apply {
 
 func (a *apply) WithSetOwnerReference(controller, block bool) Apply {
 	return a.newDesiredSet().WithSetOwnerReference(controller, block)
+}
+
+func (a *apply) WithoutOwnerReference() Apply {
+	return a.newDesiredSet().WithoutOwnerReference()
 }

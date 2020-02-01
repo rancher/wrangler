@@ -82,6 +82,10 @@ func (f *FakeApply) WithSetOwnerReference(controller, block bool) apply.Apply {
 	return f
 }
 
+func (f *FakeApply) WithoutOwnerReference() apply.Apply {
+	return f
+}
+
 func (f *FakeApply) WithRateLimiting(ratelimitingQps float32) apply.Apply {
 	return f
 }

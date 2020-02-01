@@ -399,6 +399,10 @@ func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, st
 		apply = apply.WithRestrictClusterScoped()
 	}
 
+	if a.opts.WithoutOwnerReference {
+	  apply = apply.WithoutOwnerReference()
+	}
+
 	return newStatus, apply.
 		WithOwner(obj).
 		WithSetID(a.name).
