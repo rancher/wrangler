@@ -20,6 +20,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+const (
+	DisableOwnerAssignment = "objectset.rio.cattle.io/disableOwner"
+)
+
 var (
 	ErrReplace      = errors.New("replace object with changes")
 	ReplaceOnChange = func(name string, o runtime.Object, patchType types2.PatchType, data []byte, subresources ...string) (runtime.Object, error) {
@@ -61,6 +65,12 @@ func (o *desiredSet) assignOwnerReference(gvk schema.GroupVersionKind, objs map[
 			continue
 		}
 
+		v = v.DeepCopyObject()
+		vMeta, err := meta.Accessor(v)
+		if err != nil {
+			return err
+		}
+
 		assignNS := false
 		assignOwner := true
 		if o.a.clients.IsNamespaced(gvk) {
@@ -69,24 +79,21 @@ func (o *desiredSet) assignOwnerReference(gvk schema.GroupVersionKind, objs map[
 			} else if k.Namespace != ownerMeta.GetNamespace() && ownerNSed {
 				assignOwner = false
 			}
+			if vMeta.GetAnnotations()[DisableOwnerAssignment] == "true" {
+				assignOwner = false
+			}
 		}
 
 		if !assignOwner {
 			continue
 		}
 
-		v = v.DeepCopyObject()
-		meta, err := meta.Accessor(v)
-		if err != nil {
-			return err
-		}
-
 		if assignNS {
-			meta.SetNamespace(ownerMeta.GetNamespace())
+			vMeta.SetNamespace(ownerMeta.GetNamespace())
 		}
 
 		shouldSet := true
-		for _, of := range meta.GetOwnerReferences() {
+		for _, of := range vMeta.GetOwnerReferences() {
 			if ownerMeta.GetUID() == of.UID {
 				shouldSet = false
 				break
@@ -94,7 +101,7 @@ func (o *desiredSet) assignOwnerReference(gvk schema.GroupVersionKind, objs map[
 		}
 
 		if shouldSet {
-			meta.SetOwnerReferences(append(meta.GetOwnerReferences(), v1.OwnerReference{
+			vMeta.SetOwnerReferences(append(vMeta.GetOwnerReferences(), v1.OwnerReference{
 				APIVersion:         ownerGVK.GroupVersion().String(),
 				Kind:               ownerGVK.Kind,
 				Name:               ownerMeta.GetName(),
