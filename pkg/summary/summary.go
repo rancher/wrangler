@@ -1,6 +1,8 @@
 package summary
 
 import (
+	"strings"
+
 	"github.com/rancher/wrangler/pkg/data"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -32,5 +34,6 @@ func Summarize(unstr *unstructured.Unstructured) Summary {
 		summary.State = "active"
 	}
 
+	summary.State = strings.ToLower(summary.State)
 	return summary
 }
