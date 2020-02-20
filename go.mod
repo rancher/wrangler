@@ -3,6 +3,7 @@ module github.com/rancher/wrangler
 go 1.12
 
 require (
+	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/ghodss/yaml v1.0.0
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.4.2
