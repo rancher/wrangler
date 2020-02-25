@@ -58,7 +58,7 @@ func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (ru
 }
 
 func originalAndModified(gvk schema.GroupVersionKind, oldMetadata v1.Object, newObject runtime.Object) ([]byte, []byte, error) {
-	original, err := getOriginal(gvk, oldMetadata)
+	original, err := getOriginalBytes(gvk, oldMetadata)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -138,7 +138,6 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 	if err != nil {
 		return false, err
 	}
-
 	current, err := json.Marshal(oldObject)
 	if err != nil {
 		return false, err
@@ -162,12 +161,18 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		return false, nil
 	}
 
+	logrus.Debugf("DesiredSet - Patch %s %s/%s for %s -- [%s, %s, %s, %s]", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID, patch, original, modified, current)
+
 	if reconciler != nil {
 		newObject, err := prepareObjectForCreate(gvk, newObject)
 		if err != nil {
 			return false, err
 		}
-		handled, err := reconciler(oldObject, newObject)
+		originalObject, err := getOriginalObject(gvk, oldMetadata)
+		if err != nil {
+			return false, err
+		}
+		handled, err := reconciler(originalObject, newObject)
 		if err != nil {
 			return false, err
 		}
@@ -175,9 +180,6 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 			return true, nil
 		}
 	}
-
-	logrus.Debugf("DesiredSet - Patch %s %s/%s for %s -- [%s, %s, %s, %s]", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID,
-		patch, original, modified, current)
 
 	logrus.Debugf("DesiredSet - Updated %s %s/%s for %s -- %s %s", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID, patchType, patch)
 	_, err = patcher(oldMetadata.GetNamespace(), oldMetadata.GetName(), patchType, patch)
@@ -215,10 +217,10 @@ func removeCreationTimestamp(data map[string]interface{}) bool {
 	return false
 }
 
-func getOriginal(gvk schema.GroupVersionKind, obj v1.Object) ([]byte, error) {
+func getOriginalObject(gvk schema.GroupVersionKind, obj v1.Object) (runtime.Object, error) {
 	original := appliedFromAnnotation(obj.GetAnnotations()[LabelApplied])
 	if len(original) == 0 {
-		return []byte("{}"), nil
+		return nil, nil
 	}
 
 	mapObj := map[string]interface{}{}
@@ -228,16 +230,19 @@ func getOriginal(gvk schema.GroupVersionKind, obj v1.Object) ([]byte, error) {
 	}
 
 	removeCreationTimestamp(mapObj)
-
-	u := &unstructured.Unstructured{
+	return prepareObjectForCreate(gvk, &unstructured.Unstructured{
 		Object: mapObj,
-	}
+	})
+}
 
-	objCopy, err := prepareObjectForCreate(gvk, u)
+func getOriginalBytes(gvk schema.GroupVersionKind, obj v1.Object) ([]byte, error) {
+	objCopy, err := getOriginalObject(gvk, obj)
 	if err != nil {
 		return nil, err
 	}
-
+	if objCopy == nil {
+		return []byte("{}"), nil
+	}
 	return json.Marshal(objCopy)
 }
 
