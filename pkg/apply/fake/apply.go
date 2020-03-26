@@ -1,6 +1,8 @@
 package fake
 
 import (
+	"context"
+
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/apply/injectors"
 	"github.com/rancher/wrangler/pkg/objectset"
@@ -87,5 +89,9 @@ func (f *FakeApply) WithRateLimiting(ratelimitingQps float32) apply.Apply {
 }
 
 func (f *FakeApply) WithNoDelete() apply.Apply {
+	return f
+}
+
+func (f *FakeApply) WithContext(ctx context.Context) apply.Apply {
 	return f
 }
