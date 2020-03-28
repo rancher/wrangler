@@ -14,7 +14,7 @@ func (c Cond) GetStatus(obj interface{}) string {
 }
 
 func (c Cond) SetError(obj interface{}, reason string, err error) {
-	if err == nil {
+	if err == nil || err == generic.ErrSkip {
 		c.True(obj)
 		c.Message(obj, "")
 		c.Reason(obj, reason)
