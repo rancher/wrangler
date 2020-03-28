@@ -95,3 +95,23 @@ func (f *FakeApply) WithNoDelete() apply.Apply {
 func (f *FakeApply) WithContext(ctx context.Context) apply.Apply {
 	return f
 }
+
+func (f *FakeApply) WithCacheTypeFactory(factory apply.InformerFactory) apply.Apply {
+	return f
+}
+
+func (f *FakeApply) DryRun(objs ...runtime.Object) (apply.Plan, error) {
+	return apply.Plan{}, nil
+}
+
+func (f *FakeApply) FindOwner(obj runtime.Object) (runtime.Object, error) {
+	return nil, nil
+}
+
+func (f *FakeApply) PurgeOrphan(obj runtime.Object) error {
+	return nil
+}
+
+func (f *FakeApply) WithOwnerKey(key string, gvk schema.GroupVersionKind) apply.Apply {
+	return f
+}

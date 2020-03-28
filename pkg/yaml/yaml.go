@@ -4,13 +4,24 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
+	"github.com/rancher/wrangler/pkg/data/convert"
+	"github.com/rancher/wrangler/pkg/gvk"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"
+)
+
+var (
+	cleanPrefix = []string{
+		"kubectl.kubernetes.io/",
+		"objectset.rio.cattle.io/",
+	}
 )
 
 func Unmarshal(data []byte, v interface{}) error {
@@ -66,6 +77,100 @@ func toObjects(bytes []byte) ([]runtime.Object, error) {
 	}
 
 	return []runtime.Object{obj}, nil
+}
+
+// Export will attempt to clean up the objects a bit before
+// rendering to yaml so that they can easily be imported into another
+// cluster
+func Export(objects ...runtime.Object) ([]byte, error) {
+	if len(objects) == 0 {
+		return nil, nil
+	}
+
+	buffer := &bytes.Buffer{}
+	for i, obj := range objects {
+		if i > 0 {
+			buffer.WriteString("\n---\n")
+		}
+
+		obj, err := CleanObjectForExport(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		bytes, err := yaml.Marshal(obj)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to encode %s", obj.GetObjectKind().GroupVersionKind())
+		}
+		buffer.Write(bytes)
+	}
+
+	return buffer.Bytes(), nil
+}
+
+func CleanObjectForExport(obj runtime.Object) (runtime.Object, error) {
+	obj = obj.DeepCopyObject()
+	if obj.GetObjectKind().GroupVersionKind().Kind == "" {
+		if gvk, err := gvk.Get(obj); err == nil {
+			obj.GetObjectKind().SetGroupVersionKind(gvk)
+		} else if err != nil {
+			return nil, fmt.Errorf("kind and/or apiVersion is not set on input object: %v", obj)
+		}
+	}
+
+	data, err := convert.EncodeToMap(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	unstr := &unstructured.Unstructured{
+		Object: data,
+	}
+
+	metadata := map[string]interface{}{}
+
+	if name := unstr.GetName(); len(name) > 0 {
+		metadata["name"] = name
+	} else if generated := unstr.GetGenerateName(); len(generated) > 0 {
+		metadata["generateName"] = generated
+	} else {
+		return nil, fmt.Errorf("either name or generateName must be set on obj: %v", obj)
+	}
+
+	if unstr.GetNamespace() != "" {
+		metadata["namespace"] = unstr.GetNamespace()
+	}
+	if annotations := unstr.GetAnnotations(); len(annotations) > 0 {
+		cleanMap(annotations)
+		metadata["annotations"] = annotations
+	}
+	if labels := unstr.GetLabels(); len(labels) > 0 {
+		cleanMap(labels)
+		metadata["labels"] = labels
+	}
+
+	if spec, ok := data["spec"]; ok {
+		if spec == nil {
+			delete(data, "spec")
+		} else if m, ok := spec.(map[string]interface{}); ok && len(m) == 0 {
+			delete(data, "spec")
+		}
+	}
+
+	data["metadata"] = metadata
+	delete(data, "status")
+
+	return unstr, nil
+}
+
+func cleanMap(annoLabels map[string]string) {
+	for k := range annoLabels {
+		for _, prefix := range cleanPrefix {
+			if strings.HasPrefix(k, prefix) {
+				delete(annoLabels, k)
+			}
+		}
+	}
 }
 
 func ToBytes(objects []runtime.Object) ([]byte, error) {
