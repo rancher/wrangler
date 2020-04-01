@@ -99,7 +99,7 @@ func parseSchema(schema *types.Schema, schemas *types.Schemas) (*v1beta1.JSONSch
 		//}
 
 		if f.Required {
-			fieldJSP.Required = append(fieldJSP.Required, name)
+			jsp.Required = append(jsp.Required, name)
 		}
 
 		if definition.IsMapType(f.Type) {
@@ -166,6 +166,7 @@ func parseSchema(schema *types.Schema, schemas *types.Schemas) (*v1beta1.JSONSch
 					return nil, err
 				}
 				fieldJSP.Properties = subObject.Properties
+				fieldJSP.Required = subObject.Required
 			}
 		}
 
