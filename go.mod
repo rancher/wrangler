@@ -10,7 +10,7 @@ require (
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/pkg/errors v0.8.1
-	github.com/rancher/lasso v0.0.0-20200416051330-84b9f0674810
+	github.com/rancher/lasso v0.0.0-20200417051414-b55b9620e2e7
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
