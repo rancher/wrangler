@@ -127,7 +127,7 @@ type {{.lowerName}}Controller struct {
 }
 
 func New{{.type}}Controller(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) {{.type}}Controller {
-	c := controller.ForResource(gvk.GroupVersion().WithResource(resource), namespaced)
+	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
 	return &{{.lowerName}}Controller{
 		controller: c,
 		client:     c.Client(),
