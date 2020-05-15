@@ -60,7 +60,7 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 	types = orderer.OrderTypes(types)
 
 	sw.Do("func init() {\n", nil)
-	sw.Do(f.gv.Version+".AddToScheme(schemes.All)\n", nil)
+	sw.Do("schemes.Register("+f.gv.Version+".AddToScheme)\n", nil)
 	sw.Do("}\n", nil)
 
 	sw.Do("type Interface interface {\n", nil)
