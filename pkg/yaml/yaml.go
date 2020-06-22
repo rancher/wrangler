@@ -171,6 +171,21 @@ func CleanObjectForExport(obj runtime.Object) (runtime.Object, error) {
 	return unstr, nil
 }
 
+func CleanAnnotationsForExport(annotations map[string]string) map[string]string {
+	result := make(map[string]string, len(annotations))
+
+outer:
+	for k := range annotations {
+		for _, prefix := range cleanPrefix {
+			if strings.HasPrefix(k, prefix) {
+				continue outer
+			}
+		}
+		result[k] = annotations[k]
+	}
+	return result
+}
+
 func cleanMap(annoLabels map[string]string) {
 	for k := range annoLabels {
 		for _, prefix := range cleanPrefix {
