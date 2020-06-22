@@ -114,7 +114,7 @@ func CleanObjectForExport(obj runtime.Object) (runtime.Object, error) {
 		if gvk, err := gvk.Get(obj); err == nil {
 			obj.GetObjectKind().SetGroupVersionKind(gvk)
 		} else if err != nil {
-			return nil, fmt.Errorf("kind and/or apiVersion is not set on input object: %v", obj)
+			return nil, errors.Wrapf(err, "kind and/or apiVersion is not set on input object: %v", obj)
 		}
 	}
 
