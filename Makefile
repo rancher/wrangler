@@ -1,4 +1,7 @@
-all: validate build
+all: generate validate build
+
+generate:
+	go generate
 
 validate:
 	go fmt ./...
