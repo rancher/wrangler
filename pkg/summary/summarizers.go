@@ -98,13 +98,13 @@ type Summarizer func(obj data.Object, conditions []Condition, summary Summary) S
 func init() {
 	Summarizers = []Summarizer{
 		checkStatusSummary,
-		checkStandard,
 		checkErrors,
 		checkTransitioning,
 		checkActive,
 		checkPhase,
 		checkInitializing,
 		checkRemoving,
+		checkStandard,
 		checkLoadBalancer,
 		checkPod,
 		checkPodSelector,
