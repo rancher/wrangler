@@ -22,5 +22,26 @@ func TestJSON(t *testing.T) {
 	if i != 57600000 {
 		t.Fatal("not", 57600000, "got", m["ttl"])
 	}
+}
 
+func TestArgKey(t *testing.T) {
+	data := []struct {
+		input  string
+		output string
+	}{
+		{
+			input:  "disableOpenAPIValidation",
+			output: "--disable-open-api-validation",
+		},
+		{
+			input:  "skipCRDs",
+			output: "--skip-crds",
+		},
+	}
+
+	for _, data := range data {
+		if ToArgKey(data.input) != data.output {
+			t.Errorf("expected %s, got %s", data.output, ToArgKey(data.input))
+		}
+	}
 }
