@@ -362,10 +362,7 @@ func (s *Schemas) processFieldsMappers(t reflect.Type, fieldName string, schema 
 }
 
 func applyTag(structField *reflect.StructField, field *Field) error {
-	t, ok := structField.Tag.Lookup("wrangler")
-	if !ok {
-		t = structField.Tag.Get("norman")
-	}
+	t := structField.Tag.Get("wrangler")
 	for _, part := range strings.Split(t, ",") {
 		if part == "" {
 			continue
