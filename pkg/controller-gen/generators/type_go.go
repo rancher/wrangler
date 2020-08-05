@@ -313,9 +313,9 @@ func (c *{{.lowerName}}Cache) GetByIndex(indexName, key string) (result []*{{.ve
 }
 
 {{ if .hasStatus -}}
-type {{.type}}StatusHandler func(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error)
+type {{.type}}StatusHandler func(obj *{{.version}}.{{.type}}, status {{.version}}.{{.type}}Status) ({{.version}}.{{.type}}Status, error)
 
-type {{.type}}GeneratingHandler func(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ([]runtime.Object, {{.version}}.{{.statusType}}, error)
+type {{.type}}GeneratingHandler func(obj *{{.version}}.{{.type}}, status {{.version}}.{{.type}}Status) ([]runtime.Object, {{.version}}.{{.type}}Status, error)
 
 func Register{{.type}}StatusHandler(ctx context.Context, controller {{.type}}Controller, condition condition.Cond, name string, handler {{.type}}StatusHandler) {
 	statusHandler := &{{.lowerName}}StatusHandler{
@@ -401,7 +401,7 @@ func (a *{{.lowerName}}GeneratingHandler) Remove(key string, obj *{{.version}}.{
 		ApplyObjects()
 }
 
-func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error) {
+func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, status {{.version}}.{{.type}}Status) ({{.version}}.{{.type}}Status, error) {
 	objs, newStatus, err := a.{{.type}}GeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
