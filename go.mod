@@ -7,7 +7,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/lasso v0.0.0-20200515155337-a34e1e26ad91
+	github.com/rancher/lasso v0.0.0-20200807231317-fff0364fb3f6
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
