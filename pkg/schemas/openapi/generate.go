@@ -132,6 +132,9 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 		jsp.Items = &v1beta1.JSONSchemaPropsOrArray{
 			Schema: items,
 		}
+	case "string":
+		jsp.Type = t
+		jsp.Nullable = true
 	default:
 		jsp.Type = t
 	}
