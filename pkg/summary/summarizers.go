@@ -110,6 +110,7 @@ func init() {
 		checkPodSelector,
 		checkOwner,
 		checkApplyOwned,
+		checkCattleTypes,
 	}
 }
 
