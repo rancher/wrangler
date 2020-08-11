@@ -318,6 +318,11 @@ func (a *serviceStatusHandler) sync(key string, obj *v1.Service) (*v1.Service, e
 		}
 	}
 	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+		if a.condition != "" {
+			// Since status has changed, update the lastUpdatedTime
+			a.condition.LastUpdated(&newStatus, time.Now().UTC().Format(time.RFC3339))
+		}
+
 		var newErr error
 		obj.Status = newStatus
 		obj, newErr = a.client.UpdateStatus(obj)
