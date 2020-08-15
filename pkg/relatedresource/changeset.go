@@ -28,6 +28,8 @@ func FromString(key string) Key {
 	return NewKey(kv.RSplit(key, "/"))
 }
 
+// Look for owner references that match the apiVersion and kind and resolve to the namespace and
+// name of the parent. The namespaced flag is whether the apiVersion/kind referenced is expected to be namespaced
 func OwnerResolver(namespaced bool, apiVersion, kind string) Resolver {
 	return func(namespace, name string, obj runtime.Object) ([]Key, error) {
 		if obj == nil {
