@@ -190,7 +190,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 		return
 	}
 
-	if o.setOwnerReference {
+	if o.setOwnerReference && o.owner != nil {
 		if err := o.assignOwnerReference(gvk, objs); err != nil {
 			o.err(err)
 			return
