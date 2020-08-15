@@ -3,7 +3,6 @@ package controllergen
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,15 +44,6 @@ func Run(opts cgargs.Options) {
 	genericArgs.GoHeaderFilePath = opts.Boilerplate
 	genericArgs.InputDirs = parseTypes(customArgs)
 
-	if genericArgs.OutputBase == "./" { //go modules
-		tempDir, err := ioutil.TempDir("", "")
-		if err != nil {
-			return
-		}
-
-		genericArgs.OutputBase = tempDir
-		defer os.RemoveAll(tempDir)
-	}
 	customArgs.OutputBase = genericArgs.OutputBase
 
 	clientGen := generators.NewClientGenerator()
@@ -85,17 +75,6 @@ func Run(opts cgargs.Options) {
 		}
 	}
 
-	if len(deepCopygroups) == 0 && len(groups) == 0 && len(listerGroups) == 0 && len(informerGroups) == 0 {
-		if err := copyGoPathToModules(customArgs); err != nil {
-			logrus.Fatalf("go modules copy failed: %v", err)
-		}
-		return
-	}
-
-	if err := copyGoPathToModules(customArgs); err != nil {
-		logrus.Fatalf("go modules copy failed: %v", err)
-	}
-
 	if err := generateDeepcopy(deepCopygroups, customArgs); err != nil {
 		logrus.Fatalf("deepcopy failed: %v", err)
 	}
@@ -110,10 +89,6 @@ func Run(opts cgargs.Options) {
 
 	if err := generateInformers(informerGroups, customArgs); err != nil {
 		logrus.Fatalf("informers failed: %v", err)
-	}
-
-	if err := copyGoPathToModules(customArgs); err != nil {
-		logrus.Fatalf("go modules copy failed: %v", err)
 	}
 }
 
