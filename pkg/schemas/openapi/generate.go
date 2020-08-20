@@ -9,14 +9,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 )
 
-var (
-	blacklistFields = map[string]bool{
-		"kind":       true,
-		"apiVersion": true,
-		"metadata":   true,
-	}
-)
-
 func MustGenerate(obj interface{}) *v1beta1.JSONSchemaProps {
 	if obj == nil {
 		return nil
