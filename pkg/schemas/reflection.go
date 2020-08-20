@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	blacklistNames = map[string]bool{
+	skippedNames = map[string]bool{
 		"links":   true,
 		"actions": true,
 	}
@@ -249,8 +249,8 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 			}
 		}
 
-		if blacklistNames[fieldName] {
-			logrus.Debugf("Ignoring blacklisted field %s.%s for %v", schema.ID, fieldName, field)
+		if skippedNames[fieldName] {
+			logrus.Debugf("Ignoring skip field %s.%s for %v", schema.ID, fieldName, field)
 			continue
 		}
 
