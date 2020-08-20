@@ -7,14 +7,14 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/lasso v0.0.0-20200807231317-fff0364fb3f6
+	github.com/rancher/lasso v0.0.0-20200820172840-0e4cc0ef5cb0
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
-	k8s.io/api v0.18.0
+	k8s.io/api v0.18.8
 	k8s.io/apiextensions-apiserver v0.18.0
-	k8s.io/apimachinery v0.18.0
-	k8s.io/client-go v0.18.0
+	k8s.io/apimachinery v0.18.8
+	k8s.io/client-go v0.18.8
 	k8s.io/code-generator v0.18.0
 	k8s.io/gengo v0.0.0-20200114144118-36b2048a9120
 	k8s.io/kube-aggregator v0.18.0
