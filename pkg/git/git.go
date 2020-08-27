@@ -45,7 +45,7 @@ func NewGit(directory, url string, opts *Options) (*Git, error) {
 		caBundle:          opts.CABundle,
 		insecureTLSVerify: opts.InsecureTLSVerify,
 		secret:            opts.Credential,
-		headers: 		   opts.Headers,
+		headers:           opts.Headers,
 	}
 	return g, g.setCredential(opts.Credential)
 }
@@ -309,7 +309,9 @@ func (g *Git) gitCmd(output io.Writer, args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Env = os.Environ()
 	cmd.Stderr = output
-	cmd.Stdout = output
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		cmd.Stdout = output
+	}
 	cmd.Stdin = bytes.NewBuffer([]byte(g.password))
 
 	if g.agent != nil {
