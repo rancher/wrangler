@@ -231,7 +231,11 @@ func (g *Git) remoteSHAChanged(branch, sha string) (bool, error) {
 }
 
 func (g *Git) git(args ...string) error {
-	return g.gitCmd(os.Stdout, args...)
+	var output io.Writer
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		output = os.Stdout
+	}
+	return g.gitCmd(output, args...)
 }
 
 func (g *Git) gitOutput(args ...string) (string, error) {
@@ -309,9 +313,7 @@ func (g *Git) gitCmd(output io.Writer, args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Env = os.Environ()
 	cmd.Stderr = output
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		cmd.Stdout = output
-	}
+	cmd.Stdout = output
 	cmd.Stdin = bytes.NewBuffer([]byte(g.password))
 
 	if g.agent != nil {
