@@ -382,7 +382,7 @@ func (g *Git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
 				}
 				return
 			}
-			if err := agent.ServeAgent(*g.agent, conn); err != nil && k8snet.IsProbableEOF(err) {
+			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
 				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
 			}
 		}

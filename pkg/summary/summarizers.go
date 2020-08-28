@@ -199,6 +199,9 @@ func checkErrors(_ data.Object, conditions []Condition, summary Summary) Summary
 		if (ErrorFalse[c.Type()] && c.Status() == "False") || c.Reason() == "Error" {
 			summary.Error = true
 			summary.Message = append(summary.Message, c.Message())
+			if summary.State == "active" || summary.State == "" {
+				summary.State = "error"
+			}
 			break
 		}
 	}
@@ -339,7 +342,8 @@ func checkRemoving(obj data.Object, conditions []Condition, summary Summary) Sum
 func checkLoadBalancer(obj data.Object, _ []Condition, summary Summary) Summary {
 	if (summary.State == "active" || summary.State == "") &&
 		obj.String("kind") == "Service" &&
-		obj.String("spec", "serviceKind") == "LoadBalancer" {
+		(obj.String("spec", "serviceKind") == "LoadBalancer" ||
+			obj.String("spec", "type") == "LoadBalancer") {
 		addresses := obj.Slice("status", "loadBalancer", "ingress")
 		if len(addresses) == 0 {
 			summary.State = "pending"
