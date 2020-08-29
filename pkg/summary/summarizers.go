@@ -137,10 +137,14 @@ func checkOwner(obj data.Object, conditions []Condition, summary Summary) Summar
 }
 
 func checkStatusSummary(obj data.Object, conditions []Condition, summary Summary) Summary {
-	obj = obj.Map("status", "summary")
-	if len(obj) == 0 {
-		return summary
+	summaryObj := obj.Map("status", "display")
+	if len(summaryObj) == 0 {
+		summaryObj = obj.Map("status", "summary")
+		if len(summaryObj) == 0 {
+			return summary
+		}
 	}
+	obj = summaryObj
 
 	if _, ok := obj["state"]; ok {
 		summary.State = obj.String("state")
