@@ -186,8 +186,8 @@ func GetSelector(labelSet map[string]string) (labels.Selector, error) {
 }
 
 func GetLabelsAndAnnotations(setID string, owner runtime.Object) (map[string]string, map[string]string, error) {
-	if setID == "" {
-		return nil, nil, fmt.Errorf("set ID can not be empty")
+	if setID == "" && owner == nil {
+		return nil, nil, fmt.Errorf("set ID or owner must be set")
 	}
 
 	annotations := map[string]string{
