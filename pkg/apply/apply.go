@@ -80,6 +80,7 @@ type Apply interface {
 	WithNoDelete() Apply
 	WithGVK(gvks ...schema.GroupVersionKind) Apply
 	WithSetOwnerReference(controller, block bool) Apply
+	WithIgnorePreviousApplied() Apply
 
 	FindOwner(obj runtime.Object) (runtime.Object, error)
 	PurgeOrphan(obj runtime.Object) error
@@ -272,6 +273,10 @@ func (a *apply) WithSetOwnerReference(controller, block bool) Apply {
 
 func (a *apply) WithContext(ctx context.Context) Apply {
 	return a.newDesiredSet().WithContext(ctx)
+}
+
+func (a *apply) WithIgnorePreviousApplied() Apply {
+	return a.newDesiredSet().WithIgnorePreviousApplied()
 }
 
 func (a *apply) FindOwner(obj runtime.Object) (runtime.Object, error) {

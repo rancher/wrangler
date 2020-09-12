@@ -2,6 +2,7 @@ package apply
 
 import (
 	"context"
+
 	"github.com/rancher/wrangler/pkg/apply/injectors"
 	"github.com/rancher/wrangler/pkg/kv"
 	"github.com/rancher/wrangler/pkg/merr"
@@ -17,6 +18,7 @@ type desiredSet struct {
 	ctx                      context.Context
 	defaultNamespace         string
 	listerNamespace          string
+	ignorePreviousApplied    bool
 	setOwnerReference        bool
 	ownerReferenceController bool
 	ownerReferenceBlock      bool
@@ -120,6 +122,11 @@ func (o desiredSet) WithInjectorName(injs ...string) Apply {
 
 func (o desiredSet) WithCacheTypeFactory(factory InformerFactory) Apply {
 	o.informerFactory = factory
+	return o
+}
+
+func (o desiredSet) WithIgnorePreviousApplied() Apply {
+	o.ignorePreviousApplied = true
 	return o
 }
 

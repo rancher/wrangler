@@ -148,7 +148,7 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, oldObject, newObject runtime.Object) (bool, error) {
+func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal bool, oldObject, newObject runtime.Object) (bool, error) {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
 		return false, err
@@ -158,6 +158,11 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 	if err != nil {
 		return false, err
 	}
+
+	if ignoreOriginal {
+		original = nil
+	}
+
 	current, err := json.Marshal(oldObject)
 	if err != nil {
 		return false, err
@@ -220,7 +225,7 @@ func (o *desiredSet) compareObjects(gvk schema.GroupVersionKind, reconciler Reco
 		o.plan.Objects = append(o.plan.Objects, oldObject)
 	}
 
-	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, oldObject, newObject); err != nil {
+	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, oldObject, newObject); err != nil {
 		return err
 	} else if !ran {
 		logrus.Debugf("DesiredSet - No change(2) %s %s/%s for %s", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID)
