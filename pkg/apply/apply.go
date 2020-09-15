@@ -81,6 +81,7 @@ type Apply interface {
 	WithGVK(gvks ...schema.GroupVersionKind) Apply
 	WithSetOwnerReference(controller, block bool) Apply
 	WithIgnorePreviousApplied() Apply
+	WithDiffPatch(gvk schema.GroupVersionKind, namespace, name string, patch []byte) Apply
 
 	FindOwner(obj runtime.Object) (runtime.Object, error)
 	PurgeOrphan(obj runtime.Object) error
@@ -285,4 +286,8 @@ func (a *apply) FindOwner(obj runtime.Object) (runtime.Object, error) {
 
 func (a *apply) PurgeOrphan(obj runtime.Object) error {
 	return a.newDesiredSet().PurgeOrphan(obj)
+}
+
+func (a *apply) WithDiffPatch(gvk schema.GroupVersionKind, namespace, name string, patch []byte) Apply {
+	return a.newDesiredSet().WithDiffPatch(gvk, namespace, name, patch)
 }

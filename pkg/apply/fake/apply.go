@@ -119,3 +119,7 @@ func (f *FakeApply) PurgeOrphan(obj runtime.Object) error {
 func (f *FakeApply) WithOwnerKey(key string, gvk schema.GroupVersionKind) apply.Apply {
 	return f
 }
+
+func (f *FakeApply) WithDiffPatch(gvk schema.GroupVersionKind, namespace, name string, patch []byte) apply.Apply {
+	return f
+}

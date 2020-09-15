@@ -13,6 +13,11 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+type patchKey struct {
+	schema.GroupVersionKind
+	objectset.ObjectKey
+}
+
 type desiredSet struct {
 	a                        *apply
 	ctx                      context.Context
@@ -27,6 +32,7 @@ type desiredSet struct {
 	pruneTypes               map[schema.GroupVersionKind]cache.SharedIndexInformer
 	patchers                 map[schema.GroupVersionKind]Patcher
 	reconcilers              map[schema.GroupVersionKind]Reconciler
+	diffPatches              map[patchKey][][]byte
 	informerFactory          InformerFactory
 	remove                   bool
 	noDelete                 bool
@@ -70,6 +76,23 @@ func (o desiredSet) ApplyObjects(objs ...runtime.Object) error {
 	os := objectset.NewObjectSet()
 	os.Add(objs...)
 	return o.Apply(os)
+}
+
+func (o desiredSet) WithDiffPatch(gvk schema.GroupVersionKind, namespace, name string, patch []byte) Apply {
+	patches := map[patchKey][][]byte{}
+	for k, v := range o.diffPatches {
+		patches[k] = v
+	}
+	key := patchKey{
+		GroupVersionKind: gvk,
+		ObjectKey: objectset.ObjectKey{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	patches[key] = append(patches[key], patch)
+	o.diffPatches = patches
+	return o
 }
 
 // WithGVK uses a known listing of existing gvks to modify the the prune types to allow for deletion of objects
