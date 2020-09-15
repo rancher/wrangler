@@ -176,6 +176,21 @@ func (o *desiredSet) createPatcher(client dynamic.NamespaceableResourceInterface
 	}
 }
 
+func (o *desiredSet) filterCrossVersion(gvk schema.GroupVersionKind, keys []objectset.ObjectKey) []objectset.ObjectKey {
+	result := make([]objectset.ObjectKey, 0, len(keys))
+	gk := gvk.GroupKind()
+	for _, key := range keys {
+		if o.objs.Contains(gk, key) {
+			continue
+		}
+		if key.Namespace == o.defaultNamespace && o.objs.Contains(gk, objectset.ObjectKey{Name: key.Name}) {
+			continue
+		}
+		result = append(result, key)
+	}
+	return result
+}
+
 func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.GroupVersionKind, objs map[objectset.ObjectKey]runtime.Object) {
 	controller, client, err := o.getControllerAndClient(debugID, gvk)
 	if err != nil {
@@ -223,6 +238,9 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 	}
 
 	toCreate, toDelete, toUpdate := compareSets(existing, objs)
+
+	// check for resources in the objectset but under a different version of the same group/kind
+	toDelete = o.filterCrossVersion(gvk, toDelete)
 
 	if o.createPlan {
 		o.plan.Create[gvk] = toCreate
