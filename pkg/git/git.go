@@ -40,8 +40,8 @@ func NewGit(directory, url string, opts *Options) (*Git, error) {
 	}
 
 	g := &Git{
-		url:               url,
-		directory:         directory,
+		URL:               url,
+		Directory:         directory,
 		caBundle:          opts.CABundle,
 		insecureTLSVerify: opts.InsecureTLSVerify,
 		secret:            opts.Credential,
@@ -51,8 +51,8 @@ func NewGit(directory, url string, opts *Options) (*Git, error) {
 }
 
 type Git struct {
-	url               string
-	directory         string
+	URL               string
+	Directory         string
 	password          string
 	agent             *agent.Agent
 	caBundle          []byte
@@ -64,7 +64,7 @@ type Git struct {
 // LsRemote runs ls-remote on git repo and returns the HEAD commit SHA
 func (g *Git) LsRemote(branch string) (string, error) {
 	output := &bytes.Buffer{}
-	if err := g.gitCmd(output, "ls-remote", g.url, formatRefForBranch(branch)); err != nil {
+	if err := g.gitCmd(output, "ls-remote", g.URL, formatRefForBranch(branch)); err != nil {
 		return "", err
 	}
 
@@ -92,7 +92,7 @@ func (g *Git) Head(branch string) (string, error) {
 
 // Clone runs git clone with depth 1
 func (g *Git) Clone(branch string) error {
-	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.url, g.directory)
+	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.URL, g.Directory)
 }
 
 // Update updates git repo if remote sha has changed
@@ -188,21 +188,21 @@ func (g *Git) httpClientWithCreds() (*http.Client, error) {
 }
 
 func (g *Git) remoteSHAChanged(branch, sha string) (bool, error) {
-	formattedURL := formatGitURL(g.url, branch)
+	formattedURL := formatGitURL(g.URL, branch)
 	if formattedURL == "" {
 		return true, nil
 	}
 
 	client, err := g.httpClientWithCreds()
 	if err != nil {
-		logrus.Warnf("Problem creating http client to check git remote sha of repo [%v]: %v", g.url, err)
+		logrus.Warnf("Problem creating http client to check git remote sha of repo [%v]: %v", g.URL, err)
 		return true, nil
 	}
 	defer client.CloseIdleConnections()
 
 	req, err := http.NewRequest("GET", formattedURL, nil)
 	if err != nil {
-		logrus.Warnf("Problem creating request to check git remote sha of repo [%v]: %v", g.url, err)
+		logrus.Warnf("Problem creating request to check git remote sha of repo [%v]: %v", g.URL, err)
 		return true, nil
 	}
 
@@ -217,7 +217,7 @@ func (g *Git) remoteSHAChanged(branch, sha string) (bool, error) {
 		// Return timeout errors so caller can decide whether or not to proceed with updating the repo
 		uErr := &url.Error{}
 		if ok := errors.As(err, &uErr); ok && uErr.Timeout() {
-			return false, errors.Wrapf(uErr, "Repo [%v] is not accessible", g.url)
+			return false, errors.Wrapf(uErr, "Repo [%v] is not accessible", g.URL)
 		}
 		return true, nil
 	}
@@ -255,12 +255,12 @@ func (g *Git) setCredential(cred *corev1.Secret) error {
 			return nil
 		}
 
-		u, err := url.Parse(g.url)
+		u, err := url.Parse(g.URL)
 		if err != nil {
 			return err
 		}
 		u.User = url.User(string(username))
-		g.url = u.String()
+		g.URL = u.String()
 		g.password = string(password)
 	} else if cred.Type == corev1.SecretTypeSSHAuth {
 		key, err := keyutil.ParsePrivateKeyPEM(cred.Data[corev1.SSHAuthPrivateKey])
@@ -282,31 +282,31 @@ func (g *Git) setCredential(cred *corev1.Secret) error {
 }
 
 func (g *Git) clone(branch string) error {
-	gitDir := filepath.Join(g.directory, ".git")
+	gitDir := filepath.Join(g.Directory, ".git")
 	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
 		return nil
 	}
 
-	if err := os.RemoveAll(g.directory); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %v", g.directory, err)
+	if err := os.RemoveAll(g.Directory); err != nil {
+		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
 	}
 
-	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.url, g.directory)
+	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.URL, g.Directory)
 }
 
 func (g *Git) fetchAndReset(rev string) error {
-	if err := g.git("-C", g.directory, "fetch", "origin", rev); err != nil {
+	if err := g.git("-C", g.Directory, "fetch", "origin", rev); err != nil {
 		return err
 	}
 	return g.reset("FETCH_HEAD")
 }
 
 func (g *Git) reset(rev string) error {
-	return g.git("-C", g.directory, "reset", "--hard", rev)
+	return g.git("-C", g.Directory, "reset", "--hard", rev)
 }
 
 func (g *Git) currentCommit() (string, error) {
-	return g.gitOutput("-C", g.directory, "rev-parse", "HEAD")
+	return g.gitOutput("-C", g.Directory, "rev-parse", "HEAD")
 }
 
 func (g *Git) gitCmd(output io.Writer, args ...string) error {
