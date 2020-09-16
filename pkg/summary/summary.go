@@ -47,7 +47,7 @@ func (s Summary) String() string {
 		msg += "]"
 	}
 	if len(s.Message) > 0 {
-		msg = msg + " " + s.Message[0]
+		msg = msg + " " + strings.Join(s.Message, ", ")
 	}
 	return msg
 }
