@@ -117,6 +117,11 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 		delete(data, "apiVersion")
 	}
 
+	if _, ok := data["status"]; ok {
+		mod = true
+		delete(data, "status")
+	}
+
 	if deleted := removeCreationTimestamp(data); deleted {
 		mod = true
 	}
