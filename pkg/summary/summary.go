@@ -10,12 +10,12 @@ import (
 )
 
 type Summary struct {
-	State         string
-	Error         bool
-	Transitioning bool
-	Message       []string
-	Attributes    map[string]interface{}
-	Relationships []Relationship
+	State         string                 `json:"state,omitempty"`
+	Error         bool                   `json:"error,omitempty"`
+	Transitioning bool                   `json:"transitioning,omitempty"`
+	Message       []string               `json:"message,omitempty"`
+	Attributes    map[string]interface{} `json:"-"`
+	Relationships []Relationship         `json:"-"`
 }
 
 type Relationship struct {

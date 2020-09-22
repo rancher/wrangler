@@ -8,7 +8,7 @@ func checkCattleTypes(obj data.Object, condition []Condition, summary Summary) S
 	return checkRelease(obj, condition, summary)
 }
 
-func checkRelease(obj data.Object, condition []Condition, summary Summary) Summary {
+func checkRelease(obj data.Object, _ []Condition, summary Summary) Summary {
 	if !isKind(obj, "Release", "catalog.cattle.io") {
 		return summary
 	}

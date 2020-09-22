@@ -70,6 +70,7 @@ var (
 		"KernelHasNoDeadlock": true,
 		"Unschedulable":       true,
 		"ReplicaFailure":      true,
+		"Stalled":             true,
 	}
 
 	// True ==
@@ -90,12 +91,28 @@ var (
 		"Progressing": "inactive",
 	}
 
-	Summarizers []Summarizer
+	// True ==
+	// False == transitioning
+	// Unknown == error
+	TransitioningTrue = map[string]string{
+		"Reconciling": "reconciling",
+	}
+
+	Summarizers          []Summarizer
+	ConditionSummarizers []Summarizer
 )
 
 type Summarizer func(obj data.Object, conditions []Condition, summary Summary) Summary
 
 func init() {
+	ConditionSummarizers = []Summarizer{
+		checkErrors,
+		checkTransitioning,
+		checkRemoving,
+		checkStandard,
+		checkCattleTypes,
+	}
+
 	Summarizers = []Summarizer{
 		checkStatusSummary,
 		checkErrors,
@@ -136,7 +153,7 @@ func checkOwner(obj data.Object, conditions []Condition, summary Summary) Summar
 	return summary
 }
 
-func checkStatusSummary(obj data.Object, conditions []Condition, summary Summary) Summary {
+func checkStatusSummary(obj data.Object, _ []Condition, summary Summary) Summary {
 	summaryObj := obj.Map("status", "display")
 	if len(summaryObj) == 0 {
 		summaryObj = obj.Map("status", "summary")
@@ -162,7 +179,7 @@ func checkStatusSummary(obj data.Object, conditions []Condition, summary Summary
 	return summary
 }
 
-func checkStandard(obj data.Object, conditions []Condition, summary Summary) Summary {
+func checkStandard(obj data.Object, _ []Condition, summary Summary) Summary {
 	if summary.State != "" {
 		return summary
 	}
@@ -255,6 +272,21 @@ func checkTransitioning(_ data.Object, conditions []Condition, summary Summary) 
 			summary.Message = append(summary.Message, c.Message())
 		} else if c.Status() == "Unknown" {
 			summary.Error = true
+			summary.State = newState
+			summary.Message = append(summary.Message, c.Message())
+		}
+	}
+
+	for _, c := range conditions {
+		if summary.State != "" {
+			break
+		}
+		newState, ok := TransitioningTrue[c.Type()]
+		if !ok {
+			continue
+		}
+		if c.Status() == "True" {
+			summary.Transitioning = true
 			summary.State = newState
 			summary.Message = append(summary.Message, c.Message())
 		}
