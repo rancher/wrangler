@@ -111,6 +111,7 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 		jsp.Nullable = true
 		if additionalProps.Type != "object" {
 			jsp.AdditionalProperties = &v1beta1.JSONSchemaPropsOrBool{
+				Allows: true,
 				Schema: additionalProps,
 			}
 		}
