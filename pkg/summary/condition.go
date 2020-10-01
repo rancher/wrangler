@@ -61,7 +61,7 @@ func NormalizeConditions(runtimeObj runtime.Object) {
 	obj = unstr.Object
 	for _, condition := range obj.Slice("status", "conditions") {
 		var summary Summary
-		for _, summarizer := range Summarizers {
+		for _, summarizer := range ConditionSummarizers {
 			summary = summarizer(obj, []Condition{{d: condition}}, summary)
 		}
 		condition.Set("error", summary.Error)

@@ -109,8 +109,7 @@ func init() {
 		checkErrors,
 		checkTransitioning,
 		checkRemoving,
-		checkStandard,
-		checkCattleTypes,
+		checkCattleReady,
 	}
 
 	Summarizers = []Summarizer{
