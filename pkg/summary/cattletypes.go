@@ -1,8 +1,24 @@
 package summary
 
 import (
+	"strings"
+
 	"github.com/rancher/wrangler/pkg/data"
 )
+
+func checkCattleReady(obj data.Object, condition []Condition, summary Summary) Summary {
+	if strings.Contains(obj.String("apiVersion"), "cattle.io/") {
+		for _, condition := range condition {
+			if condition.Type() == "Ready" && condition.Status() == "False" && condition.Message() != "" {
+				summary.Message = append(summary.Message, condition.Message())
+				summary.Error = true
+				return summary
+			}
+		}
+	}
+
+	return summary
+}
 
 func checkCattleTypes(obj data.Object, condition []Condition, summary Summary) Summary {
 	return checkRelease(obj, condition, summary)
