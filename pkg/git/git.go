@@ -62,7 +62,11 @@ type Git struct {
 }
 
 // LsRemote runs ls-remote on git repo and returns the HEAD commit SHA
-func (g *Git) LsRemote(branch string) (string, error) {
+func (g *Git) LsRemote(branch string, commit string) (string, error) {
+	if changed, err := g.remoteSHAChanged(branch, commit); err != nil || !changed {
+		return commit, err
+	}
+	
 	output := &bytes.Buffer{}
 	if err := g.gitCmd(output, "ls-remote", g.URL, formatRefForBranch(branch)); err != nil {
 		return "", err
