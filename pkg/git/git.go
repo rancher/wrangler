@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-
 	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh/agent"
@@ -66,7 +65,7 @@ func (g *Git) LsRemote(branch string, commit string) (string, error) {
 	if changed, err := g.remoteSHAChanged(branch, commit); err != nil || !changed {
 		return commit, err
 	}
-	
+
 	output := &bytes.Buffer{}
 	if err := g.gitCmd(output, "ls-remote", g.URL, formatRefForBranch(branch)); err != nil {
 		return "", err
@@ -361,11 +360,16 @@ func (g *Git) gitCmd(output io.Writer, args ...string) error {
 func (g *Git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
 	r, err := randomtoken.Generate()
 	if err != nil {
+		return nil, err
+	}
+
+	tmpDir, err := ioutil.TempDir("", "ssh-agent")
+	if err != nil {
+		return nil, err
 	}
 
 	addr := &net.UnixAddr{
-		// use \0 as null character
-		Name: "\\0ssh-agent-" + r,
+		Name: filepath.Join(tmpDir, r),
 		Net:  "unix",
 	}
 
@@ -377,6 +381,7 @@ func (g *Git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
 	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
 
 	go func() {
+		defer os.RemoveAll(tmpDir)
 		defer l.Close()
 		for {
 			conn, err := l.Accept()
