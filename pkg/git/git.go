@@ -315,7 +315,8 @@ func (g *Git) currentCommit() (string, error) {
 func (g *Git) gitCmd(output io.Writer, args ...string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Env = os.Environ()
-	cmd.Stderr = output
+	stderrBuf := &bytes.Buffer{}
+	cmd.Stderr = stderrBuf
 	cmd.Stdout = output
 	cmd.Stdin = bytes.NewBuffer([]byte(g.password))
 
@@ -352,7 +353,7 @@ func (g *Git) gitCmd(output io.Writer, args ...string) error {
 
 	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("git %s error: %w", strings.Join(args, " "), err)
+		return fmt.Errorf("git %s error: %w, detail: %v", strings.Join(args, " "), err, stderrBuf.String())
 	}
 	return nil
 }
