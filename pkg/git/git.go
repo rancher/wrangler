@@ -262,7 +262,7 @@ func (g *Git) setCredential(cred *corev1.Secret) error {
 		if err != nil {
 			return err
 		}
-		u.User = url.User(string(username))
+		u.User = url.UserPassword(string(username), string(password))
 		g.URL = u.String()
 		g.password = string(password)
 	} else if cred.Type == corev1.SecretTypeSSHAuth {
@@ -318,7 +318,6 @@ func (g *Git) gitCmd(output io.Writer, args ...string) error {
 	stderrBuf := &bytes.Buffer{}
 	cmd.Stderr = stderrBuf
 	cmd.Stdout = output
-	cmd.Stdin = bytes.NewBuffer([]byte(g.password))
 
 	if g.agent != nil {
 		c, err := g.injectAgent(cmd)
