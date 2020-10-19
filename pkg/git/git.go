@@ -313,12 +313,12 @@ func (g *Git) currentCommit() (string, error) {
 }
 
 func (g *Git) gitCmd(output io.Writer, args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Env = os.Environ()
+	kv := fmt.Sprintf("credential.helper=%s", "/bin/sh -c 'echo password=$GIT_PASSWORD'")
+	cmd := exec.Command("git", append([]string{"-c", kv}, args...)...)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_PASSWORD=%s", g.password))
 	stderrBuf := &bytes.Buffer{}
 	cmd.Stderr = stderrBuf
 	cmd.Stdout = output
-	cmd.Stdin = bytes.NewBuffer([]byte(g.password))
 
 	if g.agent != nil {
 		c, err := g.injectAgent(cmd)
