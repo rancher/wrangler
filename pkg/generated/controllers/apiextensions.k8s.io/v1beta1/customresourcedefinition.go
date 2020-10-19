@@ -325,9 +325,12 @@ func (a *customResourceDefinitionStatusHandler) sync(key string, obj *v1beta1.Cu
 
 		var newErr error
 		obj.Status = newStatus
-		obj, newErr = a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
+		}
+		if newErr == nil {
+			obj = newObj
 		}
 	}
 	return obj, err
