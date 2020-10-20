@@ -58,6 +58,7 @@ type Git struct {
 	insecureTLSVerify bool
 	secret            *corev1.Secret
 	headers           map[string]string
+	knownHosts        []byte
 }
 
 // LsRemote runs ls-remote on git repo and returns the HEAD commit SHA
@@ -277,7 +278,7 @@ func (g *Git) setCredential(cred *corev1.Secret) error {
 		if err != nil {
 			return err
 		}
-
+		g.knownHosts = cred.Data["known_hosts"]
 		g.agent = &sshAgent
 	}
 
@@ -328,6 +329,25 @@ func (g *Git) gitCmd(output io.Writer, args ...string) error {
 		defer c.Close()
 	}
 
+	if len(g.knownHosts) != 0 {
+		f, err := ioutil.TempFile("", "known_hosts")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(f.Name())
+		defer f.Close()
+
+		if _, err := f.Write(g.knownHosts); err != nil {
+			return err
+		}
+		if err := f.Close(); err != nil {
+			return fmt.Errorf("closing knownHosts file %s: %w", f.Name(), err)
+		}
+
+		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+fmt.Sprintf("ssh -o UserKnownHostsFile=%s", f.Name()))
+	} else {
+		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+fmt.Sprintf("ssh -o StrictHostKeyChecking=accept-new"))
+	}
 	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0")
 
 	if g.insecureTLSVerify {
