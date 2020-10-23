@@ -25,7 +25,7 @@ func checkCattleTypes(obj data.Object, condition []Condition, summary Summary) S
 }
 
 func checkRelease(obj data.Object, _ []Condition, summary Summary) Summary {
-	if !isKind(obj, "Release", "catalog.cattle.io") {
+	if !isKind(obj, "App", "catalog.cattle.io") {
 		return summary
 	}
 	if obj.String("status", "summary", "state") != "deployed" {
@@ -36,7 +36,7 @@ func checkRelease(obj data.Object, _ []Condition, summary Summary) Summary {
 			Name:       resources.String("name"),
 			Kind:       resources.String("kind"),
 			APIVersion: resources.String("apiVersion"),
-			Type:       "manages",
+			Type:       "helmresource",
 		})
 	}
 	return summary
