@@ -43,8 +43,25 @@ type Clients struct {
 	RESTConfig      *rest.Config
 	CachedDiscovery discovery.CachedDiscoveryInterface
 	RESTMapper      meta.RESTMapper
+	FactoryOptions  *generic.FactoryOptions
 
 	starters []start.Starter
+}
+
+func ensureSharedFactory(cfg *rest.Config, opts *generic.FactoryOptions) (*generic.FactoryOptions, error) {
+	if opts == nil {
+		opts = &generic.FactoryOptions{}
+	}
+
+	copy := *opts
+	factory, err := generic.NewFactoryFromConfigWithOptions(cfg, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	copy.SharedControllerFactory = factory.ControllerFactory()
+	copy.SharedCacheFactory = factory.ControllerFactory().SharedCacheFactory()
+	return &copy, nil
 }
 
 func New(clientConfig clientcmd.ClientConfig, opts *generic.FactoryOptions) (*Clients, error) {
@@ -52,7 +69,23 @@ func New(clientConfig clientcmd.ClientConfig, opts *generic.FactoryOptions) (*Cl
 	if err != nil {
 		return nil, err
 	}
+
+	clients, err := NewFromConfig(cfg, opts)
+	if err != nil {
+		return nil, err
+	}
+	clients.ClientConfig = clientConfig
+
+	return clients, nil
+}
+
+func NewFromConfig(cfg *rest.Config, opts *generic.FactoryOptions) (*Clients, error) {
 	cfg = restConfigDefaults(cfg)
+
+	opts, err := ensureSharedFactory(cfg, opts)
+	if err != nil {
+		return nil, err
+	}
 
 	core, err := core.NewFactoryFromConfigWithOptions(cfg, opts)
 	if err != nil {
@@ -106,7 +139,6 @@ func New(clientConfig clientcmd.ClientConfig, opts *generic.FactoryOptions) (*Cl
 		API:             api.Apiregistration().V1(),
 		Batch:           batch.Batch().V1(),
 		Apply:           apply.WithSetOwnerReference(false, false),
-		ClientConfig:    clientConfig,
 		RESTConfig:      cfg,
 		CachedDiscovery: cache,
 		RESTMapper:      restMapper,
