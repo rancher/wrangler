@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	v1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -13,7 +14,8 @@ import (
 )
 
 var (
-	defObjType = &unstructured.Unstructured{}
+	defObjType    = &unstructured.Unstructured{}
+	jsonPatchType = v1.PatchTypeJSONPatch
 )
 
 func NewRouter() *Router {
@@ -29,10 +31,7 @@ func (r *Router) sendError(rw http.ResponseWriter, review *v1.AdmissionReview, e
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	review.Response = &v1.AdmissionResponse{
-		UID:    review.Request.UID,
-		Result: &errors.NewInternalError(err).ErrStatus,
-	}
+	review.Response.Result = &errors.NewInternalError(err).ErrStatus
 	writeResponse(rw, review)
 }
 
@@ -109,6 +108,26 @@ func (r *Request) DecodeObject() (runtime.Object, error) {
 
 type Response struct {
 	v1.AdmissionResponse
+}
+
+func (r *Response) CreatePatch(request *Request, newObj runtime.Object) error {
+	if len(r.Patch) > 0 {
+		return fmt.Errorf("response patch has already been already been assigned")
+	}
+
+	newBytes, err := json.Marshal(newObj)
+	if err != nil {
+		return err
+	}
+
+	patch, err := jsonpatch.CreateMergePatch(request.Object.Raw, newBytes)
+	if err != nil {
+		return err
+	}
+
+	r.Patch = patch
+	r.PatchType = &jsonPatchType
+	return nil
 }
 
 type Handler interface {
