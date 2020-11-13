@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -27,6 +28,7 @@ type Router struct {
 }
 
 func (r *Router) sendError(rw http.ResponseWriter, review *v1.AdmissionReview, err error) {
+	logrus.Debug(err)
 	if review == nil || review.Request == nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return

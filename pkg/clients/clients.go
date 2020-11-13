@@ -142,6 +142,7 @@ func NewFromConfig(cfg *rest.Config, opts *generic.FactoryOptions) (*Clients, er
 		RESTConfig:      cfg,
 		CachedDiscovery: cache,
 		RESTMapper:      restMapper,
+		FactoryOptions:  opts, 
 		starters: []start.Starter{
 			core,
 			rbac,
