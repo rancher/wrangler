@@ -12,6 +12,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 func main() {
@@ -102,6 +103,15 @@ func main() {
 			networkingv1.GroupName: {
 				Types: []interface{}{
 					networkingv1.NetworkPolicy{},
+				},
+				InformersPackage: "k8s.io/client-go/informers",
+				ClientSetPackage: "k8s.io/client-go/kubernetes",
+				ListersPackage:   "k8s.io/client-go/listers",
+			},
+			admissionregistrationv1.GroupName: {
+				Types: []interface{}{
+					admissionregistrationv1.ValidatingWebhookConfiguration{},
+					admissionregistrationv1.MutatingWebhookConfiguration{},
 				},
 				InformersPackage: "k8s.io/client-go/informers",
 				ClientSetPackage: "k8s.io/client-go/kubernetes",
