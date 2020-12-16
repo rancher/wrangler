@@ -1,29 +1,27 @@
 package git
 
 import (
-	"bufio"
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	gogit "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	ghttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/pkg/errors"
-	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh/agent"
 	corev1 "k8s.io/api/core/v1"
-	k8snet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/client-go/util/keyutil"
 )
 
 type Options struct {
@@ -52,13 +50,15 @@ func NewGit(directory, url string, opts *Options) (*Git, error) {
 type Git struct {
 	URL               string
 	Directory         string
+	user              string
 	password          string
-	agent             *agent.Agent
 	caBundle          []byte
 	insecureTLSVerify bool
 	secret            *corev1.Secret
 	headers           map[string]string
 	knownHosts        []byte
+	privateKey        []byte
+	auth              transport.AuthMethod
 }
 
 // LsRemote runs ls-remote on git repo and returns the HEAD commit SHA
@@ -67,49 +67,67 @@ func (g *Git) LsRemote(branch string, commit string) (string, error) {
 		return commit, err
 	}
 
-	output := &bytes.Buffer{}
-	if err := g.gitCmd(output, "ls-remote", g.URL, formatRefForBranch(branch)); err != nil {
+	rem := gogit.NewRemote(memory.NewStorage(), &config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{g.URL},
+	})
+
+	refs, err := rem.List(&gogit.ListOptions{
+		Auth:            g.auth,
+		InsecureSkipTLS: g.insecureTLSVerify,
+		CABundle:        g.caBundle,
+	})
+	if err != nil {
 		return "", err
 	}
 
-	var lines []string
-	s := bufio.NewScanner(output)
-	for s.Scan() {
-		lines = append(lines, s.Text())
+	for _, ref := range refs {
+		if ref.Name().String() == fmt.Sprintf("refs/heads/%s", branch) {
+			return ref.Hash().String(), nil
+		}
 	}
 
-	return firstField(lines, fmt.Sprintf("no commit for branch: %s", branch))
+	return "", fmt.Errorf("no commit for branch: %s, url: %s", branch, g.URL)
 }
 
 // Head runs git clone on directory(if not exist), reset dirty content and return the HEAD commit
 func (g *Git) Head(branch string) (string, error) {
-	if err := g.clone(branch); err != nil {
+	repo, err := g.clone(branch)
+	if err != nil {
 		return "", err
 	}
 
-	if err := g.reset("HEAD"); err != nil {
+	if err := g.reset(repo, "HEAD"); err != nil {
 		return "", err
 	}
 
-	return g.currentCommit()
+	return g.currentCommit(repo)
 }
 
 // Clone runs git clone with depth 1
-func (g *Git) Clone(branch string) error {
-	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.URL, g.Directory)
+func (g *Git) Clone(branch string) (*gogit.Repository, error) {
+	return gogit.PlainClone(g.Directory, false, &gogit.CloneOptions{
+		URL:           g.URL,
+		SingleBranch:  true,
+		NoCheckout:    true,
+		Depth:         1,
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
+		Progress:      os.Stdout,
+	})
 }
 
 // Update updates git repo if remote sha has changed
 func (g *Git) Update(branch string) (string, error) {
-	if err := g.clone(branch); err != nil {
+	repo, err := g.clone(branch)
+	if err != nil {
 		return "", nil
 	}
 
-	if err := g.reset("HEAD"); err != nil {
+	if err := g.reset(repo, "HEAD"); err != nil {
 		return "", err
 	}
 
-	commit, err := g.currentCommit()
+	commit, err := g.currentCommit(repo)
 	if err != nil {
 		return commit, err
 	}
@@ -118,24 +136,25 @@ func (g *Git) Update(branch string) (string, error) {
 		return commit, err
 	}
 
-	if err := g.fetchAndReset(branch); err != nil {
+	if err := g.fetchAndCheckout(repo, branch, commit); err != nil {
 		return "", err
 	}
 
-	return g.currentCommit()
+	return g.currentCommit(repo)
 }
 
 // Ensure runs git clone, clean DIRTY contents and fetch the latest commit
-func (g *Git) Ensure(commit string) error {
-	if err := g.clone("master"); err != nil {
+func (g *Git) Ensure(branch, commit string) error {
+	repo, err := g.clone(branch)
+	if err != nil {
 		return err
 	}
 
-	if err := g.reset(commit); err == nil {
+	if err := g.reset(repo, commit); err != nil {
 		return nil
 	}
 
-	return g.fetchAndReset(commit)
+	return g.fetchAndCheckout(repo, branch, commit)
 }
 
 func (g *Git) httpClientWithCreds() (*http.Client, error) {
@@ -234,20 +253,6 @@ func (g *Git) remoteSHAChanged(branch, sha string) (bool, error) {
 	return true, nil
 }
 
-func (g *Git) git(args ...string) error {
-	var output io.Writer
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		output = os.Stdout
-	}
-	return g.gitCmd(output, args...)
-}
-
-func (g *Git) gitOutput(args ...string) (string, error) {
-	output := &bytes.Buffer{}
-	err := g.gitCmd(output, args...)
-	return strings.TrimSpace(output.String()), err
-}
-
 func (g *Git) setCredential(cred *corev1.Secret) error {
 	if cred == nil {
 		return nil
@@ -264,161 +269,123 @@ func (g *Git) setCredential(cred *corev1.Secret) error {
 			return err
 		}
 		u.User = url.User(string(username))
+		g.user = string(username)
 		g.URL = u.String()
 		g.password = string(password)
 	} else if cred.Type == corev1.SecretTypeSSHAuth {
-		key, err := keyutil.ParsePrivateKeyPEM(cred.Data[corev1.SSHAuthPrivateKey])
-		if err != nil {
-			return err
-		}
-		sshAgent := agent.NewKeyring()
-		err = sshAgent.Add(agent.AddedKey{
-			PrivateKey: key,
-		})
-		if err != nil {
-			return err
-		}
+		g.privateKey = cred.Data[corev1.SSHAuthPrivateKey]
 		g.knownHosts = cred.Data["known_hosts"]
-		g.agent = &sshAgent
 	}
 
-	return nil
+	var err error
+	g.auth, err = g.setupAuth()
+	return err
 }
 
-func (g *Git) clone(branch string) error {
+func (g *Git) clone(branch string) (*gogit.Repository, error) {
 	gitDir := filepath.Join(g.Directory, ".git")
 	if dir, err := os.Stat(gitDir); err == nil && dir.IsDir() {
-		return nil
+		return gogit.PlainOpen(g.Directory)
 	}
 
 	if err := os.RemoveAll(g.Directory); err != nil {
-		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
+		return nil, fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
 	}
 
-	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.URL, g.Directory)
+	return gogit.PlainClone(g.Directory, false, &gogit.CloneOptions{
+		URL:             g.URL,
+		Auth:            g.auth,
+		SingleBranch:    true,
+		NoCheckout:      true,
+		Depth:           1,
+		ReferenceName:   plumbing.NewBranchReferenceName(branch),
+		Progress:        os.Stdout,
+		InsecureSkipTLS: g.insecureTLSVerify,
+		CABundle:        g.caBundle,
+	})
 }
 
-func (g *Git) fetchAndReset(rev string) error {
-	if err := g.git("-C", g.Directory, "fetch", "origin", rev); err != nil {
+func (g *Git) fetchAndCheckout(repo *gogit.Repository, branch, commit string) error {
+	if err := repo.Fetch(&gogit.FetchOptions{
+		RemoteName: "origin",
+		Auth:       g.auth,
+		RefSpecs: []config.RefSpec{
+			refName(branch),
+		},
+		InsecureSkipTLS: g.insecureTLSVerify,
+		CABundle:        g.caBundle,
+		Progress:        os.Stdout,
+	}); err != nil && err != gogit.NoErrAlreadyUpToDate {
 		return err
 	}
-	return g.reset("FETCH_HEAD")
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+	if err := wt.Reset(&gogit.ResetOptions{
+		Mode: gogit.HardReset,
+	}); err != nil {
+		return err
+	}
+	return wt.Checkout(&gogit.CheckoutOptions{
+		Hash: plumbing.NewHash(commit),
+	})
 }
 
-func (g *Git) reset(rev string) error {
-	return g.git("-C", g.Directory, "reset", "--hard", rev)
+func (g *Git) reset(repo *gogit.Repository, rev string) error {
+	wt, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+	return wt.Reset(&gogit.ResetOptions{
+		Commit: plumbing.NewHash(rev),
+		Mode:   gogit.HardReset,
+	})
 }
 
-func (g *Git) currentCommit() (string, error) {
-	return g.gitOutput("-C", g.Directory, "rev-parse", "HEAD")
+func (g *Git) currentCommit(repo *gogit.Repository) (string, error) {
+	head, err := repo.Head()
+	return head.Hash().String(), err
 }
 
-func (g *Git) gitCmd(output io.Writer, args ...string) error {
-	kv := fmt.Sprintf("credential.helper=%s", "/bin/sh -c 'echo password=$GIT_PASSWORD'")
-	cmd := exec.Command("git", append([]string{"-c", kv}, args...)...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_PASSWORD=%s", g.password))
-	stderrBuf := &bytes.Buffer{}
-	cmd.Stderr = stderrBuf
-	cmd.Stdout = output
+func (g *Git) setupAuth() (transport.AuthMethod, error) {
+	if g.user != "" || g.password != "" {
+		return &ghttp.BasicAuth{
+			Username: g.user,
+			Password: g.password,
+		}, nil
+	}
 
-	if g.agent != nil {
-		c, err := g.injectAgent(cmd)
+	if len(g.privateKey) > 0 {
+		publicKey, err := ssh.NewPublicKeys("git", g.privateKey, "")
 		if err != nil {
-			return err
+			return nil, err
 		}
-		defer c.Close()
-	}
-
-	if len(g.knownHosts) != 0 {
-		f, err := ioutil.TempFile("", "known_hosts")
-		if err != nil {
-			return err
-		}
-		defer os.RemoveAll(f.Name())
-		defer f.Close()
-
-		if _, err := f.Write(g.knownHosts); err != nil {
-			return err
-		}
-		if err := f.Close(); err != nil {
-			return fmt.Errorf("closing knownHosts file %s: %w", f.Name(), err)
-		}
-
-		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+fmt.Sprintf("ssh -o UserKnownHostsFile=%s", f.Name()))
-	} else {
-		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+fmt.Sprintf("ssh -o StrictHostKeyChecking=accept-new"))
-	}
-	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0")
-
-	if g.insecureTLSVerify {
-		cmd.Env = append(cmd.Env, "GIT_SSL_NO_VERIFY=false")
-	}
-
-	if len(g.caBundle) > 0 {
-		f, err := ioutil.TempFile("", "ca-pem-")
-		if err != nil {
-			return err
-		}
-		defer os.Remove(f.Name())
-		defer f.Close()
-
-		if _, err := f.Write(g.caBundle); err != nil {
-			return fmt.Errorf("writing cabundle to %s: %w", f.Name(), err)
-		}
-		if err := f.Close(); err != nil {
-			return fmt.Errorf("closing cabundle %s: %w", f.Name(), err)
-		}
-		cmd.Env = append(cmd.Env, "GIT_SSL_CAINFO="+f.Name())
-	}
-
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("git %s error: %w, detail: %v", strings.Join(args, " "), err, stderrBuf.String())
-	}
-	return nil
-}
-
-func (g *Git) injectAgent(cmd *exec.Cmd) (io.Closer, error) {
-	r, err := randomtoken.Generate()
-	if err != nil {
-		return nil, err
-	}
-
-	tmpDir, err := ioutil.TempDir("", "ssh-agent")
-	if err != nil {
-		return nil, err
-	}
-
-	addr := &net.UnixAddr{
-		Name: filepath.Join(tmpDir, r),
-		Net:  "unix",
-	}
-
-	l, err := net.ListenUnix(addr.Net, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	cmd.Env = append(cmd.Env, "SSH_AUTH_SOCK="+addr.Name)
-
-	go func() {
-		defer os.RemoveAll(tmpDir)
-		defer l.Close()
-		for {
-			conn, err := l.Accept()
+		if len(g.knownHosts) > 0 {
+			f, err := ioutil.TempFile("", "known_hosts")
 			if err != nil {
-				if !k8snet.IsProbableEOF(err) {
-					logrus.Errorf("failed to accept ssh-agent client connection: %v", err)
-				}
-				return
+				return nil, err
 			}
-			if err := agent.ServeAgent(*g.agent, conn); err != nil && err != io.EOF {
-				logrus.Errorf("failed to handle ssh-agent client connection: %v", err)
-			}
-		}
-	}()
+			defer os.RemoveAll(f.Name())
+			defer f.Close()
 
-	return l, nil
+			if _, err := f.Write(g.knownHosts); err != nil {
+				return nil, err
+			}
+			if err := f.Close(); err != nil {
+				return nil, fmt.Errorf("closing knownHosts file %s: %w", f.Name(), err)
+			}
+			callback, err := ssh.NewKnownHostsCallback(f.Name())
+			if err != nil {
+				return nil, err
+			}
+			publicKey.HostKeyCallback = callback
+		}
+
+		return publicKey, nil
+	}
+	return nil, nil
 }
 
 func formatGitURL(endpoint, branch string) string {
@@ -444,27 +411,6 @@ func formatGitURL(endpoint, branch string) string {
 	return ""
 }
 
-func firstField(lines []string, errText string) (string, error) {
-	if len(lines) == 0 {
-		return "", errors.New(errText)
-	}
-
-	fields := strings.Fields(lines[0])
-	if len(fields) == 0 {
-		return "", errors.New(errText)
-	}
-
-	if len(fields[0]) == 0 {
-		return "", errors.New(errText)
-	}
-
-	return fields[0], nil
-}
-
-func formatRefForBranch(branch string) string {
-	return fmt.Sprintf("refs/heads/%s", branch)
-}
-
 type basicRoundTripper struct {
 	username string
 	password string
@@ -474,4 +420,8 @@ type basicRoundTripper struct {
 func (b *basicRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	request.SetBasicAuth(b.username, b.password)
 	return b.next.RoundTrip(request)
+}
+
+func refName(ref string) config.RefSpec {
+	return config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", ref, ref))
 }
