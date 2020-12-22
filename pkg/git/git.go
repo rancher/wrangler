@@ -96,6 +96,9 @@ func (g *Git) Head(branch string) (string, error) {
 
 // Clone runs git clone with depth 1
 func (g *Git) Clone(branch string) error {
+	if branch == "" {
+		return g.git("clone", "--depth=1", "-n", g.URL, g.Directory)
+	}
 	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.URL, g.Directory)
 }
 
@@ -127,7 +130,7 @@ func (g *Git) Update(branch string) (string, error) {
 
 // Ensure runs git clone, clean DIRTY contents and fetch the latest commit
 func (g *Git) Ensure(commit string) error {
-	if err := g.clone("master"); err != nil {
+	if err := g.clone(""); err != nil {
 		return err
 	}
 
@@ -295,7 +298,7 @@ func (g *Git) clone(branch string) error {
 		return fmt.Errorf("failed to remove directory %s: %v", g.Directory, err)
 	}
 
-	return g.git("clone", "--depth=1", "-n", "--branch", branch, g.URL, g.Directory)
+	return g.Clone(branch)
 }
 
 func (g *Git) fetchAndReset(rev string) error {
