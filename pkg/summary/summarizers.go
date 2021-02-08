@@ -315,6 +315,9 @@ func checkPhase(obj data.Object, _ []Condition, summary Summary) Summary {
 	if phase == "Succeeded" {
 		summary.State = "succeeded"
 		summary.Transitioning = false
+	} else if phase == "Bound" {
+		summary.State = "bound"
+		summary.Transitioning = false
 	} else if phase != "" && summary.State == "" {
 		summary.State = phase
 	}
