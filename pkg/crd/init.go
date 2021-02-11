@@ -43,6 +43,7 @@ type CRD struct {
 	Scale        bool
 	Categories   []string
 	ShortNames   []string
+	Labels       map[string]string
 }
 
 func (c CRD) WithSchema(schema *v1beta1.JSONSchemaProps) CRD {
@@ -273,6 +274,7 @@ func (c CRD) ToCustomResourceDefinition() (apiext.CustomResourceDefinition, erro
 		crd.Spec.Scope = apiext.NamespaceScoped
 	}
 
+	crd.Labels = c.Labels
 	return crd, nil
 }
 
