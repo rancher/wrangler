@@ -13,7 +13,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 func main() {
