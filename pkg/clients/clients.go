@@ -4,7 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
+	admissionreg "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io"
+	admissionregcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
 	crdcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io"
@@ -19,7 +22,6 @@ import (
 	rbaccontrollers "github.com/rancher/wrangler/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/ratelimit"
-	"github.com/rancher/wrangler/pkg/start"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/memory"
@@ -30,22 +32,22 @@ import (
 )
 
 type Clients struct {
-	K8s   kubernetes.Interface
-	Core  corecontrollers.Interface
-	RBAC  rbaccontrollers.Interface
-	Apps  appcontrollers.Interface
-	CRD   crdcontrollers.Interface
-	API   apicontrollers.Interface
-	Batch batchcontrollers.Interface
-	Apply apply.Apply
+	K8s       kubernetes.Interface
+	Core      corecontrollers.Interface
+	RBAC      rbaccontrollers.Interface
+	Apps      appcontrollers.Interface
+	CRD       crdcontrollers.Interface
+	API       apicontrollers.Interface
+	Admission admissionregcontrollers.Interface
+	Batch     batchcontrollers.Interface
+	Apply     apply.Apply
 
-	ClientConfig    clientcmd.ClientConfig
-	RESTConfig      *rest.Config
-	CachedDiscovery discovery.CachedDiscoveryInterface
-	RESTMapper      meta.RESTMapper
-	FactoryOptions  *generic.FactoryOptions
-
-	starters []start.Starter
+	ClientConfig            clientcmd.ClientConfig
+	RESTConfig              *rest.Config
+	CachedDiscovery         discovery.CachedDiscoveryInterface
+	SharedControllerFactory controller.SharedControllerFactory
+	RESTMapper              meta.RESTMapper
+	FactoryOptions          *generic.FactoryOptions
 }
 
 func ensureSharedFactory(cfg *rest.Config, opts *generic.FactoryOptions) (*generic.FactoryOptions, error) {
@@ -112,6 +114,11 @@ func NewFromConfig(cfg *rest.Config, opts *generic.FactoryOptions) (*Clients, er
 		return nil, err
 	}
 
+	adminReg, err := admissionreg.NewFactoryFromConfigWithOptions(cfg, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	k8s, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, err
@@ -131,26 +138,20 @@ func NewFromConfig(cfg *rest.Config, opts *generic.FactoryOptions) (*Clients, er
 	}
 
 	return &Clients{
-		K8s:             k8s,
-		Core:            core.Core().V1(),
-		RBAC:            rbac.Rbac().V1(),
-		Apps:            apps.Apps().V1(),
-		CRD:             crd.Apiextensions().V1beta1(),
-		API:             api.Apiregistration().V1(),
-		Batch:           batch.Batch().V1(),
-		Apply:           apply.WithSetOwnerReference(false, false),
-		RESTConfig:      cfg,
-		CachedDiscovery: cache,
-		RESTMapper:      restMapper,
-		FactoryOptions:  opts, 
-		starters: []start.Starter{
-			core,
-			rbac,
-			apps,
-			api,
-			crd,
-			batch,
-		},
+		K8s:                     k8s,
+		Core:                    core.Core().V1(),
+		RBAC:                    rbac.Rbac().V1(),
+		Apps:                    apps.Apps().V1(),
+		CRD:                     crd.Apiextensions().V1beta1(),
+		API:                     api.Apiregistration().V1(),
+		Admission:               adminReg.Admissionregistration().V1(),
+		Batch:                   batch.Batch().V1(),
+		Apply:                   apply.WithSetOwnerReference(false, false),
+		RESTConfig:              cfg,
+		CachedDiscovery:         cache,
+		SharedControllerFactory: opts.SharedControllerFactory,
+		RESTMapper:              restMapper,
+		FactoryOptions:          opts,
 	}, nil
 }
 
@@ -171,7 +172,7 @@ func (c *Clients) ToRESTMapper() (meta.RESTMapper, error) {
 }
 
 func (c *Clients) Start(ctx context.Context) error {
-	return start.All(ctx, 5, c.starters...)
+	return c.SharedControllerFactory.Start(ctx, 5)
 }
 
 func restConfigDefaults(cfg *rest.Config) *rest.Config {
