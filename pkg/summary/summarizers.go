@@ -77,18 +77,16 @@ var (
 	// False == error
 	// Unknown ==
 	ErrorFalse = map[string]bool{
-		"Failed":      true,
-		"Progressing": true,
+		"Failed": true,
 	}
 
 	// True ==
 	// False == transitioning
 	// Unknown == error
 	TransitioningFalse = map[string]string{
-		"Completed":   "activating",
-		"Ready":       "unavailable",
-		"Available":   "updating",
-		"Progressing": "inactive",
+		"Completed": "activating",
+		"Ready":     "unavailable",
+		"Available": "updating",
 	}
 
 	// True ==
