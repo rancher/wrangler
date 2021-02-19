@@ -3,6 +3,7 @@ package main
 import (
 	controllergen "github.com/rancher/wrangler/pkg/controller-gen"
 	"github.com/rancher/wrangler/pkg/controller-gen/args"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -12,7 +13,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 func main() {
