@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/wrangler/pkg/apply"
 	admissionreg "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io"
 	admissionregcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io/v1"
@@ -42,6 +43,7 @@ type Clients struct {
 	Batch     batchcontrollers.Interface
 	Apply     apply.Apply
 
+	Dynamic                 *dynamic.Controller
 	ClientConfig            clientcmd.ClientConfig
 	RESTConfig              *rest.Config
 	CachedDiscovery         discovery.CachedDiscoveryInterface
@@ -152,6 +154,7 @@ func NewFromConfig(cfg *rest.Config, opts *generic.FactoryOptions) (*Clients, er
 		SharedControllerFactory: opts.SharedControllerFactory,
 		RESTMapper:              restMapper,
 		FactoryOptions:          opts,
+		Dynamic:                 dynamic.New(k8s.Discovery()),
 	}, nil
 }
 
@@ -172,6 +175,9 @@ func (c *Clients) ToRESTMapper() (meta.RESTMapper, error) {
 }
 
 func (c *Clients) Start(ctx context.Context) error {
+	if err := c.Dynamic.Register(ctx, c.SharedControllerFactory); err != nil {
+		return err
+	}
 	return c.SharedControllerFactory.Start(ctx, 5)
 }
 
