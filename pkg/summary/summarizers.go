@@ -77,18 +77,16 @@ var (
 	// False == error
 	// Unknown ==
 	ErrorFalse = map[string]bool{
-		"Failed":      true,
-		"Progressing": true,
+		"Failed": true,
 	}
 
 	// True ==
 	// False == transitioning
 	// Unknown == error
 	TransitioningFalse = map[string]string{
-		"Completed":   "activating",
-		"Ready":       "unavailable",
-		"Available":   "updating",
-		"Progressing": "inactive",
+		"Completed": "activating",
+		"Ready":     "unavailable",
+		"Available": "updating",
 	}
 
 	// True == transitioning
@@ -314,6 +312,9 @@ func checkPhase(obj data.Object, _ []Condition, summary Summary) Summary {
 	phase := obj.String("status", "phase")
 	if phase == "Succeeded" {
 		summary.State = "succeeded"
+		summary.Transitioning = false
+	} else if phase == "Bound" {
+		summary.State = "bound"
 		summary.Transitioning = false
 	} else if phase != "" && summary.State == "" {
 		summary.State = phase
