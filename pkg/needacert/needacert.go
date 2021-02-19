@@ -186,7 +186,8 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 	defer h.locker.Unlock(lockKey)
 
 	dnsNameSet := sets.NewString(service.Name+"."+service.Namespace,
-		service.Name+"."+service.Namespace+".svc")
+		service.Name+"."+service.Namespace+".svc",
+		service.Name+"."+service.Namespace+".svc.cluster.local")
 	for k, v := range service.Annotations {
 		if !strings.HasPrefix(k, DNSAnnotation) {
 			continue
