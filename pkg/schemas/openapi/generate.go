@@ -3,6 +3,7 @@ package openapi
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	types "github.com/rancher/wrangler/pkg/schemas"
 	"github.com/rancher/wrangler/pkg/schemas/definition"
@@ -164,6 +165,7 @@ func schemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[st
 		jsp.Properties[name] = *fieldJSP
 	}
 
+	sort.Strings(jsp.Required)
 	return jsp, nil
 }
 
