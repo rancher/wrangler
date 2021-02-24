@@ -8,7 +8,7 @@ require (
 	github.com/moby/locker v1.0.1
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/lasso v0.0.0-20210218221607-54c79222a9ad
+	github.com/rancher/lasso v0.0.0-20210224225615-d687d78ea02a
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
