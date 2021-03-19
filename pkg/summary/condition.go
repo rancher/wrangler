@@ -59,7 +59,11 @@ func (c Condition) Reason() string {
 }
 
 func (c Condition) Message() string {
-	return c.String("message")
+	m := c.String("message")
+	if m == "" {
+		return c.Type() + "=" + c.Status() + " (" + c.Reason() + ")"
+	}
+	return m
 }
 
 func (c Condition) Equals(other Condition) bool {
