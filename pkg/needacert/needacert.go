@@ -30,6 +30,10 @@ var (
 	DNSAnnotation    = "need-a-cert.cattle.io/dns-name"
 )
 
+const (
+	byServiceIndex = "byService"
+)
+
 func Register(ctx context.Context,
 	secrets corecontrollers.SecretController,
 	service corecontrollers.ServiceController,
@@ -45,6 +49,9 @@ func Register(ctx context.Context,
 		crds:               crdController,
 	}
 
+	mutatingController.Cache().AddIndexer(byServiceIndex, mutatingWebhookServices)
+	validatingController.Cache().AddIndexer(byServiceIndex, validatingWebhookServices)
+
 	mutatingController.OnChange(ctx, "need-a-cert", h.OnMutationWebhookChange)
 	validatingController.OnChange(ctx, "need-a-cert", h.OnValidatingWebhookChange)
 	crdController.OnChange(ctx, "need-a-cert", h.OnCRDChange)
@@ -56,9 +63,27 @@ type handler struct {
 	secretsCache       corecontrollers.SecretCache
 	secrets            corecontrollers.SecretClient
 	serviceCache       corecontrollers.ServiceCache
-	mutatingWebHooks   admissionregcontrollers.MutatingWebhookConfigurationClient
-	validatingWebHooks admissionregcontrollers.ValidatingWebhookConfigurationClient
+	mutatingWebHooks   admissionregcontrollers.MutatingWebhookConfigurationController
+	validatingWebHooks admissionregcontrollers.ValidatingWebhookConfigurationController
 	crds               apiextcontrollers.CustomResourceDefinitionClient
+}
+
+func validatingWebhookServices(obj *adminregv1.ValidatingWebhookConfiguration) (result []string, _ error) {
+	for _, webhook := range obj.Webhooks {
+		if webhook.ClientConfig.Service != nil {
+			result = append(result, webhook.ClientConfig.Service.Namespace+"/"+webhook.ClientConfig.Service.Name)
+		}
+	}
+	return
+}
+
+func mutatingWebhookServices(obj *adminregv1.MutatingWebhookConfiguration) (result []string, _ error) {
+	for _, webhook := range obj.Webhooks {
+		if webhook.ClientConfig.Service != nil {
+			result = append(result, webhook.ClientConfig.Service.Namespace+"/"+webhook.ClientConfig.Service.Name)
+		}
+	}
+	return
 }
 
 func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.MutatingWebhookConfiguration) (*adminregv1.MutatingWebhookConfiguration, error) {
@@ -142,7 +167,24 @@ func (h *handler) OnService(key string, service *corev1.Service) (*corev1.Servic
 		return service, nil
 	}
 
-	_, err := h.generateSecret(service)
+	indexKey := service.Namespace + "/" + service.Name
+	mutating, err := h.mutatingWebHooks.Cache().GetByIndex(byServiceIndex, indexKey)
+	if err != nil {
+		return nil, err
+	}
+	for _, mutating := range mutating {
+		h.mutatingWebHooks.Enqueue(mutating.Name)
+	}
+
+	validating, err := h.validatingWebHooks.Cache().GetByIndex(byServiceIndex, indexKey)
+	if err != nil {
+		return nil, err
+	}
+	for _, validating := range validating {
+		h.mutatingWebHooks.Enqueue(validating.Name)
+	}
+
+	_, err = h.generateSecret(service)
 	return nil, err
 }
 
