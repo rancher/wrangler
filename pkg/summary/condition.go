@@ -61,7 +61,11 @@ func (c Condition) Reason() string {
 func (c Condition) Message() string {
 	m := c.String("message")
 	if m == "" {
-		return c.Type() + "=" + c.Status() + " (" + c.Reason() + ")"
+		res := c.Reason()
+		if res == "" {
+			return c.Type()
+		}
+		return c.Type() + " (" + res + ")"
 	}
 	return m
 }
