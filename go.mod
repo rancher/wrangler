@@ -10,7 +10,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.0.0-20210325230905-459cd42cfdd0
 	github.com/sirupsen/logrus v1.4.2
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72
 	k8s.io/api v0.18.8
