@@ -181,7 +181,7 @@ func (h *handler) OnService(key string, service *corev1.Service) (*corev1.Servic
 		return nil, err
 	}
 	for _, validating := range validating {
-		h.mutatingWebHooks.Enqueue(validating.Name)
+		h.validatingWebHooks.Enqueue(validating.Name)
 	}
 
 	_, err = h.generateSecret(service)
