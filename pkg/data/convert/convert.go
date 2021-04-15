@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func Singular(value interface{}) interface{} {
@@ -211,6 +213,10 @@ func ToObj(data interface{}, into interface{}) error {
 func EncodeToMap(obj interface{}) (map[string]interface{}, error) {
 	if m, ok := obj.(map[string]interface{}); ok {
 		return m, nil
+	}
+
+	if unstr, ok := obj.(*unstructured.Unstructured); ok {
+		return unstr.Object, nil
 	}
 
 	b, err := json.Marshal(obj)
