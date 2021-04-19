@@ -199,6 +199,9 @@ func ToStringSlice(data interface{}) []string {
 		}
 		return result
 	}
+	if v, ok := data.(string); ok {
+		return []string{v}
+	}
 	return nil
 }
 
