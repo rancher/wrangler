@@ -506,7 +506,7 @@ func (f *Factory) createCRD(ctx context.Context, crdDef CRD, ready map[string]*a
 }
 
 func (f *Factory) ensureAccess(ctx context.Context) (bool, error) {
-	_, err := f.CRDClient.ApiextensionsV1beta1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{})
+	_, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().List(ctx, metav1.ListOptions{})
 	if apierrors.IsForbidden(err) {
 		return false, nil
 	}
@@ -515,7 +515,10 @@ func (f *Factory) ensureAccess(ctx context.Context) (bool, error) {
 
 func (f *Factory) patchPreserveUnknownFields(ctx context.Context, name string) error {
 	existingCrd, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
