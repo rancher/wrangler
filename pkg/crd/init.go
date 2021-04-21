@@ -15,14 +15,15 @@ import (
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/pkg/schemas/openapi"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
@@ -482,6 +483,10 @@ func (f *Factory) createCRD(ctx context.Context, crdDef CRD, ready map[string]*a
 		return nil, err
 	}
 
+	if err := f.patchPreserveUnknownFields(ctx, meta.GetName()); err != nil {
+		return nil, err
+	}
+
 	logrus.Infof("Applying CRD %s", meta.GetName())
 	if err := f.apply.WithOwner(crd).ApplyObjects(crd); err != nil {
 		return nil, err
@@ -496,6 +501,26 @@ func (f *Factory) ensureAccess(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	return true, err
+}
+
+func (f *Factory) patchPreserveUnknownFields(ctx context.Context, name string) error {
+	existingCrd, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if existingCrd.Spec.PreserveUnknownFields == true {
+		if _, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Patch(
+			ctx,
+			existingCrd.Name,
+			types.MergePatchType,
+			[]byte(`{"spec":{"preserveUnknownFields":false}}`),
+			metav1.PatchOptions{},
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (f *Factory) getReadyCRDs(ctx context.Context) (map[string]*apiext.CustomResourceDefinition, error) {
