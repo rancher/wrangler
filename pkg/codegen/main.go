@@ -11,7 +11,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -76,9 +76,9 @@ func main() {
 				ClientSetPackage: "k8s.io/client-go/kubernetes",
 				ListersPackage:   "k8s.io/client-go/listers",
 			},
-			v1beta1.GroupName: {
+			apiextv1.GroupName: {
 				Types: []interface{}{
-					v1beta1.CustomResourceDefinition{},
+					apiextv1.CustomResourceDefinition{},
 				},
 				ClientSetPackage: "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
 				InformersPackage: "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions",
