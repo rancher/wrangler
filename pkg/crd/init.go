@@ -191,6 +191,13 @@ func (c CRD) WithShortNames(shortNames ...string) CRD {
 	return c
 }
 
+func (c CRD) HasOverride() bool {
+	if c.Override != nil {
+		return true
+	}
+	return false
+}
+
 func (c CRD) ToCustomResourceDefinition() (runtime.Object, error) {
 	if c.Override != nil {
 		return c.Override, nil
@@ -483,8 +490,10 @@ func (f *Factory) createCRD(ctx context.Context, crdDef CRD, ready map[string]*a
 		return nil, err
 	}
 
-	if err := f.patchPreserveUnknownFields(ctx, meta.GetName()); err != nil {
-		return nil, err
+	if !crdDef.HasOverride() {
+		if err := f.patchPreserveUnknownFields(ctx, meta.GetName()); err != nil {
+			return nil, err
+		}
 	}
 
 	logrus.Infof("Applying CRD %s", meta.GetName())
@@ -508,16 +517,15 @@ func (f *Factory) patchPreserveUnknownFields(ctx context.Context, name string) e
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	if existingCrd.Spec.PreserveUnknownFields == true {
-		if _, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Patch(
-			ctx,
-			existingCrd.Name,
-			types.MergePatchType,
-			[]byte(`{"spec":{"preserveUnknownFields":false}}`),
-			metav1.PatchOptions{},
-		); err != nil {
-			return err
-		}
+
+	if _, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Patch(
+		ctx,
+		existingCrd.Name,
+		types.MergePatchType,
+		[]byte(`{"spec":{"preserveUnknownFields":false}}`),
+		metav1.PatchOptions{},
+	); err != nil {
+		return err
 	}
 
 	return nil
