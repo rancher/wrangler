@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
@@ -188,6 +189,13 @@ func (c CRD) WithGroup(group string) CRD {
 func (c CRD) WithShortNames(shortNames ...string) CRD {
 	c.ShortNames = shortNames
 	return c
+}
+
+func (c CRD) HasOverride() bool {
+	if c.Override != nil {
+		return true
+	}
+	return false
 }
 
 func (c CRD) ToCustomResourceDefinition() (runtime.Object, error) {
@@ -483,6 +491,12 @@ func (f *Factory) createCRD(ctx context.Context, crdDef CRD, ready map[string]*a
 		return nil, err
 	}
 
+	if !crdDef.HasOverride() {
+		if err := f.patchPreserveUnknownFields(ctx, meta.GetName()); err != nil {
+			return nil, err
+		}
+	}
+
 	logrus.Infof("Applying CRD %s", meta.GetName())
 	if err := f.apply.WithOwner(crd).ApplyObjects(crd); err != nil {
 		return nil, err
@@ -497,6 +511,25 @@ func (f *Factory) ensureAccess(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	return true, err
+}
+
+func (f *Factory) patchPreserveUnknownFields(ctx context.Context, name string) error {
+	existingCrd, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	if _, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Patch(
+		ctx,
+		existingCrd.Name,
+		types.MergePatchType,
+		[]byte(`{"spec":{"preserveUnknownFields":false}}`),
+		metav1.PatchOptions{},
+	); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (f *Factory) getReadyCRDs(ctx context.Context) (map[string]*apiext.CustomResourceDefinition, error) {
