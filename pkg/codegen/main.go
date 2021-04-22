@@ -6,6 +6,7 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -112,6 +113,14 @@ func main() {
 				Types: []interface{}{
 					admissionregistrationv1.ValidatingWebhookConfiguration{},
 					admissionregistrationv1.MutatingWebhookConfiguration{},
+				},
+				InformersPackage: "k8s.io/client-go/informers",
+				ClientSetPackage: "k8s.io/client-go/kubernetes",
+				ListersPackage:   "k8s.io/client-go/listers",
+			},
+			coordinationv1.GroupName: {
+				Types: []interface{}{
+					coordinationv1.Lease{},
 				},
 				InformersPackage: "k8s.io/client-go/informers",
 				ClientSetPackage: "k8s.io/client-go/kubernetes",
