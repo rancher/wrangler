@@ -16,7 +16,7 @@ import (
 	"github.com/rancher/wrangler/pkg/slice"
 	adminregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -188,15 +188,16 @@ func (h *handler) OnService(key string, service *corev1.Service) (*corev1.Servic
 	return nil, err
 }
 
-func (h *handler) OnCRDChange(key string, crd *apiextv1beta1.CustomResourceDefinition) (*apiextv1beta1.CustomResourceDefinition, error) {
-	if crd == nil || crd.Spec.Conversion == nil || crd.Spec.Conversion.WebhookClientConfig == nil ||
-		crd.Spec.Conversion.WebhookClientConfig.Service == nil ||
-		crd.Spec.Conversion.WebhookClientConfig.Service.Name == "" {
+func (h *handler) OnCRDChange(key string, crd *apiextv1.CustomResourceDefinition) (*apiextv1.CustomResourceDefinition, error) {
+	if crd == nil || crd.Spec.Conversion == nil || crd.Spec.Conversion.Webhook == nil ||
+		crd.Spec.Conversion.Webhook.ClientConfig == nil ||
+		crd.Spec.Conversion.Webhook.ClientConfig.Service == nil ||
+		crd.Spec.Conversion.Webhook.ClientConfig.Service.Name == "" {
 		return crd, nil
 	}
 
-	service, err := h.serviceCache.Get(crd.Spec.Conversion.WebhookClientConfig.Service.Namespace,
-		crd.Spec.Conversion.WebhookClientConfig.Service.Name)
+	service, err := h.serviceCache.Get(crd.Spec.Conversion.Webhook.ClientConfig.Service.Namespace,
+		crd.Spec.Conversion.Webhook.ClientConfig.Service.Name)
 	if apierror.IsNotFound(err) {
 		return crd, nil
 	} else if err != nil {
@@ -208,9 +209,9 @@ func (h *handler) OnCRDChange(key string, crd *apiextv1beta1.CustomResourceDefin
 		return crd, nil
 	}
 
-	if !bytes.Equal(crd.Spec.Conversion.WebhookClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
+	if !bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 		crd := crd.DeepCopy()
-		crd.Spec.Conversion.WebhookClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
+		crd.Spec.Conversion.Webhook.ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
 		return h.crds.Update(crd)
 	}
 

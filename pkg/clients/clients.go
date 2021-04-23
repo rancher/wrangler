@@ -144,7 +144,7 @@ func NewFromConfig(cfg *rest.Config, opts *generic.FactoryOptions) (*Clients, er
 		Core:                    core.Core().V1(),
 		RBAC:                    rbac.Rbac().V1(),
 		Apps:                    apps.Apps().V1(),
-		CRD:                     crd.Apiextensions().V1beta1(),
+		CRD:                     crd.Apiextensions().V1(),
 		API:                     api.Apiregistration().V1(),
 		Admission:               adminReg.Admissionregistration().V1(),
 		Batch:                   batch.Batch().V1(),
