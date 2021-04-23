@@ -10,7 +10,7 @@ import (
 	admissionreg "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io"
 	admissionregcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io"
-	crdcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1beta1"
+	crdcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io"
 	apicontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	"github.com/rancher/wrangler/pkg/generated/controllers/apps"
