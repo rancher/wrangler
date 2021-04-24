@@ -51,6 +51,7 @@ type CRD struct {
 	Categories   []string
 	ShortNames   []string
 	Labels       map[string]string
+	Annotations  map[string]string
 
 	Override runtime.Object
 }
@@ -312,6 +313,7 @@ func (c CRD) ToCustomResourceDefinition() (runtime.Object, error) {
 	}
 
 	crd.Labels = c.Labels
+	crd.Annotations = c.Annotations
 	return &crd, nil
 }
 
