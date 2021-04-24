@@ -26,6 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+
+	// Ensure the gvks are loaded so that apply works correctly
+	_ "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 )
 
 type Factory struct {
