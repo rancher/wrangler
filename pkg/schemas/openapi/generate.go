@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
 	types "github.com/rancher/wrangler/pkg/schemas"
 	"github.com/rancher/wrangler/pkg/schemas/definition"
@@ -143,7 +144,9 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 		jsp.Type = t
 	}
 
-	jsp.XPreserveUnknownFields = nil
+	if jsp.Type == "object" && jsp.AdditionalProperties == nil {
+		jsp.XPreserveUnknownFields = &[]bool{true}[0]
+	}
 
 	return jsp, nil
 }
@@ -178,6 +181,9 @@ func schemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[st
 	}
 
 	sort.Strings(jsp.Required)
+	if len(jsp.Properties) == 0 && strings.HasSuffix(strings.ToLower(schema.ID), "map") {
+		jsp.XPreserveUnknownFields = &[]bool{true}[0]
+	}
 	return jsp, nil
 }
 
