@@ -21,9 +21,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 
@@ -195,13 +195,6 @@ func (c CRD) WithShortNames(shortNames ...string) CRD {
 	return c
 }
 
-func (c CRD) HasOverride() bool {
-	if c.Override != nil {
-		return true
-	}
-	return false
-}
-
 func (c CRD) ToCustomResourceDefinition() (runtime.Object, error) {
 	if c.Override != nil {
 		return c.Override, nil
@@ -314,7 +307,18 @@ func (c CRD) ToCustomResourceDefinition() (runtime.Object, error) {
 
 	crd.Labels = c.Labels
 	crd.Annotations = c.Annotations
-	return &crd, nil
+
+	// Convert to unstructured to ensure that PreserveUnknownFields=false is set because the struct will omit false
+	mapData, err := convert.EncodeToMap(crd)
+	if err != nil {
+		return nil, err
+	}
+	mapData["kind"] = "CustomResourceDefinition"
+	mapData["apiVersion"] = apiext.SchemeGroupVersion.String()
+
+	return &unstructured.Unstructured{
+		Object: mapData,
+	}, unstructured.SetNestedField(mapData, false, "spec", "preserveUnknownFields")
 }
 
 func NamespacedType(name string) CRD {
@@ -496,12 +500,6 @@ func (f *Factory) createCRD(ctx context.Context, crdDef CRD, ready map[string]*a
 		return nil, err
 	}
 
-	if !crdDef.HasOverride() {
-		if err := f.patchPreserveUnknownFields(ctx, meta.GetName()); err != nil {
-			return nil, err
-		}
-	}
-
 	logrus.Infof("Applying CRD %s", meta.GetName())
 	if err := f.apply.WithOwner(crd).ApplyObjects(crd); err != nil {
 		return nil, err
@@ -516,28 +514,6 @@ func (f *Factory) ensureAccess(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 	return true, err
-}
-
-func (f *Factory) patchPreserveUnknownFields(ctx context.Context, name string) error {
-	existingCrd, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	if _, err := f.CRDClient.ApiextensionsV1().CustomResourceDefinitions().Patch(
-		ctx,
-		existingCrd.Name,
-		types.MergePatchType,
-		[]byte(`{"spec":{"preserveUnknownFields":false}}`),
-		metav1.PatchOptions{},
-	); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (f *Factory) getReadyCRDs(ctx context.Context) (map[string]*apiext.CustomResourceDefinition, error) {
