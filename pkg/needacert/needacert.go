@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ func Register(ctx context.Context,
 
 	mutatingController.Cache().AddIndexer(byServiceIndex, mutatingWebhookServices)
 	validatingController.Cache().AddIndexer(byServiceIndex, validatingWebhookServices)
+	crdController.Cache().AddIndexer(byServiceIndex, crdWebhookServices)
 
 	mutatingController.OnChange(ctx, "need-a-cert", h.OnMutationWebhookChange)
 	validatingController.OnChange(ctx, "need-a-cert", h.OnValidatingWebhookChange)
@@ -75,6 +77,20 @@ func validatingWebhookServices(obj *adminregv1.ValidatingWebhookConfiguration) (
 		}
 	}
 	return
+}
+
+func crdWebhookServices(obj *apiextv1.CustomResourceDefinition) (result []string, _ error) {
+	if obj.Spec.Conversion != nil &&
+		obj.Spec.Conversion.Webhook != nil &&
+		obj.Spec.Conversion.Webhook.ClientConfig != nil &&
+		obj.Spec.Conversion.Webhook.ClientConfig.Service != nil {
+		return []string{
+			fmt.Sprintf("%s/%s",
+				obj.Spec.Conversion.Webhook.ClientConfig.Service.Namespace,
+				obj.Spec.Conversion.Webhook.ClientConfig.Service.Name),
+		}, nil
+	}
+	return nil, nil
 }
 
 func mutatingWebhookServices(obj *adminregv1.MutatingWebhookConfiguration) (result []string, _ error) {
