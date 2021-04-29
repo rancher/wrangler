@@ -67,7 +67,7 @@ type handler struct {
 	serviceCache       corecontrollers.ServiceCache
 	mutatingWebHooks   admissionregcontrollers.MutatingWebhookConfigurationController
 	validatingWebHooks admissionregcontrollers.ValidatingWebhookConfigurationController
-	crds               apiextcontrollers.CustomResourceDefinitionClient
+	crds               apiextcontrollers.CustomResourceDefinitionController
 }
 
 func validatingWebhookServices(obj *adminregv1.ValidatingWebhookConfiguration) (result []string, _ error) {
@@ -106,15 +106,13 @@ func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.Mutati
 	if webhook == nil {
 		return nil, nil
 	}
-	for _, webhookConfig := range webhook.Webhooks {
+	for i, webhookConfig := range webhook.Webhooks {
 		if webhookConfig.ClientConfig.Service == nil || webhookConfig.ClientConfig.Service.Name == "" {
 			continue
 		}
 
 		service, err := h.serviceCache.Get(webhookConfig.ClientConfig.Service.Namespace, webhookConfig.ClientConfig.Service.Name)
-		if apierror.IsNotFound(err) {
-			return webhook, nil
-		} else if err != nil {
+		if err != nil {
 			return nil, err
 		}
 
@@ -127,9 +125,7 @@ func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.Mutati
 
 		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 			webhook = webhook.DeepCopy()
-			for i := range webhook.Webhooks {
-				webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
-			}
+			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
 			webhook, err = h.mutatingWebHooks.Update(webhook)
 			if err != nil {
 				return webhook, err
@@ -144,15 +140,13 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 	if webhook == nil {
 		return nil, nil
 	}
-	for _, webhookConfig := range webhook.Webhooks {
+	for i, webhookConfig := range webhook.Webhooks {
 		if webhookConfig.ClientConfig.Service == nil || webhookConfig.ClientConfig.Service.Name == "" {
 			continue
 		}
 
 		service, err := h.serviceCache.Get(webhookConfig.ClientConfig.Service.Namespace, webhookConfig.ClientConfig.Service.Name)
-		if apierror.IsNotFound(err) {
-			return webhook, nil
-		} else if err != nil {
+		if err != nil {
 			return nil, err
 		}
 
@@ -165,9 +159,7 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 
 		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 			webhook = webhook.DeepCopy()
-			for i := range webhook.Webhooks {
-				webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
-			}
+			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
 			webhook, err = h.validatingWebHooks.Update(webhook)
 			if err != nil {
 				return webhook, err
@@ -181,6 +173,11 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 func (h *handler) OnService(key string, service *corev1.Service) (*corev1.Service, error) {
 	if service == nil {
 		return service, nil
+	}
+
+	_, err := h.generateSecret(service)
+	if err != nil {
+		return nil, err
 	}
 
 	indexKey := service.Namespace + "/" + service.Name
@@ -200,7 +197,14 @@ func (h *handler) OnService(key string, service *corev1.Service) (*corev1.Servic
 		h.validatingWebHooks.Enqueue(validating.Name)
 	}
 
-	_, err = h.generateSecret(service)
+	crd, err := h.crds.Cache().GetByIndex(byServiceIndex, indexKey)
+	if err != nil {
+		return nil, err
+	}
+	for _, crd := range crd {
+		h.crds.Enqueue(crd.Name)
+	}
+
 	return nil, err
 }
 
@@ -214,9 +218,7 @@ func (h *handler) OnCRDChange(key string, crd *apiextv1.CustomResourceDefinition
 
 	service, err := h.serviceCache.Get(crd.Spec.Conversion.Webhook.ClientConfig.Service.Namespace,
 		crd.Spec.Conversion.Webhook.ClientConfig.Service.Name)
-	if apierror.IsNotFound(err) {
-		return crd, nil
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 
