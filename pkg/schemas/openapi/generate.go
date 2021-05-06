@@ -121,7 +121,7 @@ func typeToProps(typeName string, schemas *types.Schemas, inflight map[string]bo
 		}
 		jsp.Type = "object"
 		jsp.Nullable = true
-		if additionalProps.Type != "object" {
+		if subType != "json" {
 			jsp.AdditionalProperties = &v1.JSONSchemaPropsOrBool{
 				Allows: true,
 				Schema: additionalProps,
