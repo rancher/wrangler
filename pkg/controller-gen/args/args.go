@@ -2,12 +2,11 @@ package args
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/gengo/types"
 )
 
 type CustomArgs struct {
 	Package      string
-	TypesByGroup map[schema.GroupVersion][]*types.Name
+	TypesByGroup map[schema.GroupVersion][]*Name
 	Options      Options
 	OutputBase   string
 }
@@ -22,6 +21,10 @@ type Type struct {
 	Version string
 	Package string
 	Name    string
+
+	Namespaced bool
+	HasStatus bool
+	StatusType string
 }
 
 type Group struct {

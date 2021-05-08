@@ -21,6 +21,20 @@ const (
 	objectComment = "+k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object"
 )
 
+type Name struct {
+	// Empty if embedded or builtin. This is the package path unless Path is specified.
+	Package string
+	// The type name.
+	Name string
+	// An optional location of the type definition for languages that can have disjoint
+	// packages and paths.
+	Path string
+
+	Namespaced bool
+	HasStatus  bool
+	StatusType string
+}
+
 func translate(types []Type, err error) (result []interface{}, _ error) {
 	for _, v := range types {
 		result = append(result, v)
@@ -28,7 +42,7 @@ func translate(types []Type, err error) (result []interface{}, _ error) {
 	return result, err
 }
 
-func ObjectsToGroupVersion(group string, objs []interface{}, ret map[schema.GroupVersion][]*types.Name) error {
+func ObjectsToGroupVersion(group string, objs []interface{}, ret map[schema.GroupVersion][]*Name) error {
 	for _, obj := range objs {
 		if s, ok := obj.(string); ok {
 			types, err := translate(ScanDirectory(s))
@@ -52,17 +66,23 @@ func ObjectsToGroupVersion(group string, objs []interface{}, ret map[schema.Grou
 	return nil
 }
 
-func toVersionType(obj interface{}) (string, *types.Name) {
+func toVersionType(obj interface{}) (string, *Name) {
 	switch v := obj.(type) {
 	case Type:
-		return v.Version, &types.Name{
-			Package: v.Package,
-			Name:    v.Name,
+		return v.Version, &Name{
+			Package:    v.Package,
+			Name:       v.Name,
+			HasStatus:  v.HasStatus,
+			Namespaced: v.Namespaced,
+			StatusType: v.StatusType,
 		}
 	case *Type:
-		return v.Version, &types.Name{
-			Package: v.Package,
-			Name:    v.Name,
+		return v.Version, &Name{
+			Package:    v.Package,
+			Name:       v.Name,
+			HasStatus:  v.HasStatus,
+			StatusType: v.StatusType,
+			Namespaced: v.Namespaced,
 		}
 	}
 
@@ -70,10 +90,13 @@ func toVersionType(obj interface{}) (string, *types.Name) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
+	statusField, hasStatus := t.FieldByName("Status")
 	pkg := path.Vendorless(t.PkgPath())
-	return versionFromPackage(pkg), &types.Name{
-		Package: pkg,
-		Name:    t.Name(),
+	return versionFromPackage(pkg), &Name{
+		Package:   pkg,
+		Name:      t.Name(),
+		HasStatus: hasStatus,
+		StatusType: statusField.Type.Name(),
 	}
 }
 
@@ -115,14 +138,30 @@ func ScanDirectory(pkgPath string) (result []Type, err error) {
 		if !ok {
 			continue
 		}
+
+		hasStatus := false
+		statusType := ""
+		for i := 0; i < s.NumFields(); i++ {
+			f := s.Field(i)
+			if f.Name() == "Status" {
+				hasStatus = true
+				if _, ok := f.Type().(*gotypes.Named); !ok {
+					hasStatus = false
+					continue
+				}
+				statusType = f.Type().(*gotypes.Named).Obj().Name()
+			}
+		}
 		for i := 0; i < s.NumFields(); i++ {
 			f := s.Field(i)
 			if f.Embedded() && f.Type().String() == "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta" {
 				pkgPath := path.Vendorless(pkgs[0].PkgPath)
 				result = append(result, Type{
-					Package: pkgPath,
-					Version: versionFromPackage(pkgPath),
-					Name:    typeAndName.Name(),
+					Package:    pkgPath,
+					Version:    versionFromPackage(pkgPath),
+					Name:       typeAndName.Name(),
+					HasStatus:  hasStatus,
+					StatusType: statusType,
 				})
 			}
 		}
