@@ -61,12 +61,13 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		},
 	}
 
+	review.Response = &response.AdmissionResponse
+
 	if err := r.admit(response, review.Request, req); err != nil {
 		r.sendError(rw, review, err)
 		return
 	}
 
-	review.Response = &response.AdmissionResponse
 	writeResponse(rw, review)
 }
 
