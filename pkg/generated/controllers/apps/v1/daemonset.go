@@ -360,6 +360,10 @@ func (a *daemonSetGeneratingHandler) Remove(key string, obj *v1.DaemonSet) (*v1.
 }
 
 func (a *daemonSetGeneratingHandler) Handle(obj *v1.DaemonSet, status v1.DaemonSetStatus) (v1.DaemonSetStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.DaemonSetGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

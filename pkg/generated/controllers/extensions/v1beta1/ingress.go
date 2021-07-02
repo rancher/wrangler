@@ -360,6 +360,10 @@ func (a *ingressGeneratingHandler) Remove(key string, obj *v1beta1.Ingress) (*v1
 }
 
 func (a *ingressGeneratingHandler) Handle(obj *v1beta1.Ingress, status v1beta1.IngressStatus) (v1beta1.IngressStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.IngressGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
