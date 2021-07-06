@@ -117,7 +117,7 @@ func ScanDirectory(pkgPath string) (result []Type, err error) {
 		}
 		for i := 0; i < s.NumFields(); i++ {
 			f := s.Field(i)
-			if f.Embedded() && f.Type().String() == "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta" {
+			if f.Embedded() && f.Name() == "ObjectMeta" {
 				pkgPath := path.Vendorless(pkgs[0].PkgPath)
 				result = append(result, Type{
 					Package: pkgPath,
