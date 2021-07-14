@@ -13,6 +13,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -80,6 +81,7 @@ func main() {
 			apiextv1.GroupName: {
 				Types: []interface{}{
 					apiextv1.CustomResourceDefinition{},
+					apiextv1beta1.CustomResourceDefinition{},
 				},
 				ClientSetPackage: "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
 				InformersPackage: "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions",

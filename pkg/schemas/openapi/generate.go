@@ -8,7 +8,7 @@ import (
 
 	types "github.com/rancher/wrangler/pkg/schemas"
 	"github.com/rancher/wrangler/pkg/schemas/definition"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 func MustGenerate(obj interface{}) *v1.JSONSchemaProps {
