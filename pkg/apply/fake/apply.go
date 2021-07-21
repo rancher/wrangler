@@ -96,6 +96,10 @@ func (f *FakeApply) WithNoDelete() apply.Apply {
 	return f
 }
 
+func (f *FakeApply) WithNoDeleteGVK() apply.Apply {
+	return f
+}
+
 func (f *FakeApply) WithContext(ctx context.Context) apply.Apply {
 	return f
 }
