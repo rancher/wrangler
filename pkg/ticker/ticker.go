@@ -7,9 +7,18 @@ import (
 
 func Context(ctx context.Context, duration time.Duration) <-chan time.Time {
 	ticker := time.NewTicker(duration)
+	c := make(chan time.Time)
 	go func() {
-		<-ctx.Done()
-		ticker.Stop()
+		for {
+			select {
+			case t := <-ticker.C:
+				c <- t
+			case <-ctx.Done():
+				close(c)
+				ticker.Stop()
+				return
+			}
+		}
 	}()
-	return ticker.C
+	return c
 }
