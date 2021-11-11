@@ -1,17 +1,21 @@
 package apply
 
 import (
+	"context"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/pkg/errors"
 	gvk2 "github.com/rancher/wrangler/pkg/gvk"
 	"github.com/rancher/wrangler/pkg/merr"
 	"github.com/rancher/wrangler/pkg/objectset"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -341,25 +345,21 @@ func (o *desiredSet) list(namespaced bool, informer cache.SharedIndexInformer, c
 	)
 
 	if informer == nil {
-		var c dynamic.ResourceInterface
+		// if a lister namespace is set assume all objects will belong to the listerNamespace
+		var namespaces []string
 		if o.listerNamespace != "" {
-			c = client.Namespace(o.listerNamespace)
+			namespaces = append(namespaces, o.listerNamespace)
 		} else {
-			c = client
+			namespaces = o.objs.Namespaces()
 		}
 
-		list, err := c.List(o.ctx, v1.ListOptions{
-			LabelSelector: selector.String(),
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, obj := range list.Items {
-			copy := obj
-			if err := addObjectToMap(objs, &copy); err != nil {
+		err := multiNamespaceList(o.ctx, namespaces, client, selector, func(obj unstructured.Unstructured) {
+			if err := addObjectToMap(objs, &obj); err != nil {
 				errs = append(errs, err)
 			}
+		})
+		if err != nil {
+			errs = append(errs, err)
 		}
 
 		return objs, merr.NewErrors(errs...)
@@ -432,4 +432,33 @@ func addObjectToMap(objs map[objectset.ObjectKey]runtime.Object, obj interface{}
 	}] = obj.(runtime.Object)
 
 	return nil
+}
+
+// multiNamespaceList lists objects across all given namespaces, because requests are concurrent it is possible for appendFn to be called before errors are reported.
+func multiNamespaceList(ctx context.Context, namespaces []string, baseClient dynamic.NamespaceableResourceInterface, selector labels.Selector, appendFn func(obj unstructured.Unstructured)) error {
+	var mu sync.Mutex
+	wg, _ctx := errgroup.WithContext(ctx)
+
+	// list all namespaces concurrently
+	for _, namespace := range namespaces {
+		namespace := namespace
+		wg.Go(func() error {
+			list, err := baseClient.Namespace(namespace).List(_ctx, v1.ListOptions{
+				LabelSelector: selector.String(),
+			})
+			if err != nil {
+				return err
+			}
+
+			mu.Lock()
+			for _, obj := range list.Items {
+				appendFn(obj)
+			}
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	return wg.Wait()
 }
