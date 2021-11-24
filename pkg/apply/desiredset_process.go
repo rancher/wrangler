@@ -443,9 +443,15 @@ func multiNamespaceList(ctx context.Context, namespaces []string, baseClient dyn
 	for _, namespace := range namespaces {
 		namespace := namespace
 		wg.Go(func() error {
-			list, err := baseClient.Namespace(namespace).List(_ctx, v1.ListOptions{
-				LabelSelector: selector.String(),
-			})
+			var list *unstructured.UnstructuredList
+			var err error
+
+			if namespace == "" {
+				list, err = baseClient.List(_ctx, v1.ListOptions{LabelSelector: selector.String()})
+			} else {
+				list, err = baseClient.Namespace(namespace).List(_ctx, v1.ListOptions{LabelSelector: selector.String()})
+
+			}
 			if err != nil {
 				return err
 			}
