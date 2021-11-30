@@ -251,7 +251,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 
 	reconciler := o.reconcilers[gvk]
 
-	existing, err := o.list(nsed, controller, client, set)
+	existing, err := o.list(nsed, controller, client, set, objs)
 	if err != nil {
 		o.err(errors.Wrapf(err, "failed to list %s for %s", gvk, debugID))
 		return
@@ -338,19 +338,22 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 	}
 }
 
-func (o *desiredSet) list(namespaced bool, informer cache.SharedIndexInformer, client dynamic.NamespaceableResourceInterface, selector labels.Selector) (map[objectset.ObjectKey]runtime.Object, error) {
+func (o *desiredSet) list(namespaced bool, informer cache.SharedIndexInformer, client dynamic.NamespaceableResourceInterface,
+	selector labels.Selector, desiredObjects map[objectset.ObjectKey]runtime.Object) (map[objectset.ObjectKey]runtime.Object, error) {
 	var (
 		errs []error
 		objs = map[objectset.ObjectKey]runtime.Object{}
 	)
 
 	if informer == nil {
-		// if a lister namespace is set assume all objects will belong to the listerNamespace
+		// if a lister namespace is set assume all objects belong to the listerNamespace
+		// otherwise use distinct namespaces from the desired objects
+		// (even if not namespaced as we'll get a single empty namespace in this case which is working OK)
 		var namespaces []string
 		if o.listerNamespace != "" {
 			namespaces = append(namespaces, o.listerNamespace)
 		} else {
-			namespaces = o.objs.Namespaces()
+			namespaces = getDistinctNamespaces(desiredObjects)
 		}
 
 		err := multiNamespaceList(o.ctx, namespaces, client, selector, func(obj unstructured.Unstructured) {
@@ -461,4 +464,24 @@ func multiNamespaceList(ctx context.Context, namespaces []string, baseClient dyn
 	}
 
 	return wg.Wait()
+}
+
+func getDistinctNamespaces(objs map[objectset.ObjectKey]runtime.Object) (namespaces []string) {
+	for objKey, _ := range objs {
+		var duplicate bool
+		for i := range namespaces {
+			if namespaces[i] == objKey.Namespace {
+				duplicate = true
+				break
+			}
+		}
+
+		if duplicate {
+			continue
+		}
+
+		namespaces = append(namespaces, objKey.Namespace)
+	}
+
+	return
 }
