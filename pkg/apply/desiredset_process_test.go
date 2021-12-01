@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rancher/wrangler/pkg/objectset"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -105,59 +104,6 @@ func Test_multiNamespaceList(t *testing.T) {
 			if tt.expectedCalls >= 0 {
 				assert.Equal(t, tt.expectedCalls, calls)
 			}
-		})
-	}
-}
-
-func TestObjectSet_getDistinctNamespaces(t *testing.T) {
-	tests := []struct {
-		name           string
-		objects        map[objectset.ObjectKey]runtime.Object
-		wantNamespaces []string
-	}{
-		{
-			name:           "empty",
-			objects:        map[objectset.ObjectKey]runtime.Object{},
-			wantNamespaces: nil,
-		},
-		{
-			name: "1 namespace",
-			objects: map[objectset.ObjectKey]runtime.Object{
-				objectset.ObjectKey{Namespace: "ns1", Name: "a"}: nil,
-				objectset.ObjectKey{Namespace: "ns1", Name: "b"}: nil,
-			},
-			wantNamespaces: []string{"ns1"},
-		},
-		{
-			name: "many namespaces",
-			objects: map[objectset.ObjectKey]runtime.Object{
-				objectset.ObjectKey{Namespace: "ns1", Name: "a"}: nil,
-				objectset.ObjectKey{Namespace: "ns2", Name: "b"}: nil,
-			},
-			wantNamespaces: []string{"ns1", "ns2"},
-		},
-		{
-			name: "many namespaces with duplicates",
-			objects: map[objectset.ObjectKey]runtime.Object{
-				objectset.ObjectKey{Namespace: "ns1", Name: "a"}: nil,
-				objectset.ObjectKey{Namespace: "ns2", Name: "b"}: nil,
-				objectset.ObjectKey{Namespace: "ns1", Name: "c"}: nil,
-			},
-			wantNamespaces: []string{"ns1", "ns2"},
-		},
-		{
-			name: "missing namespace",
-			objects: map[objectset.ObjectKey]runtime.Object{
-				objectset.ObjectKey{Namespace: "ns1", Name: "a"}: nil,
-				objectset.ObjectKey{Name: "b"}:                   nil,
-			},
-			wantNamespaces: []string{"", "ns1"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotNamespaces := getDistinctNamespaces(tt.objects)
-			assert.ElementsMatchf(t, tt.wantNamespaces, gotNamespaces, "getDistinctNamespaces() = %v, want %v", gotNamespaces, tt.wantNamespaces)
 		})
 	}
 }
