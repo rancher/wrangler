@@ -96,7 +96,7 @@ func (f *FakeApply) WithNoDelete() apply.Apply {
 	return f
 }
 
-func (f *FakeApply) WithNoDeleteGVK() apply.Apply {
+func (f *FakeApply) WithNoDeleteGVK(gvks ...schema.GroupVersionKind) apply.Apply {
 	return f
 }
 
