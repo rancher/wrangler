@@ -87,7 +87,7 @@ func originalAndModified(gvk schema.GroupVersionKind, oldMetadata v1.Object, new
 		return nil, nil, err
 	}
 
-	modified, err := json.Marshal(newObject)
+	modified, err := marshalWithOrderedKeys(newObject)
 
 	return original, modified, err
 }
@@ -184,7 +184,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		original = nil
 	}
 
-	current, err := json.Marshal(oldObject)
+	current, err := marshalWithOrderedKeys(oldObject)
 	if err != nil {
 		return false, err
 	}
@@ -451,4 +451,18 @@ func doPatch(gvk schema.GroupVersionKind, original, modified, current []byte, di
 	}
 
 	return patchType, patch, err
+}
+
+// marshalWithOrderedKeys will marshal the object, unmarshal it to a map[string]interface{}, and then marshal the map.
+// This is to make key order deterministic.
+func marshalWithOrderedKeys(obj runtime.Object) ([]byte, error) {
+	bytes, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(bytes, &m); err != nil {
+		return nil, err
+	}
+	return json.Marshal(m)
 }
