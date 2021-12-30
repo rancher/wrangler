@@ -12,7 +12,7 @@ require (
 	github.com/moby/locker v1.0.1
 	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08
+	github.com/rancher/lasso v0.0.0-20211217013041-3c6118a30611
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
