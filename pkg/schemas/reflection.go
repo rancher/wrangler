@@ -269,6 +269,8 @@ func (s *Schemas) readFields(schema *Schema, t reflect.Type) error {
 		} else if fieldType.Kind() == reflect.Bool {
 			schemaField.Nullable = false
 		} else if fieldType.Kind() == reflect.Int ||
+			fieldType.Kind() == reflect.Uint ||
+			fieldType.Kind() == reflect.Uintptr ||
 			fieldType.Kind() == reflect.Uint32 ||
 			fieldType.Kind() == reflect.Int32 ||
 			fieldType.Kind() == reflect.Uint64 ||
@@ -472,6 +474,10 @@ func (s *Schemas) determineSchemaType(t reflect.Type) (string, error) {
 	case reflect.Int:
 		fallthrough
 	case reflect.Int32:
+		fallthrough
+	case reflect.Uint:
+		fallthrough
+	case reflect.Uintptr:
 		fallthrough
 	case reflect.Uint32:
 		fallthrough
