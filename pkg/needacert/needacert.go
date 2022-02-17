@@ -112,7 +112,11 @@ func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.Mutati
 		}
 
 		service, err := h.serviceCache.Get(webhookConfig.ClientConfig.Service.Namespace, webhookConfig.ClientConfig.Service.Name)
-		if err != nil {
+		if apierror.IsNotFound(err) {
+			// OnService will be called when the service is created, which will eventually update the webhook, so no
+			// need to enqueue anything if we don't find the service
+			return webhook, nil
+		} else if err != nil {
 			return nil, err
 		}
 
@@ -146,7 +150,11 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 		}
 
 		service, err := h.serviceCache.Get(webhookConfig.ClientConfig.Service.Namespace, webhookConfig.ClientConfig.Service.Name)
-		if err != nil {
+		if apierror.IsNotFound(err) {
+			// OnService will be called when the service is created, which will eventually update the webhook, so no
+			// need to enqueue anything if we don't find the service
+			return webhook, nil
+		} else if err != nil {
 			return nil, err
 		}
 
@@ -218,7 +226,12 @@ func (h *handler) OnCRDChange(key string, crd *apiextv1.CustomResourceDefinition
 
 	service, err := h.serviceCache.Get(crd.Spec.Conversion.Webhook.ClientConfig.Service.Namespace,
 		crd.Spec.Conversion.Webhook.ClientConfig.Service.Name)
-	if err != nil {
+
+	if apierror.IsNotFound(err) {
+		// OnService will be called when the service is created, which will eventually update the CRD, so no
+		// need to enqueue anything if we don't find the service
+		return crd, nil
+	} else if err != nil {
 		return nil, err
 	}
 
