@@ -471,23 +471,9 @@ func (s *Schemas) determineSchemaType(t reflect.Type) (string, error) {
 		return "byte", nil
 	case reflect.Bool:
 		return "boolean", nil
-	case reflect.Int:
-		fallthrough
-	case reflect.Int32:
-		fallthrough
-	case reflect.Uint:
-		fallthrough
-	case reflect.Uintptr:
-		fallthrough
-	case reflect.Uint32:
-		fallthrough
-	case reflect.Uint64:
-		fallthrough
-	case reflect.Int64:
+	case reflect.Int, reflect.Int32, reflect.Uint, reflect.Uintptr, reflect.Uint32, reflect.Uint64, reflect.Int64:
 		return "int", nil
-	case reflect.Float32:
-		fallthrough
-	case reflect.Float64:
+	case reflect.Float32, reflect.Float64:
 		return "float", nil
 	case reflect.Interface:
 		return "json", nil
