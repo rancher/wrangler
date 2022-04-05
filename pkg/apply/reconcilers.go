@@ -24,7 +24,7 @@ var (
 	}
 )
 
-func reconcileDaemonSet(oldObj, newObj runtime.Object) (bool, error) {
+func reconcileDaemonSet(oldObj, _, newObj runtime.Object) (bool, error) {
 	oldSvc, ok := oldObj.(*appsv1.DaemonSet)
 	if !ok {
 		oldSvc = &appsv1.DaemonSet{}
@@ -47,7 +47,7 @@ func reconcileDaemonSet(oldObj, newObj runtime.Object) (bool, error) {
 	return false, nil
 }
 
-func reconcileDeployment(oldObj, newObj runtime.Object) (bool, error) {
+func reconcileDeployment(oldObj, _, newObj runtime.Object) (bool, error) {
 	oldSvc, ok := oldObj.(*appsv1.Deployment)
 	if !ok {
 		oldSvc = &appsv1.Deployment{}
@@ -70,7 +70,7 @@ func reconcileDeployment(oldObj, newObj runtime.Object) (bool, error) {
 	return false, nil
 }
 
-func reconcileSecret(oldObj, newObj runtime.Object) (bool, error) {
+func reconcileSecret(oldObj, _, newObj runtime.Object) (bool, error) {
 	oldSvc, ok := oldObj.(*v1.Secret)
 	if !ok {
 		oldSvc = &v1.Secret{}
@@ -93,7 +93,7 @@ func reconcileSecret(oldObj, newObj runtime.Object) (bool, error) {
 	return false, nil
 }
 
-func reconcileService(oldObj, newObj runtime.Object) (bool, error) {
+func reconcileService(oldObj, _, newObj runtime.Object) (bool, error) {
 	oldSvc, ok := oldObj.(*v1.Service)
 	if !ok {
 		oldSvc = &v1.Service{}
@@ -116,7 +116,7 @@ func reconcileService(oldObj, newObj runtime.Object) (bool, error) {
 	return false, nil
 }
 
-func reconcileJob(oldObj, newObj runtime.Object) (bool, error) {
+func reconcileJob(oldObj, newObj, _ runtime.Object) (bool, error) {
 	oldSvc, ok := oldObj.(*batchv1.Job)
 	if !ok {
 		oldSvc = &batchv1.Job{}

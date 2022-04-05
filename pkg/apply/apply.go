@@ -23,7 +23,7 @@ const (
 type Patcher func(namespace, name string, pt types.PatchType, data []byte) (runtime.Object, error)
 
 // return false if the Reconciler did not handler this object
-type Reconciler func(oldObj runtime.Object, newObj runtime.Object) (bool, error)
+type Reconciler func(oldObj runtime.Object, newObjPruned, newObj runtime.Object) (bool, error)
 
 type ClientFactory func(gvr schema.GroupVersionResource) (dynamic.NamespaceableResourceInterface, error)
 

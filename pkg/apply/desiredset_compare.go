@@ -213,6 +213,14 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		if err != nil {
 			return false, err
 		}
+
+		// We round trip the object here because when serializing to the applied
+		// annotation values are truncated to 64 bytes.
+		newObjectPruned, err := getOriginalObject(gvk, newObject.(v1.Object))
+		if err != nil {
+			return false, err
+		}
+
 		originalObject, err := getOriginalObject(gvk, oldMetadata)
 		if err != nil {
 			return false, err
@@ -220,7 +228,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		if originalObject == nil {
 			originalObject = oldObject
 		}
-		handled, err := reconciler(originalObject, newObject)
+		handled, err := reconciler(originalObject, newObjectPruned, newObject)
 		if err != nil {
 			return false, err
 		}
