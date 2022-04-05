@@ -31,6 +31,7 @@ func main() {
 					v1.ServiceAccount{},
 					v1.Endpoints{},
 					v1.ConfigMap{},
+					v1.PersistentVolume{},
 					v1.PersistentVolumeClaim{},
 					v1.Pod{},
 				},
