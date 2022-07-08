@@ -1,4 +1,4 @@
-Wrangler [BETA - Lacks full documentation]
+Wrangler
 --------
 Framework for wrapping clients, informers, listers into a simple
 usable controller pattern that promotes some good practices.
@@ -22,9 +22,7 @@ additionally generate a controller per type.  The interface to the
 controller looks as follows
 
 To use the controller all one needs to do is register simple OnChange handlers.  Also in the
-interface is access to the client and caches in a simple flat API. refer to
-[main.go](https://github.com/rancher/wrangler-sample/blob/master/main.go) and [controller.go](https://github.com/rancher/wrangler-sample/blob/master/controller.go) in
- the [sample project](https://github.com/rancher/wrangler-sample) for more complete usage.
+interface is access to the client and caches in a simple flat API.
 
 ```golang
 type FooController interface {
