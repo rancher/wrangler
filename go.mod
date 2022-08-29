@@ -20,7 +20,7 @@ require (
 	k8s.io/code-generator v0.24.0
 	k8s.io/gengo v0.0.0-20211129171323-c02415ce4185
 	k8s.io/kube-aggregator v0.24.0
-	sigs.k8s.io/cli-utils v0.27.0
+	sigs.k8s.io/cli-utils v0.33.0
 )
 
 require (
@@ -65,5 +65,5 @@ require (
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
