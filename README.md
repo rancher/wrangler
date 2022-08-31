@@ -26,7 +26,6 @@ Wrangler is a framework for using controllers. Controllers wrap clients, informe
 	2. [How to Run Handlers](#how-to-run-handlers)
 	3. [Different Ways of Interacting with Objects](#different-ways-of-interacting-with-objects)
 	4. [A Look at Structures Used in Wrangler](#a-look-at-structures-used-in-wrangler)
-3. [Documentation TODO](#documentation-todo)
 
 <br>
 
@@ -319,7 +318,7 @@ type FooClient interface {
 	// Update updates the given object in kubernetes
 	Update(*v1alpha1.Foo) (*v1alpha1.Foo, error)
 	// Status of type's CRD must be a subresource for this method to be generated. Only updates
-	// status and does not trigger OnChange handlers. TODO: confirm this.
+	// status and does not trigger OnChange handlers.
 	UpdateStatus(*v1alpha1.Foo) (*v1alpha1.Foo, error)
 	// Delete deletes the given object in kubernetes
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
