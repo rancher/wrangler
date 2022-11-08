@@ -76,20 +76,15 @@ func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (ru
 	return obj, nil
 }
 
-func originalAndModified(gvk schema.GroupVersionKind, oldMetadata v1.Object, newObject runtime.Object) ([]byte, []byte, error) {
-	original, err := getOriginalBytes(gvk, oldMetadata)
+func getModified(gvk schema.GroupVersionKind, newObject runtime.Object) ([]byte, error) {
+	newObject, err := prepareObjectForCreate(gvk, newObject)
 	if err != nil {
-		return nil, nil, err
-	}
-
-	newObject, err = prepareObjectForCreate(gvk, newObject)
-	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	modified, err := json.Marshal(newObject)
 
-	return original, modified, err
+	return modified, err
 }
 
 func emptyMaps(data map[string]interface{}, keys ...string) bool {
@@ -175,7 +170,11 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		return false, err
 	}
 
-	original, modified, err := originalAndModified(gvk, oldMetadata, newObject)
+	original, err := getOriginalBytes(gvk, oldMetadata)
+	if err != nil {
+		return false, err
+	}
+	modified, err := getModified(gvk, newObject)
 	if err != nil {
 		return false, err
 	}
