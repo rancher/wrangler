@@ -45,24 +45,26 @@ var (
 	}
 )
 
-func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (runtime.Object, error) {
-	serialized, err := serializeApplied(obj)
-	if err != nil {
-		return nil, err
-	}
+func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object, ignoreOriginal bool) (runtime.Object, error) {
+	if !ignoreOriginal {
+		serialized, err := serializeApplied(obj)
+		if err != nil {
+			return nil, err
+		}
 
-	obj = obj.DeepCopyObject()
-	m, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, err
-	}
-	annotations := m.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
+		obj = obj.DeepCopyObject()
+		m, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		annotations := m.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
 
-	annotations[LabelApplied] = appliedToAnnotation(serialized)
-	m.SetAnnotations(annotations)
+		annotations[LabelApplied] = appliedToAnnotation(serialized)
+		m.SetAnnotations(annotations)
+	}
 
 	typed, err := meta.TypeAccessor(obj)
 	if err != nil {
@@ -76,8 +78,8 @@ func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (ru
 	return obj, nil
 }
 
-func getModified(gvk schema.GroupVersionKind, newObject runtime.Object) ([]byte, error) {
-	newObject, err := prepareObjectForCreate(gvk, newObject)
+func getModified(gvk schema.GroupVersionKind, newObject runtime.Object, ignoreOriginal bool) ([]byte, error) {
+	newObject, err := prepareObjectForCreate(gvk, newObject, ignoreOriginal)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +181,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		}
 	}
 
-	modified, err := getModified(gvk, newObject)
+	modified, err := getModified(gvk, newObject, ignoreOriginal)
 	if err != nil {
 		return false, err
 	}
@@ -209,7 +211,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 
 	logrus.Debugf("DesiredSet - Patch %s %s/%s for %s -- [PATCH:%s, ORIGINAL:%s, MODIFIED:%s, CURRENT:%s]", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID, patch, original, modified, current)
 	if reconciler != nil {
-		newObject, err := prepareObjectForCreate(gvk, newObject)
+		newObject, err := prepareObjectForCreate(gvk, newObject, false)
 		if err != nil {
 			return false, err
 		}
@@ -295,7 +297,7 @@ func getOriginalObject(gvk schema.GroupVersionKind, obj v1.Object) (runtime.Obje
 	removeCreationTimestamp(mapObj)
 	return prepareObjectForCreate(gvk, &unstructured.Unstructured{
 		Object: mapObj,
-	})
+	}, false)
 }
 
 func getOriginalBytes(gvk schema.GroupVersionKind, obj v1.Object) ([]byte, error) {
