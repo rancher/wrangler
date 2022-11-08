@@ -170,17 +170,18 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		return false, err
 	}
 
-	original, err := getOriginalBytes(gvk, oldMetadata)
-	if err != nil {
-		return false, err
+	var original []byte
+
+	if !ignoreOriginal {
+		original, err = getOriginalBytes(gvk, oldMetadata)
+		if err != nil {
+			return false, err
+		}
 	}
+
 	modified, err := getModified(gvk, newObject)
 	if err != nil {
 		return false, err
-	}
-
-	if ignoreOriginal {
-		original = nil
 	}
 
 	current, err := json.Marshal(oldObject)
