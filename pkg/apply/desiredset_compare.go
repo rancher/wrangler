@@ -76,22 +76,6 @@ func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (ru
 	return obj, nil
 }
 
-func originalAndModified(gvk schema.GroupVersionKind, oldMetadata v1.Object, newObject runtime.Object) ([]byte, []byte, error) {
-	original, err := getOriginalBytes(gvk, oldMetadata)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	newObject, err = prepareObjectForCreate(gvk, newObject)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	modified, err := json.Marshal(newObject)
-
-	return original, modified, err
-}
-
 func emptyMaps(data map[string]interface{}, keys ...string) bool {
 	for _, key := range append(keys, "__invalid_key__") {
 		if len(data) == 0 {
@@ -175,7 +159,11 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		return false, err
 	}
 
-	original, modified, err := originalAndModified(gvk, oldMetadata, newObject)
+	original, err := getOriginalBytes(gvk, oldMetadata)
+	if err != nil {
+		return false, err
+	}
+	modified, err := getModifiedBytes(gvk, newObject)
 	if err != nil {
 		return false, err
 	}
@@ -307,6 +295,14 @@ func getOriginalBytes(gvk schema.GroupVersionKind, obj v1.Object) ([]byte, error
 		return []byte("{}"), nil
 	}
 	return json.Marshal(objCopy)
+}
+
+func getModifiedBytes(gvk schema.GroupVersionKind, obj runtime.Object) ([]byte, error) {
+	obj, err := prepareObjectForCreate(gvk, obj)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(obj)
 }
 
 func appliedFromAnnotation(str string) []byte {
