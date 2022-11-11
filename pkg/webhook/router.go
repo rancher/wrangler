@@ -45,7 +45,7 @@ func writeResponse(rw http.ResponseWriter, review *v1.AdmissionReview) {
 	json.NewEncoder(rw).Encode(review)
 }
 
-// ServeHTTP inspects the http.Request and calls the Admit function on all matching handlers.
+// ServeHTTP inspects the http.Request and calls the Admit function on the first matching RouteMatch.
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	review := &v1.AdmissionReview{}
 	err := json.NewDecoder(req.Body).Decode(review)

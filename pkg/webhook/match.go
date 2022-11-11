@@ -28,20 +28,11 @@ func (r *RouteMatch) admit(response *Response, request *Request) error {
 }
 
 func (r *RouteMatch) matches(req *v1.AdmissionRequest) bool {
-	var group, version, kind, resource string
-
-	if req.RequestKind != nil {
-		group, version, kind = req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind
-	}
-	if req.RequestResource != nil {
-		group, version, resource = req.RequestResource.Group, req.RequestResource.Version, req.RequestResource.Resource
-	}
-
-	return checkString(r.kind, kind) &&
-		checkString(r.resource, resource) &&
+	return checkString(r.kind, req.Kind.Kind) &&
+		checkString(r.resource, req.Resource.Resource) &&
 		checkString(r.subResource, req.SubResource) &&
-		checkString(r.version, version) &&
-		checkString(r.group, group) &&
+		checkString(r.version, req.Kind.Version) &&
+		checkString(r.group, req.Kind.Group) &&
 		checkString(r.name, req.Name) &&
 		checkString(r.namespace, req.Namespace) &&
 		checkString(string(r.operation), string(req.Operation)) &&
