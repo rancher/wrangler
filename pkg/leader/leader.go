@@ -52,7 +52,7 @@ func run(ctx context.Context, namespace, name string, client kubernetes.Interfac
 		Lock:          rl,
 		LeaseDuration: 45 * t,
 		RenewDeadline: 30 * t,
-		RetryPeriod:   2 * t,
+		RetryPeriod:   2 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				go cb(ctx)
