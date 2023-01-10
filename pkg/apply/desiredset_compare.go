@@ -447,7 +447,7 @@ func doPatch(gvk schema.GroupVersionKind, original, modified, current []byte, di
 	}
 
 	if err != nil {
-		logrus.Errorf("Failed to calcuated patch: %v", err)
+		logrus.Errorf("Failed to calculate patch: %v", err)
 	}
 
 	return patchType, patch, err
