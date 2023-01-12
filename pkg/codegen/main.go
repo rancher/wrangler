@@ -8,6 +8,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -38,6 +39,15 @@ func main() {
 				InformersPackage: "k8s.io/client-go/informers",
 				ClientSetPackage: "k8s.io/client-go/kubernetes",
 				ListersPackage:   "k8s.io/client-go/listers",
+			},
+			discoveryv1.GroupName: {
+				Types: []interface{}{
+					discoveryv1.EndpointSlice{},
+				},
+				OutputControllerPackageName: "discovery",
+				InformersPackage:            "k8s.io/client-go/informers",
+				ClientSetPackage:            "k8s.io/client-go/kubernetes",
+				ListersPackage:              "k8s.io/client-go/listers",
 			},
 			extensionsv1beta1.GroupName: {
 				Types: []interface{}{
