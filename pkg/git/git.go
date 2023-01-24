@@ -309,7 +309,7 @@ func (g *Git) fetchAndReset(rev string) error {
 }
 
 func (g *Git) reset(rev string) error {
-	return g.git("-C", g.Directory, "reset", "--hard", "--", rev)
+	return g.git("-C", g.Directory, "reset", "--hard", rev)
 }
 
 func (g *Git) currentCommit() (string, error) {
