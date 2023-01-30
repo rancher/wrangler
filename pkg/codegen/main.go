@@ -36,26 +36,17 @@ func main() {
 					v1.PersistentVolumeClaim{},
 					v1.Pod{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 			discoveryv1.GroupName: {
 				Types: []interface{}{
 					discoveryv1.EndpointSlice{},
 				},
 				OutputControllerPackageName: "discovery",
-				InformersPackage:            "k8s.io/client-go/informers",
-				ClientSetPackage:            "k8s.io/client-go/kubernetes",
-				ListersPackage:              "k8s.io/client-go/listers",
 			},
 			extensionsv1beta1.GroupName: {
 				Types: []interface{}{
 					extensionsv1beta1.Ingress{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 			rbacv1.GroupName: {
 				Types: []interface{}{
@@ -65,9 +56,6 @@ func main() {
 					rbacv1.ClusterRoleBinding{},
 				},
 				OutputControllerPackageName: "rbac",
-				InformersPackage:            "k8s.io/client-go/informers",
-				ClientSetPackage:            "k8s.io/client-go/kubernetes",
-				ListersPackage:              "k8s.io/client-go/listers",
 			},
 			appsv1.GroupName: {
 				Types: []interface{}{
@@ -75,67 +63,43 @@ func main() {
 					appsv1.DaemonSet{},
 					appsv1.StatefulSet{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 			storagev1.GroupName: {
 				OutputControllerPackageName: "storage",
 				Types: []interface{}{
 					storagev1.StorageClass{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 			apiextv1.GroupName: {
 				Types: []interface{}{
 					apiextv1.CustomResourceDefinition{},
 				},
-				ClientSetPackage: "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
-				InformersPackage: "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions",
-				ListersPackage:   "k8s.io/apiextensions-apiserver/pkg/client/listers",
 			},
 			apiv1.GroupName: {
 				Types: []interface{}{
 					apiv1.APIService{},
 				},
-				ClientSetPackage: "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset",
-				InformersPackage: "k8s.io/kube-aggregator/pkg/client/informers/externalversions",
-				ListersPackage:   "k8s.io/kube-aggregator/pkg/client/listers",
 			},
 			batchv1.GroupName: {
 				Types: []interface{}{
 					batchv1.Job{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 			networkingv1.GroupName: {
 				Types: []interface{}{
 					networkingv1.NetworkPolicy{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 			admissionregistrationv1.GroupName: {
 				Types: []interface{}{
 					admissionregistrationv1.ValidatingWebhookConfiguration{},
 					admissionregistrationv1.MutatingWebhookConfiguration{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 			coordinationv1.GroupName: {
 				Types: []interface{}{
 					coordinationv1.Lease{},
 				},
-				InformersPackage: "k8s.io/client-go/informers",
-				ClientSetPackage: "k8s.io/client-go/kubernetes",
-				ListersPackage:   "k8s.io/client-go/listers",
 			},
 		},
 	})

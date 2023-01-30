@@ -164,23 +164,6 @@ func (c *{{.lowerName}}Controller) Updater() generic.Updater {
 	}
 }
 
-func Update{{.type}}DeepCopyOnChange(client {{.type}}Client, obj *{{.version}}.{{.type}}, handler func(obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)) (*{{.version}}.{{.type}}, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
 func (c *{{.lowerName}}Controller) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
 	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
