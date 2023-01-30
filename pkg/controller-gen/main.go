@@ -123,7 +123,7 @@ func sourcePackagePath(customArgs *cgargs.CustomArgs, pkgName string) string {
 	return pkg
 }
 
-//until k8s code-gen supports gopath
+// until k8s code-gen supports gopath
 func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
 
 	pathsToCopy := map[string]bool{}
@@ -357,15 +357,6 @@ func generateListers(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 func parseTypes(customArgs *cgargs.CustomArgs) []string {
 	for groupName, group := range customArgs.Options.Groups {
 		if group.GenerateTypes || group.GenerateClients {
-			if group.InformersPackage == "" {
-				group.InformersPackage = filepath.Join(customArgs.Package, "informers/externalversions")
-			}
-			if group.ClientSetPackage == "" {
-				group.ClientSetPackage = filepath.Join(customArgs.Package, "clientset/versioned")
-			}
-			if group.ListersPackage == "" {
-				group.ListersPackage = filepath.Join(customArgs.Package, "listers")
-			}
 			customArgs.Options.Groups[groupName] = group
 		}
 	}
