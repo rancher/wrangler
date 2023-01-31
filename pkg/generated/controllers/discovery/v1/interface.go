@@ -20,6 +20,7 @@ package v1
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	v1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,6 +44,8 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) EndpointSlice() EndpointSliceController {
-	return NewEndpointSliceController(schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}, "endpointslices", true, c.controllerFactory)
+func (v *version) EndpointSlice() EndpointSliceController {
+	return &endpointSliceController{
+		Controller: generic.NewController[*v1.EndpointSlice, *v1.EndpointSliceList](schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}, "endpointslices", true, v.controllerFactory),
+	}
 }

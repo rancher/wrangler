@@ -20,6 +20,7 @@ package v1
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	v1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,6 +44,8 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) Lease() LeaseController {
-	return NewLeaseController(schema.GroupVersionKind{Group: "coordination.k8s.io", Version: "v1", Kind: "Lease"}, "leases", true, c.controllerFactory)
+func (v *version) Lease() LeaseController {
+	return &leaseController{
+		Controller: generic.NewController[*v1.Lease, *v1.LeaseList](schema.GroupVersionKind{Group: "coordination.k8s.io", Version: "v1", Kind: "Lease"}, "leases", true, v.controllerFactory),
+	}
 }
