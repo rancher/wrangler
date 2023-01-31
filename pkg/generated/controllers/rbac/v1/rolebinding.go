@@ -22,20 +22,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
 type RoleBindingHandler func(string, *v1.RoleBinding) (*v1.RoleBinding, error)
@@ -74,183 +66,27 @@ type RoleBindingCache interface {
 type RoleBindingIndexer func(obj *v1.RoleBinding) ([]string, error)
 
 type roleBindingController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
-}
-
-func NewRoleBindingController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) RoleBindingController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &roleBindingController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
-	}
-}
-
-func FromRoleBindingHandlerToHandler(sync RoleBindingHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.RoleBinding
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.RoleBinding))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
-}
-
-func (c *roleBindingController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.RoleBinding))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateRoleBindingDeepCopyOnChange(client RoleBindingClient, obj *v1.RoleBinding, handler func(obj *v1.RoleBinding) (*v1.RoleBinding, error)) (*v1.RoleBinding, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *roleBindingController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *roleBindingController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
+	*generic.Controller[*v1.RoleBinding, *v1.RoleBindingList]
 }
 
 func (c *roleBindingController) OnChange(ctx context.Context, name string, sync RoleBindingHandler) {
-	c.AddGenericHandler(ctx, name, FromRoleBindingHandlerToHandler(sync))
+	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.RoleBinding](sync))
 }
 
 func (c *roleBindingController) OnRemove(ctx context.Context, name string, sync RoleBindingHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromRoleBindingHandlerToHandler(sync)))
-}
-
-func (c *roleBindingController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *roleBindingController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *roleBindingController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *roleBindingController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
+	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.RoleBinding](sync))
 }
 
 func (c *roleBindingController) Cache() RoleBindingCache {
 	return &roleBindingCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
+		c.Controller.Cache(),
 	}
-}
-
-func (c *roleBindingController) Create(obj *v1.RoleBinding) (*v1.RoleBinding, error) {
-	result := &v1.RoleBinding{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *roleBindingController) Update(obj *v1.RoleBinding) (*v1.RoleBinding, error) {
-	result := &v1.RoleBinding{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *roleBindingController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *roleBindingController) Get(namespace, name string, options metav1.GetOptions) (*v1.RoleBinding, error) {
-	result := &v1.RoleBinding{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *roleBindingController) List(namespace string, opts metav1.ListOptions) (*v1.RoleBindingList, error) {
-	result := &v1.RoleBindingList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *roleBindingController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *roleBindingController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.RoleBinding, error) {
-	result := &v1.RoleBinding{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type roleBindingCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *roleBindingCache) Get(namespace, name string) (*v1.RoleBinding, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.RoleBinding), nil
-}
-
-func (c *roleBindingCache) List(namespace string, selector labels.Selector) (ret []*v1.RoleBinding, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.RoleBinding))
-	})
-
-	return ret, err
+	*generic.Cache[*v1.RoleBinding]
 }
 
 func (c *roleBindingCache) AddIndexer(indexName string, indexer RoleBindingIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.RoleBinding))
-		},
-	}))
-}
-
-func (c *roleBindingCache) GetByIndex(indexName, key string) (result []*v1.RoleBinding, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.RoleBinding, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.RoleBinding))
-	}
-	return result, nil
+	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.RoleBinding](indexer))
 }
