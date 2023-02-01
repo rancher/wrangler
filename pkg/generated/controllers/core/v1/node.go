@@ -37,65 +37,108 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type NodeHandler func(string, *v1.Node) (*v1.Node, error)
-
+// NodeController interface for managing Node resources.
 type NodeController interface {
 	generic.ControllerMeta
 	NodeClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync NodeHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync NodeHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() NodeCache
 }
 
+// NodeClient interface for managing Node resources in Kubernetes.
 type NodeClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Node) (*v1.Node, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Node) (*v1.Node, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.Node) (*v1.Node, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v1.Node, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v1.NodeList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Node, err error)
 }
 
+// NodeCache interface for retrieving Node resources in memory.
 type NodeCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v1.Node, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v1.Node, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer NodeIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Node, error)
 }
 
+// NodeHandler is function for performing any potential modifications to a Node resource.
+type NodeHandler func(string, *v1.Node) (*v1.Node, error)
+
+// NodeIndexer computes a set of indexed values for the provided object.
 type NodeIndexer func(obj *v1.Node) ([]string, error)
 
-type nodeController struct {
-	*generic.NonNamespacedController[*v1.Node, *v1.NodeList]
+// NodeGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to NodeController interface.
+type NodeGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.Node, *v1.NodeList]
 }
 
-func (c *nodeController) OnChange(ctx context.Context, name string, sync NodeHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.Node](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *NodeGenericController) OnChange(ctx context.Context, name string, sync NodeHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Node](sync))
 }
 
-func (c *nodeController) OnRemove(ctx context.Context, name string, sync NodeHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.Node](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *NodeGenericController) OnRemove(ctx context.Context, name string, sync NodeHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Node](sync))
 }
 
-func (c *nodeController) Cache() NodeCache {
-	return &nodeCache{
-		c.NonNamespacedController.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *NodeGenericController) Cache() NodeCache {
+	return &NodeGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-type nodeCache struct {
-	*generic.NonNamespacedCache[*v1.Node]
+// NodeGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to NodeCache interface.
+type NodeGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v1.Node]
 }
 
-func (c *nodeCache) AddIndexer(indexName string, indexer NodeIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.Node](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c NodeGenericCache) AddIndexer(indexName string, indexer NodeIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Node](indexer))
 }
 
 type NodeStatusHandler func(obj *v1.Node, status v1.NodeStatus) (v1.NodeStatus, error)

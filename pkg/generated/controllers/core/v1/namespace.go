@@ -37,65 +37,108 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type NamespaceHandler func(string, *v1.Namespace) (*v1.Namespace, error)
-
+// NamespaceController interface for managing Namespace resources.
 type NamespaceController interface {
 	generic.ControllerMeta
 	NamespaceClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync NamespaceHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync NamespaceHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() NamespaceCache
 }
 
+// NamespaceClient interface for managing Namespace resources in Kubernetes.
 type NamespaceClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Namespace) (*v1.Namespace, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Namespace) (*v1.Namespace, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.Namespace) (*v1.Namespace, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v1.Namespace, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v1.NamespaceList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error)
 }
 
+// NamespaceCache interface for retrieving Namespace resources in memory.
 type NamespaceCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v1.Namespace, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v1.Namespace, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer NamespaceIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Namespace, error)
 }
 
+// NamespaceHandler is function for performing any potential modifications to a Namespace resource.
+type NamespaceHandler func(string, *v1.Namespace) (*v1.Namespace, error)
+
+// NamespaceIndexer computes a set of indexed values for the provided object.
 type NamespaceIndexer func(obj *v1.Namespace) ([]string, error)
 
-type namespaceController struct {
-	*generic.NonNamespacedController[*v1.Namespace, *v1.NamespaceList]
+// NamespaceGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to NamespaceController interface.
+type NamespaceGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
 }
 
-func (c *namespaceController) OnChange(ctx context.Context, name string, sync NamespaceHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.Namespace](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *NamespaceGenericController) OnChange(ctx context.Context, name string, sync NamespaceHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Namespace](sync))
 }
 
-func (c *namespaceController) OnRemove(ctx context.Context, name string, sync NamespaceHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.Namespace](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *NamespaceGenericController) OnRemove(ctx context.Context, name string, sync NamespaceHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Namespace](sync))
 }
 
-func (c *namespaceController) Cache() NamespaceCache {
-	return &namespaceCache{
-		c.NonNamespacedController.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *NamespaceGenericController) Cache() NamespaceCache {
+	return &NamespaceGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-type namespaceCache struct {
-	*generic.NonNamespacedCache[*v1.Namespace]
+// NamespaceGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to NamespaceCache interface.
+type NamespaceGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v1.Namespace]
 }
 
-func (c *namespaceCache) AddIndexer(indexName string, indexer NamespaceIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.Namespace](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c NamespaceGenericCache) AddIndexer(indexName string, indexer NamespaceIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Namespace](indexer))
 }
 
 type NamespaceStatusHandler func(obj *v1.Namespace, status v1.NamespaceStatus) (v1.NamespaceStatus, error)

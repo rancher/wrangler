@@ -45,7 +45,7 @@ type version struct {
 }
 
 func (v *version) NetworkPolicy() NetworkPolicyController {
-	return &networkPolicyController{
-		Controller: generic.NewController[*v1.NetworkPolicy, *v1.NetworkPolicyList](schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}, "networkpolicies", true, v.controllerFactory),
+	return &NetworkPolicyGenericController{
+		generic.NewController[*v1.NetworkPolicy, *v1.NetworkPolicyList](schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}, "networkpolicies", true, v.controllerFactory),
 	}
 }

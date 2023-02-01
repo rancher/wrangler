@@ -30,63 +30,103 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type RoleHandler func(string, *v1.Role) (*v1.Role, error)
-
+// RoleController interface for managing Role resources.
 type RoleController interface {
 	generic.ControllerMeta
 	RoleClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync RoleHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync RoleHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() RoleCache
 }
 
+// RoleClient interface for managing Role resources in Kubernetes.
 type RoleClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Role) (*v1.Role, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Role) (*v1.Role, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Role, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.RoleList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Role, err error)
 }
 
+// RoleCache interface for retrieving Role resources in memory.
 type RoleCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Role, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Role, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer RoleIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Role, error)
 }
 
+// RoleHandler is function for performing any potential modifications to a Role resource.
+type RoleHandler func(string, *v1.Role) (*v1.Role, error)
+
+// RoleIndexer computes a set of indexed values for the provided object.
 type RoleIndexer func(obj *v1.Role) ([]string, error)
 
-type roleController struct {
-	*generic.Controller[*v1.Role, *v1.RoleList]
+// RoleGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RoleController interface.
+type RoleGenericController struct {
+	generic.ControllerInterface[*v1.Role, *v1.RoleList]
 }
 
-func (c *roleController) OnChange(ctx context.Context, name string, sync RoleHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.Role](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RoleGenericController) OnChange(ctx context.Context, name string, sync RoleHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Role](sync))
 }
 
-func (c *roleController) OnRemove(ctx context.Context, name string, sync RoleHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.Role](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RoleGenericController) OnRemove(ctx context.Context, name string, sync RoleHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Role](sync))
 }
 
-func (c *roleController) Cache() RoleCache {
-	return &roleCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *RoleGenericController) Cache() RoleCache {
+	return &RoleGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type roleCache struct {
-	*generic.Cache[*v1.Role]
+// RoleGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RoleCache interface.
+type RoleGenericCache struct {
+	generic.CacheInterface[*v1.Role]
 }
 
-func (c *roleCache) AddIndexer(indexName string, indexer RoleIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.Role](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RoleGenericCache) AddIndexer(indexName string, indexer RoleIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Role](indexer))
 }

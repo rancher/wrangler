@@ -37,65 +37,108 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type DeploymentHandler func(string, *v1.Deployment) (*v1.Deployment, error)
-
+// DeploymentController interface for managing Deployment resources.
 type DeploymentController interface {
 	generic.ControllerMeta
 	DeploymentClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync DeploymentHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync DeploymentHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() DeploymentCache
 }
 
+// DeploymentClient interface for managing Deployment resources in Kubernetes.
 type DeploymentClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Deployment) (*v1.Deployment, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Deployment) (*v1.Deployment, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.Deployment) (*v1.Deployment, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Deployment, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.DeploymentList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Deployment, err error)
 }
 
+// DeploymentCache interface for retrieving Deployment resources in memory.
 type DeploymentCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Deployment, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Deployment, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer DeploymentIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Deployment, error)
 }
 
+// DeploymentHandler is function for performing any potential modifications to a Deployment resource.
+type DeploymentHandler func(string, *v1.Deployment) (*v1.Deployment, error)
+
+// DeploymentIndexer computes a set of indexed values for the provided object.
 type DeploymentIndexer func(obj *v1.Deployment) ([]string, error)
 
-type deploymentController struct {
-	*generic.Controller[*v1.Deployment, *v1.DeploymentList]
+// DeploymentGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to DeploymentController interface.
+type DeploymentGenericController struct {
+	generic.ControllerInterface[*v1.Deployment, *v1.DeploymentList]
 }
 
-func (c *deploymentController) OnChange(ctx context.Context, name string, sync DeploymentHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.Deployment](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *DeploymentGenericController) OnChange(ctx context.Context, name string, sync DeploymentHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Deployment](sync))
 }
 
-func (c *deploymentController) OnRemove(ctx context.Context, name string, sync DeploymentHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.Deployment](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *DeploymentGenericController) OnRemove(ctx context.Context, name string, sync DeploymentHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Deployment](sync))
 }
 
-func (c *deploymentController) Cache() DeploymentCache {
-	return &deploymentCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *DeploymentGenericController) Cache() DeploymentCache {
+	return &DeploymentGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type deploymentCache struct {
-	*generic.Cache[*v1.Deployment]
+// DeploymentGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to DeploymentCache interface.
+type DeploymentGenericCache struct {
+	generic.CacheInterface[*v1.Deployment]
 }
 
-func (c *deploymentCache) AddIndexer(indexName string, indexer DeploymentIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.Deployment](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c DeploymentGenericCache) AddIndexer(indexName string, indexer DeploymentIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Deployment](indexer))
 }
 
 type DeploymentStatusHandler func(obj *v1.Deployment, status v1.DeploymentStatus) (v1.DeploymentStatus, error)

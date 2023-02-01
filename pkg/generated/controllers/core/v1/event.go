@@ -30,63 +30,103 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type EventHandler func(string, *v1.Event) (*v1.Event, error)
-
+// EventController interface for managing Event resources.
 type EventController interface {
 	generic.ControllerMeta
 	EventClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync EventHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync EventHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() EventCache
 }
 
+// EventClient interface for managing Event resources in Kubernetes.
 type EventClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Event) (*v1.Event, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Event) (*v1.Event, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Event, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.EventList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Event, err error)
 }
 
+// EventCache interface for retrieving Event resources in memory.
 type EventCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Event, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Event, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer EventIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Event, error)
 }
 
+// EventHandler is function for performing any potential modifications to a Event resource.
+type EventHandler func(string, *v1.Event) (*v1.Event, error)
+
+// EventIndexer computes a set of indexed values for the provided object.
 type EventIndexer func(obj *v1.Event) ([]string, error)
 
-type eventController struct {
-	*generic.Controller[*v1.Event, *v1.EventList]
+// EventGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to EventController interface.
+type EventGenericController struct {
+	generic.ControllerInterface[*v1.Event, *v1.EventList]
 }
 
-func (c *eventController) OnChange(ctx context.Context, name string, sync EventHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.Event](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *EventGenericController) OnChange(ctx context.Context, name string, sync EventHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Event](sync))
 }
 
-func (c *eventController) OnRemove(ctx context.Context, name string, sync EventHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.Event](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *EventGenericController) OnRemove(ctx context.Context, name string, sync EventHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Event](sync))
 }
 
-func (c *eventController) Cache() EventCache {
-	return &eventCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *EventGenericController) Cache() EventCache {
+	return &EventGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type eventCache struct {
-	*generic.Cache[*v1.Event]
+// EventGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to EventCache interface.
+type EventGenericCache struct {
+	generic.CacheInterface[*v1.Event]
 }
 
-func (c *eventCache) AddIndexer(indexName string, indexer EventIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.Event](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c EventGenericCache) AddIndexer(indexName string, indexer EventIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Event](indexer))
 }
