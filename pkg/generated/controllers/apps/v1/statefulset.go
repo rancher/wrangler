@@ -37,65 +37,108 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type StatefulSetHandler func(string, *v1.StatefulSet) (*v1.StatefulSet, error)
-
+// StatefulSetController interface for managing StatefulSet resources.
 type StatefulSetController interface {
 	generic.ControllerMeta
 	StatefulSetClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync StatefulSetHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync StatefulSetHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() StatefulSetCache
 }
 
+// StatefulSetClient interface for managing StatefulSet resources in Kubernetes.
 type StatefulSetClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.StatefulSet) (*v1.StatefulSet, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.StatefulSet) (*v1.StatefulSet, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.StatefulSet) (*v1.StatefulSet, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.StatefulSet, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.StatefulSetList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StatefulSet, err error)
 }
 
+// StatefulSetCache interface for retrieving StatefulSet resources in memory.
 type StatefulSetCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.StatefulSet, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.StatefulSet, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer StatefulSetIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.StatefulSet, error)
 }
 
+// StatefulSetHandler is function for performing any potential modifications to a StatefulSet resource.
+type StatefulSetHandler func(string, *v1.StatefulSet) (*v1.StatefulSet, error)
+
+// StatefulSetIndexer computes a set of indexed values for the provided object.
 type StatefulSetIndexer func(obj *v1.StatefulSet) ([]string, error)
 
-type statefulSetController struct {
-	*generic.Controller[*v1.StatefulSet, *v1.StatefulSetList]
+// StatefulSetGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to StatefulSetController interface.
+type StatefulSetGenericController struct {
+	generic.ControllerInterface[*v1.StatefulSet, *v1.StatefulSetList]
 }
 
-func (c *statefulSetController) OnChange(ctx context.Context, name string, sync StatefulSetHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.StatefulSet](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *StatefulSetGenericController) OnChange(ctx context.Context, name string, sync StatefulSetHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.StatefulSet](sync))
 }
 
-func (c *statefulSetController) OnRemove(ctx context.Context, name string, sync StatefulSetHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.StatefulSet](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *StatefulSetGenericController) OnRemove(ctx context.Context, name string, sync StatefulSetHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.StatefulSet](sync))
 }
 
-func (c *statefulSetController) Cache() StatefulSetCache {
-	return &statefulSetCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *StatefulSetGenericController) Cache() StatefulSetCache {
+	return &StatefulSetGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type statefulSetCache struct {
-	*generic.Cache[*v1.StatefulSet]
+// StatefulSetGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to StatefulSetCache interface.
+type StatefulSetGenericCache struct {
+	generic.CacheInterface[*v1.StatefulSet]
 }
 
-func (c *statefulSetCache) AddIndexer(indexName string, indexer StatefulSetIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.StatefulSet](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c StatefulSetGenericCache) AddIndexer(indexName string, indexer StatefulSetIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.StatefulSet](indexer))
 }
 
 type StatefulSetStatusHandler func(obj *v1.StatefulSet, status v1.StatefulSetStatus) (v1.StatefulSetStatus, error)

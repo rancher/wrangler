@@ -37,65 +37,108 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type ServiceHandler func(string, *v1.Service) (*v1.Service, error)
-
+// ServiceController interface for managing Service resources.
 type ServiceController interface {
 	generic.ControllerMeta
 	ServiceClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ServiceHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ServiceHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ServiceCache
 }
 
+// ServiceClient interface for managing Service resources in Kubernetes.
 type ServiceClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Service) (*v1.Service, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Service) (*v1.Service, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.Service) (*v1.Service, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Service, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.ServiceList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Service, err error)
 }
 
+// ServiceCache interface for retrieving Service resources in memory.
 type ServiceCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Service, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Service, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ServiceIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Service, error)
 }
 
+// ServiceHandler is function for performing any potential modifications to a Service resource.
+type ServiceHandler func(string, *v1.Service) (*v1.Service, error)
+
+// ServiceIndexer computes a set of indexed values for the provided object.
 type ServiceIndexer func(obj *v1.Service) ([]string, error)
 
-type serviceController struct {
-	*generic.Controller[*v1.Service, *v1.ServiceList]
+// ServiceGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ServiceController interface.
+type ServiceGenericController struct {
+	generic.ControllerInterface[*v1.Service, *v1.ServiceList]
 }
 
-func (c *serviceController) OnChange(ctx context.Context, name string, sync ServiceHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.Service](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ServiceGenericController) OnChange(ctx context.Context, name string, sync ServiceHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Service](sync))
 }
 
-func (c *serviceController) OnRemove(ctx context.Context, name string, sync ServiceHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.Service](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ServiceGenericController) OnRemove(ctx context.Context, name string, sync ServiceHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Service](sync))
 }
 
-func (c *serviceController) Cache() ServiceCache {
-	return &serviceCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *ServiceGenericController) Cache() ServiceCache {
+	return &ServiceGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type serviceCache struct {
-	*generic.Cache[*v1.Service]
+// ServiceGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ServiceCache interface.
+type ServiceGenericCache struct {
+	generic.CacheInterface[*v1.Service]
 }
 
-func (c *serviceCache) AddIndexer(indexName string, indexer ServiceIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.Service](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ServiceGenericCache) AddIndexer(indexName string, indexer ServiceIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Service](indexer))
 }
 
 type ServiceStatusHandler func(obj *v1.Service, status v1.ServiceStatus) (v1.ServiceStatus, error)

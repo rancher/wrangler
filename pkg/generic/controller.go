@@ -1,3 +1,4 @@
+// Package generic provides generic types and implementations for Controllers, Clients, and Caches.
 package generic
 
 import (
@@ -21,23 +22,73 @@ var ErrSkip = controller.ErrIgnore
 
 // ControllerMeta holds meta information shared by all controllers.
 type ControllerMeta interface {
+	// Informer returns the SharedIndexInformer used by this controller.
 	Informer() cache.SharedIndexInformer
+
+	// GroupVersionKind returns the GVK used to create this Controller.
 	GroupVersionKind() schema.GroupVersionKind
 
+	// AddGenericHandler adds a generic handler that runs when a resource changes.
 	AddGenericHandler(ctx context.Context, name string, handler Handler)
+
+	// AddGenericHandler adds a generic handler that runs when a resource is removed.
 	AddGenericRemoveHandler(ctx context.Context, name string, handler Handler)
+
+	// Updater returns a update function that will attempt to perform an update for a specific resource type.
 	Updater() Updater
 }
 
-// RuntimeMetaObject is an interface for a K8s Object to be used with a specific controller
+// RuntimeMetaObject is an interface for a K8s Object to be used with a specific controller.
 type RuntimeMetaObject interface {
 	comparable
 	runtime.Object
 	metav1.Object
 }
 
-// Client is a interface to performs CRUD like operations on an Object.
-type Client[T runtime.Object, TList runtime.Object] interface {
+// ControllerInterface interface for managing K8s Objects.
+type ControllerInterface[T runtime.Object, TList runtime.Object] interface {
+	ControllerMeta
+	ClientInterface[T, TList]
+
+	// OnChange runs the given object handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// OnRemove runs the given object handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() CacheInterface[T]
+}
+
+// NonNamespacedControllerInterface interface for managing non namespaced K8s Objects.
+type NonNamespacedControllerInterface[T runtime.Object, TList runtime.Object] interface {
+	ControllerMeta
+	NonNamespacedClientInterface[T, TList]
+
+	// OnChange runs the given object handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// OnRemove runs the given object handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() NonNamespacedCacheInterface[T]
+}
+
+// ClientInterface is an interface to performs CRUD like operations on an Objects.
+type ClientInterface[T runtime.Object, TList runtime.Object] interface {
 	// Create creates a new object and return the newly created Object or an error.
 	Create(T) (T, error)
 
@@ -48,9 +99,10 @@ type Client[T runtime.Object, TList runtime.Object] interface {
 	// Will always return an error if the object does not have a status field.
 	UpdateStatus(T) (T, error)
 
-	// Delete deletes the Object in the given name and Namespace.
+	// Delete deletes the Object in the given name and namespace.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
 
+	// Get will attempt to retrieve the resource with the given name in the given namespace.
 	Get(namespace, name string, options metav1.GetOptions) (T, error)
 
 	// List will attempt to find resources in the given namespace.
@@ -63,13 +115,42 @@ type Client[T runtime.Object, TList runtime.Object] interface {
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
 }
 
+// NonNamespacedClientInterface is an interface to performs CRUD like operations on nonNamespaced Objects.
+type NonNamespacedClientInterface[T runtime.Object, TList runtime.Object] interface {
+	// Create creates a new object and return the newly created Object or an error.
+	Create(T) (T, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(T) (T, error)
+
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(T) (T, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (T, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (TList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+}
+
 // ObjectHandler performs operations on the given runtime.Object and returns the new runtime.Object or an error
 type Handler func(key string, obj runtime.Object) (runtime.Object, error)
 
 // ObjectHandler performs operations on the given object and returns the new object or an error
-type ObjectHandler[T RuntimeMetaObject] func(string, T) (T, error)
+type ObjectHandler[T runtime.Object] func(string, T) (T, error)
 
-type Indexer[T RuntimeMetaObject] func(obj T) ([]string, error)
+// Indexer computes a set of indexed values for the provided object.
+type Indexer[T runtime.Object] func(obj T) ([]string, error)
 
 // FromObjectHandlerToHandler converts an ObjecHandler to a Handler.
 func FromObjectHandlerToHandler[T RuntimeMetaObject](sync ObjectHandler[T]) Handler {
@@ -151,17 +232,17 @@ func (c *Controller[T, TList]) AddGenericRemoveHandler(ctx context.Context, name
 	c.AddGenericHandler(ctx, name, NewRemoveHandler(name, c.Updater(), handler))
 }
 
-// OnChange runs the given object handler when the controller detects an object was changed.
+// OnChange runs the given object handler when the controller detects a resource was changed.
 func (c *Controller[T, TList]) OnChange(ctx context.Context, name string, sync ObjectHandler[T]) {
 	c.AddGenericHandler(ctx, name, FromObjectHandlerToHandler(sync))
 }
 
-// OnRemove runs the given object handler when the controller detects an object was removed.
+// OnRemove runs the given object handler when the controller detects a resource was changed.
 func (c *Controller[T, TList]) OnRemove(ctx context.Context, name string, sync ObjectHandler[T]) {
 	c.AddGenericHandler(ctx, name, NewRemoveHandler(name, c.Updater(), FromObjectHandlerToHandler(sync)))
 }
 
-// Enqueue adds the Object with the given name in the provided namespace to the worker queue of the controller.
+// Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
 func (c *Controller[T, TList]) Enqueue(namespace, name string) {
 	c.controller.Enqueue(namespace, name)
 }
@@ -182,7 +263,7 @@ func (c *Controller[T, TList]) GroupVersionKind() schema.GroupVersionKind {
 }
 
 // Cache returns a cache for the objects T.
-func (c *Controller[T, TList]) Cache() *Cache[T] {
+func (c *Controller[T, TList]) Cache() CacheInterface[T] {
 	return &Cache[T]{
 		indexer:  c.Informer().GetIndexer(),
 		resource: c.groupResource,
@@ -285,8 +366,8 @@ func (c *NonNamespacedController[T, TList]) Patch(name string, pt types.PatchTyp
 }
 
 // Cache calls Controller.Cache(...) and wraps the result in a new NonNamespacedCache.
-func (c *NonNamespacedController[T, TList]) Cache() *NonNamespacedCache[T] {
+func (c *NonNamespacedController[T, TList]) Cache() NonNamespacedCacheInterface[T] {
 	return &NonNamespacedCache[T]{
-		Cache: *c.Controller.Cache(),
+		CacheInterface: c.Controller.Cache(),
 	}
 }

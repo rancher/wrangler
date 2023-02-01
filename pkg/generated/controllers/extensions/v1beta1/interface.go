@@ -45,7 +45,7 @@ type version struct {
 }
 
 func (v *version) Ingress() IngressController {
-	return &ingressController{
-		Controller: generic.NewController[*v1beta1.Ingress, *v1beta1.IngressList](schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, "ingresses", true, v.controllerFactory),
+	return &IngressGenericController{
+		generic.NewController[*v1beta1.Ingress, *v1beta1.IngressList](schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, "ingresses", true, v.controllerFactory),
 	}
 }

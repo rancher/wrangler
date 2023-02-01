@@ -30,63 +30,103 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type RoleBindingHandler func(string, *v1.RoleBinding) (*v1.RoleBinding, error)
-
+// RoleBindingController interface for managing RoleBinding resources.
 type RoleBindingController interface {
 	generic.ControllerMeta
 	RoleBindingClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync RoleBindingHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync RoleBindingHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() RoleBindingCache
 }
 
+// RoleBindingClient interface for managing RoleBinding resources in Kubernetes.
 type RoleBindingClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.RoleBinding) (*v1.RoleBinding, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.RoleBinding) (*v1.RoleBinding, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.RoleBinding, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.RoleBindingList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RoleBinding, err error)
 }
 
+// RoleBindingCache interface for retrieving RoleBinding resources in memory.
 type RoleBindingCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.RoleBinding, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.RoleBinding, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer RoleBindingIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.RoleBinding, error)
 }
 
+// RoleBindingHandler is function for performing any potential modifications to a RoleBinding resource.
+type RoleBindingHandler func(string, *v1.RoleBinding) (*v1.RoleBinding, error)
+
+// RoleBindingIndexer computes a set of indexed values for the provided object.
 type RoleBindingIndexer func(obj *v1.RoleBinding) ([]string, error)
 
-type roleBindingController struct {
-	*generic.Controller[*v1.RoleBinding, *v1.RoleBindingList]
+// RoleBindingGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RoleBindingController interface.
+type RoleBindingGenericController struct {
+	generic.ControllerInterface[*v1.RoleBinding, *v1.RoleBindingList]
 }
 
-func (c *roleBindingController) OnChange(ctx context.Context, name string, sync RoleBindingHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.RoleBinding](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RoleBindingGenericController) OnChange(ctx context.Context, name string, sync RoleBindingHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.RoleBinding](sync))
 }
 
-func (c *roleBindingController) OnRemove(ctx context.Context, name string, sync RoleBindingHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.RoleBinding](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RoleBindingGenericController) OnRemove(ctx context.Context, name string, sync RoleBindingHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.RoleBinding](sync))
 }
 
-func (c *roleBindingController) Cache() RoleBindingCache {
-	return &roleBindingCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *RoleBindingGenericController) Cache() RoleBindingCache {
+	return &RoleBindingGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type roleBindingCache struct {
-	*generic.Cache[*v1.RoleBinding]
+// RoleBindingGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RoleBindingCache interface.
+type RoleBindingGenericCache struct {
+	generic.CacheInterface[*v1.RoleBinding]
 }
 
-func (c *roleBindingCache) AddIndexer(indexName string, indexer RoleBindingIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.RoleBinding](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RoleBindingGenericCache) AddIndexer(indexName string, indexer RoleBindingIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.RoleBinding](indexer))
 }

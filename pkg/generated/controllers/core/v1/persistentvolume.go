@@ -37,65 +37,108 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type PersistentVolumeHandler func(string, *v1.PersistentVolume) (*v1.PersistentVolume, error)
-
+// PersistentVolumeController interface for managing PersistentVolume resources.
 type PersistentVolumeController interface {
 	generic.ControllerMeta
 	PersistentVolumeClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync PersistentVolumeHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync PersistentVolumeHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() PersistentVolumeCache
 }
 
+// PersistentVolumeClient interface for managing PersistentVolume resources in Kubernetes.
 type PersistentVolumeClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.PersistentVolume) (*v1.PersistentVolume, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.PersistentVolume) (*v1.PersistentVolume, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.PersistentVolume) (*v1.PersistentVolume, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v1.PersistentVolume, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v1.PersistentVolumeList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error)
 }
 
+// PersistentVolumeCache interface for retrieving PersistentVolume resources in memory.
 type PersistentVolumeCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v1.PersistentVolume, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v1.PersistentVolume, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer PersistentVolumeIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.PersistentVolume, error)
 }
 
+// PersistentVolumeHandler is function for performing any potential modifications to a PersistentVolume resource.
+type PersistentVolumeHandler func(string, *v1.PersistentVolume) (*v1.PersistentVolume, error)
+
+// PersistentVolumeIndexer computes a set of indexed values for the provided object.
 type PersistentVolumeIndexer func(obj *v1.PersistentVolume) ([]string, error)
 
-type persistentVolumeController struct {
-	*generic.NonNamespacedController[*v1.PersistentVolume, *v1.PersistentVolumeList]
+// PersistentVolumeGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to PersistentVolumeController interface.
+type PersistentVolumeGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.PersistentVolume, *v1.PersistentVolumeList]
 }
 
-func (c *persistentVolumeController) OnChange(ctx context.Context, name string, sync PersistentVolumeHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.PersistentVolume](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *PersistentVolumeGenericController) OnChange(ctx context.Context, name string, sync PersistentVolumeHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.PersistentVolume](sync))
 }
 
-func (c *persistentVolumeController) OnRemove(ctx context.Context, name string, sync PersistentVolumeHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.PersistentVolume](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *PersistentVolumeGenericController) OnRemove(ctx context.Context, name string, sync PersistentVolumeHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.PersistentVolume](sync))
 }
 
-func (c *persistentVolumeController) Cache() PersistentVolumeCache {
-	return &persistentVolumeCache{
-		c.NonNamespacedController.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *PersistentVolumeGenericController) Cache() PersistentVolumeCache {
+	return &PersistentVolumeGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-type persistentVolumeCache struct {
-	*generic.NonNamespacedCache[*v1.PersistentVolume]
+// PersistentVolumeGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to PersistentVolumeCache interface.
+type PersistentVolumeGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v1.PersistentVolume]
 }
 
-func (c *persistentVolumeCache) AddIndexer(indexName string, indexer PersistentVolumeIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.PersistentVolume](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c PersistentVolumeGenericCache) AddIndexer(indexName string, indexer PersistentVolumeIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.PersistentVolume](indexer))
 }
 
 type PersistentVolumeStatusHandler func(obj *v1.PersistentVolume, status v1.PersistentVolumeStatus) (v1.PersistentVolumeStatus, error)

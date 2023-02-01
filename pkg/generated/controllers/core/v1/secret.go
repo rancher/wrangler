@@ -30,63 +30,103 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type SecretHandler func(string, *v1.Secret) (*v1.Secret, error)
-
+// SecretController interface for managing Secret resources.
 type SecretController interface {
 	generic.ControllerMeta
 	SecretClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync SecretHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync SecretHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() SecretCache
 }
 
+// SecretClient interface for managing Secret resources in Kubernetes.
 type SecretClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Secret) (*v1.Secret, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Secret) (*v1.Secret, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Secret, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.SecretList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
 }
 
+// SecretCache interface for retrieving Secret resources in memory.
 type SecretCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Secret, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Secret, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer SecretIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Secret, error)
 }
 
+// SecretHandler is function for performing any potential modifications to a Secret resource.
+type SecretHandler func(string, *v1.Secret) (*v1.Secret, error)
+
+// SecretIndexer computes a set of indexed values for the provided object.
 type SecretIndexer func(obj *v1.Secret) ([]string, error)
 
-type secretController struct {
-	*generic.Controller[*v1.Secret, *v1.SecretList]
+// SecretGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to SecretController interface.
+type SecretGenericController struct {
+	generic.ControllerInterface[*v1.Secret, *v1.SecretList]
 }
 
-func (c *secretController) OnChange(ctx context.Context, name string, sync SecretHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.Secret](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *SecretGenericController) OnChange(ctx context.Context, name string, sync SecretHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Secret](sync))
 }
 
-func (c *secretController) OnRemove(ctx context.Context, name string, sync SecretHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.Secret](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *SecretGenericController) OnRemove(ctx context.Context, name string, sync SecretHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Secret](sync))
 }
 
-func (c *secretController) Cache() SecretCache {
-	return &secretCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *SecretGenericController) Cache() SecretCache {
+	return &SecretGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type secretCache struct {
-	*generic.Cache[*v1.Secret]
+// SecretGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to SecretCache interface.
+type SecretGenericCache struct {
+	generic.CacheInterface[*v1.Secret]
 }
 
-func (c *secretCache) AddIndexer(indexName string, indexer SecretIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.Secret](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c SecretGenericCache) AddIndexer(indexName string, indexer SecretIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Secret](indexer))
 }

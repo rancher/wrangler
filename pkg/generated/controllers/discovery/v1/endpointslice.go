@@ -30,63 +30,103 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type EndpointSliceHandler func(string, *v1.EndpointSlice) (*v1.EndpointSlice, error)
-
+// EndpointSliceController interface for managing EndpointSlice resources.
 type EndpointSliceController interface {
 	generic.ControllerMeta
 	EndpointSliceClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync EndpointSliceHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync EndpointSliceHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() EndpointSliceCache
 }
 
+// EndpointSliceClient interface for managing EndpointSlice resources in Kubernetes.
 type EndpointSliceClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.EndpointSlice) (*v1.EndpointSlice, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.EndpointSlice) (*v1.EndpointSlice, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.EndpointSlice, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.EndpointSliceList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.EndpointSlice, err error)
 }
 
+// EndpointSliceCache interface for retrieving EndpointSlice resources in memory.
 type EndpointSliceCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.EndpointSlice, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.EndpointSlice, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer EndpointSliceIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.EndpointSlice, error)
 }
 
+// EndpointSliceHandler is function for performing any potential modifications to a EndpointSlice resource.
+type EndpointSliceHandler func(string, *v1.EndpointSlice) (*v1.EndpointSlice, error)
+
+// EndpointSliceIndexer computes a set of indexed values for the provided object.
 type EndpointSliceIndexer func(obj *v1.EndpointSlice) ([]string, error)
 
-type endpointSliceController struct {
-	*generic.Controller[*v1.EndpointSlice, *v1.EndpointSliceList]
+// EndpointSliceGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to EndpointSliceController interface.
+type EndpointSliceGenericController struct {
+	generic.ControllerInterface[*v1.EndpointSlice, *v1.EndpointSliceList]
 }
 
-func (c *endpointSliceController) OnChange(ctx context.Context, name string, sync EndpointSliceHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.EndpointSlice](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *EndpointSliceGenericController) OnChange(ctx context.Context, name string, sync EndpointSliceHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.EndpointSlice](sync))
 }
 
-func (c *endpointSliceController) OnRemove(ctx context.Context, name string, sync EndpointSliceHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.EndpointSlice](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *EndpointSliceGenericController) OnRemove(ctx context.Context, name string, sync EndpointSliceHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.EndpointSlice](sync))
 }
 
-func (c *endpointSliceController) Cache() EndpointSliceCache {
-	return &endpointSliceCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *EndpointSliceGenericController) Cache() EndpointSliceCache {
+	return &EndpointSliceGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type endpointSliceCache struct {
-	*generic.Cache[*v1.EndpointSlice]
+// EndpointSliceGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to EndpointSliceCache interface.
+type EndpointSliceGenericCache struct {
+	generic.CacheInterface[*v1.EndpointSlice]
 }
 
-func (c *endpointSliceCache) AddIndexer(indexName string, indexer EndpointSliceIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.EndpointSlice](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c EndpointSliceGenericCache) AddIndexer(indexName string, indexer EndpointSliceIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.EndpointSlice](indexer))
 }

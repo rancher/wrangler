@@ -82,7 +82,6 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 	for _, t := range types {
 		m := map[string]interface{}{
 			"type":         t.Name.Name,
-			"lowerName":    namer.IL(t.Name.Name),
 			"plural":       plural.Name(t),
 			"pluralLower":  strings.ToLower(plural.Name(t)),
 			"version":      f.gv.Version,
@@ -93,8 +92,8 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 		}
 		body := `
 		func (v *version) {{.type}}() {{.type}}Controller {
-			return &{{.lowerName}}Controller {
-				{{ if not .namespaced}}NonNamespaced{{end}}Controller: generic.New{{ if not .namespaced}}NonNamespaced{{end}}Controller[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List](schema.GroupVersionKind{Group: "{{.group}}", Version: "{{.version}}", Kind: "{{.type}}"}, "{{.pluralLower}}", {{ if .namespaced}}true, {{end}}v.controllerFactory),
+			return &{{.type}}GenericController {
+				generic.New{{ if not .namespaced}}NonNamespaced{{end}}Controller[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List](schema.GroupVersionKind{Group: "{{.group}}", Version: "{{.version}}", Kind: "{{.type}}"}, "{{.pluralLower}}", {{ if .namespaced}}true, {{end}}v.controllerFactory),
 			} 
 		}
 		`

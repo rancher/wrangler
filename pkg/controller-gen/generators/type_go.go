@@ -82,69 +82,111 @@ func hasStatus(t *types.Type) bool {
 }
 
 var typeBody = `
-type {{.type}}Handler func(string, *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
-
+// {{.type}}Controller interface for managing {{.type}} resources.
 type {{.type}}Controller interface {
     generic.ControllerMeta
 	{{.type}}Client
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync {{.type}}Handler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync {{.type}}Handler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue({{ if .namespaced}}namespace, {{end}}name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter({{ if .namespaced}}namespace, {{end}}name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() {{.type}}Cache
 }
 
+// {{.type}}Client interface for managing {{.type}} resources in Kubernetes.
 type {{.type}}Client interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
 {{ if .hasStatus -}}
+
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
 {{- end }}
+
+	// Delete deletes the Object in the given name.
 	Delete({{ if .namespaced}}namespace, {{end}}name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get({{ if .namespaced}}namespace, {{end}}name string, options metav1.GetOptions) (*{{.version}}.{{.type}}, error)
+	
+	// List will attempt to find multiple resources.
 	List({{ if .namespaced}}namespace string, {{end}}opts metav1.ListOptions) (*{{.version}}.{{.type}}List, error)
+	
+	// Watch will start watching resources.
 	Watch({{ if .namespaced}}namespace string, {{end}}opts metav1.ListOptions) (watch.Interface, error)
+	
+	// Patch will patch the resource with the matching name.
 	Patch({{ if .namespaced}}namespace, {{end}}name string, pt types.PatchType, data []byte, subresources ...string) (result *{{.version}}.{{.type}}, err error)
 }
 
+// {{.type}}Cache interface for retrieving {{.type}} resources in memory.
 type {{.type}}Cache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get({{ if .namespaced}}namespace, {{end}}name string) (*{{.version}}.{{.type}}, error)
+	
+	// List will attempt to find resources from the Cache.
 	List({{ if .namespaced}}namespace string, {{end}}selector labels.Selector) ([]*{{.version}}.{{.type}}, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer {{.type}}Indexer)
+	
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*{{.version}}.{{.type}}, error)
 }
+// {{.type}}Handler is function for performing any potential modifications to a {{.type}} resource.
+type {{.type}}Handler func(string, *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
 
+// {{.type}}Indexer computes a set of indexed values for the provided object.
 type {{.type}}Indexer func(obj *{{.version}}.{{.type}}) ([]string, error)
 
-type {{.lowerName}}Controller struct {
-	*generic.{{ if not .namespaced}}NonNamespaced{{end}}Controller[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
+// {{.type}}GenericController wraps wrangler/pkg/generic.{{ if not .namespaced}}NonNamespaced{{end}}Controller so that the function definitions adhere to {{.type}}Controller interface.
+type {{.type}}GenericController struct {
+	generic.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
 }
 
-func (c *{{.lowerName}}Controller) OnChange(ctx context.Context, name string, sync {{.type}}Handler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*{{.version}}.{{.type}}](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *{{.type}}GenericController) OnChange(ctx context.Context, name string, sync {{.type}}Handler) {
+	c.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*{{.version}}.{{.type}}](sync))
 }
 
-func (c *{{.lowerName}}Controller) OnRemove(ctx context.Context, name string, sync {{.type}}Handler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*{{.version}}.{{.type}}](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *{{.type}}GenericController) OnRemove(ctx context.Context, name string, sync {{.type}}Handler) {
+	c.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*{{.version}}.{{.type}}](sync))
 }
 
-func (c *{{.lowerName}}Controller) Cache() {{.type}}Cache {
-	return &{{.lowerName}}Cache{
-		c.{{ if not .namespaced}}NonNamespaced{{end}}Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *{{.type}}GenericController) Cache() {{.type}}Cache {
+	return &{{.type}}GenericCache{
+		c.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface.Cache(),
 	}
 }
 
-type {{.lowerName}}Cache struct {
-	*generic.{{ if not .namespaced}}NonNamespaced{{end}}Cache[*{{.version}}.{{.type}}]
+// {{.type}}GenericCache wraps wrangler/pkg/generic.{{ if not .namespaced}}NonNamespaced{{end}}Cache so the function definitions adhere to {{.type}}Cache interface.
+type {{.type}}GenericCache struct {
+	generic.{{ if not .namespaced}}NonNamespaced{{end}}CacheInterface[*{{.version}}.{{.type}}]
 }
 
-func (c *{{.lowerName}}Cache) AddIndexer(indexName string, indexer {{.type}}Indexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*{{.version}}.{{.type}}](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c {{.type}}GenericCache) AddIndexer(indexName string, indexer {{.type}}Indexer) {
+	c.{{ if not .namespaced}}NonNamespaced{{end}}CacheInterface.AddIndexer(indexName, generic.Indexer[*{{.version}}.{{.type}}](indexer))
 }
-
 
 {{ if .hasStatus -}}
 type {{.type}}StatusHandler func(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error)

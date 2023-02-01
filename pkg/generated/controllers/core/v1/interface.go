@@ -55,67 +55,67 @@ type version struct {
 }
 
 func (v *version) ConfigMap() ConfigMapController {
-	return &configMapController{
-		Controller: generic.NewController[*v1.ConfigMap, *v1.ConfigMapList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}, "configmaps", true, v.controllerFactory),
+	return &ConfigMapGenericController{
+		generic.NewController[*v1.ConfigMap, *v1.ConfigMapList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}, "configmaps", true, v.controllerFactory),
 	}
 }
 
 func (v *version) Endpoints() EndpointsController {
-	return &endpointsController{
-		Controller: generic.NewController[*v1.Endpoints, *v1.EndpointsList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}, "endpoints", true, v.controllerFactory),
+	return &EndpointsGenericController{
+		generic.NewController[*v1.Endpoints, *v1.EndpointsList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Endpoints"}, "endpoints", true, v.controllerFactory),
 	}
 }
 
 func (v *version) Event() EventController {
-	return &eventController{
-		Controller: generic.NewController[*v1.Event, *v1.EventList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}, "events", true, v.controllerFactory),
+	return &EventGenericController{
+		generic.NewController[*v1.Event, *v1.EventList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Event"}, "events", true, v.controllerFactory),
 	}
 }
 
 func (v *version) Namespace() NamespaceController {
-	return &namespaceController{
-		NonNamespacedController: generic.NewNonNamespacedController[*v1.Namespace, *v1.NamespaceList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}, "namespaces", v.controllerFactory),
+	return &NamespaceGenericController{
+		generic.NewNonNamespacedController[*v1.Namespace, *v1.NamespaceList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Namespace"}, "namespaces", v.controllerFactory),
 	}
 }
 
 func (v *version) Node() NodeController {
-	return &nodeController{
-		NonNamespacedController: generic.NewNonNamespacedController[*v1.Node, *v1.NodeList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Node"}, "nodes", v.controllerFactory),
+	return &NodeGenericController{
+		generic.NewNonNamespacedController[*v1.Node, *v1.NodeList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Node"}, "nodes", v.controllerFactory),
 	}
 }
 
 func (v *version) PersistentVolume() PersistentVolumeController {
-	return &persistentVolumeController{
-		NonNamespacedController: generic.NewNonNamespacedController[*v1.PersistentVolume, *v1.PersistentVolumeList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolume"}, "persistentvolumes", v.controllerFactory),
+	return &PersistentVolumeGenericController{
+		generic.NewNonNamespacedController[*v1.PersistentVolume, *v1.PersistentVolumeList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolume"}, "persistentvolumes", v.controllerFactory),
 	}
 }
 
 func (v *version) PersistentVolumeClaim() PersistentVolumeClaimController {
-	return &persistentVolumeClaimController{
-		Controller: generic.NewController[*v1.PersistentVolumeClaim, *v1.PersistentVolumeClaimList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}, "persistentvolumeclaims", true, v.controllerFactory),
+	return &PersistentVolumeClaimGenericController{
+		generic.NewController[*v1.PersistentVolumeClaim, *v1.PersistentVolumeClaimList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "PersistentVolumeClaim"}, "persistentvolumeclaims", true, v.controllerFactory),
 	}
 }
 
 func (v *version) Pod() PodController {
-	return &podController{
-		Controller: generic.NewController[*v1.Pod, *v1.PodList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", true, v.controllerFactory),
+	return &PodGenericController{
+		generic.NewController[*v1.Pod, *v1.PodList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", true, v.controllerFactory),
 	}
 }
 
 func (v *version) Secret() SecretController {
-	return &secretController{
-		Controller: generic.NewController[*v1.Secret, *v1.SecretList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}, "secrets", true, v.controllerFactory),
+	return &SecretGenericController{
+		generic.NewController[*v1.Secret, *v1.SecretList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Secret"}, "secrets", true, v.controllerFactory),
 	}
 }
 
 func (v *version) Service() ServiceController {
-	return &serviceController{
-		Controller: generic.NewController[*v1.Service, *v1.ServiceList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, "services", true, v.controllerFactory),
+	return &ServiceGenericController{
+		generic.NewController[*v1.Service, *v1.ServiceList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Service"}, "services", true, v.controllerFactory),
 	}
 }
 
 func (v *version) ServiceAccount() ServiceAccountController {
-	return &serviceAccountController{
-		Controller: generic.NewController[*v1.ServiceAccount, *v1.ServiceAccountList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ServiceAccount"}, "serviceaccounts", true, v.controllerFactory),
+	return &ServiceAccountGenericController{
+		generic.NewController[*v1.ServiceAccount, *v1.ServiceAccountList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ServiceAccount"}, "serviceaccounts", true, v.controllerFactory),
 	}
 }

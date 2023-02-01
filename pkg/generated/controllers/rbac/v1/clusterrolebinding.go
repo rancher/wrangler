@@ -30,63 +30,103 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type ClusterRoleBindingHandler func(string, *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
-
+// ClusterRoleBindingController interface for managing ClusterRoleBinding resources.
 type ClusterRoleBindingController interface {
 	generic.ControllerMeta
 	ClusterRoleBindingClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ClusterRoleBindingHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ClusterRoleBindingHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ClusterRoleBindingCache
 }
 
+// ClusterRoleBindingClient interface for managing ClusterRoleBinding resources in Kubernetes.
 type ClusterRoleBindingClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v1.ClusterRoleBinding, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClusterRoleBinding, err error)
 }
 
+// ClusterRoleBindingCache interface for retrieving ClusterRoleBinding resources in memory.
 type ClusterRoleBindingCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v1.ClusterRoleBinding, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v1.ClusterRoleBinding, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ClusterRoleBindingIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.ClusterRoleBinding, error)
 }
 
+// ClusterRoleBindingHandler is function for performing any potential modifications to a ClusterRoleBinding resource.
+type ClusterRoleBindingHandler func(string, *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error)
+
+// ClusterRoleBindingIndexer computes a set of indexed values for the provided object.
 type ClusterRoleBindingIndexer func(obj *v1.ClusterRoleBinding) ([]string, error)
 
-type clusterRoleBindingController struct {
-	*generic.NonNamespacedController[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList]
+// ClusterRoleBindingGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to ClusterRoleBindingController interface.
+type ClusterRoleBindingGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList]
 }
 
-func (c *clusterRoleBindingController) OnChange(ctx context.Context, name string, sync ClusterRoleBindingHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1.ClusterRoleBinding](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ClusterRoleBindingGenericController) OnChange(ctx context.Context, name string, sync ClusterRoleBindingHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.ClusterRoleBinding](sync))
 }
 
-func (c *clusterRoleBindingController) OnRemove(ctx context.Context, name string, sync ClusterRoleBindingHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1.ClusterRoleBinding](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ClusterRoleBindingGenericController) OnRemove(ctx context.Context, name string, sync ClusterRoleBindingHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.ClusterRoleBinding](sync))
 }
 
-func (c *clusterRoleBindingController) Cache() ClusterRoleBindingCache {
-	return &clusterRoleBindingCache{
-		c.NonNamespacedController.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *ClusterRoleBindingGenericController) Cache() ClusterRoleBindingCache {
+	return &ClusterRoleBindingGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-type clusterRoleBindingCache struct {
-	*generic.NonNamespacedCache[*v1.ClusterRoleBinding]
+// ClusterRoleBindingGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to ClusterRoleBindingCache interface.
+type ClusterRoleBindingGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v1.ClusterRoleBinding]
 }
 
-func (c *clusterRoleBindingCache) AddIndexer(indexName string, indexer ClusterRoleBindingIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1.ClusterRoleBinding](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ClusterRoleBindingGenericCache) AddIndexer(indexName string, indexer ClusterRoleBindingIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.ClusterRoleBinding](indexer))
 }

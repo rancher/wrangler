@@ -37,65 +37,108 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
-type IngressHandler func(string, *v1beta1.Ingress) (*v1beta1.Ingress, error)
-
+// IngressController interface for managing Ingress resources.
 type IngressController interface {
 	generic.ControllerMeta
 	IngressClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync IngressHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync IngressHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() IngressCache
 }
 
+// IngressClient interface for managing Ingress resources in Kubernetes.
 type IngressClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1beta1.Ingress) (*v1beta1.Ingress, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1beta1.Ingress) (*v1beta1.Ingress, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1beta1.Ingress) (*v1beta1.Ingress, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1beta1.Ingress, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1beta1.IngressList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error)
 }
 
+// IngressCache interface for retrieving Ingress resources in memory.
 type IngressCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1beta1.Ingress, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1beta1.Ingress, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer IngressIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1beta1.Ingress, error)
 }
 
+// IngressHandler is function for performing any potential modifications to a Ingress resource.
+type IngressHandler func(string, *v1beta1.Ingress) (*v1beta1.Ingress, error)
+
+// IngressIndexer computes a set of indexed values for the provided object.
 type IngressIndexer func(obj *v1beta1.Ingress) ([]string, error)
 
-type ingressController struct {
-	*generic.Controller[*v1beta1.Ingress, *v1beta1.IngressList]
+// IngressGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to IngressController interface.
+type IngressGenericController struct {
+	generic.ControllerInterface[*v1beta1.Ingress, *v1beta1.IngressList]
 }
 
-func (c *ingressController) OnChange(ctx context.Context, name string, sync IngressHandler) {
-	c.Controller.OnChange(ctx, name, generic.ObjectHandler[*v1beta1.Ingress](sync))
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *IngressGenericController) OnChange(ctx context.Context, name string, sync IngressHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1beta1.Ingress](sync))
 }
 
-func (c *ingressController) OnRemove(ctx context.Context, name string, sync IngressHandler) {
-	c.Controller.OnRemove(ctx, name, generic.ObjectHandler[*v1beta1.Ingress](sync))
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *IngressGenericController) OnRemove(ctx context.Context, name string, sync IngressHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1beta1.Ingress](sync))
 }
 
-func (c *ingressController) Cache() IngressCache {
-	return &ingressCache{
-		c.Controller.Cache(),
+// Cache returns a cache of resources in memory.
+func (c *IngressGenericController) Cache() IngressCache {
+	return &IngressGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-type ingressCache struct {
-	*generic.Cache[*v1beta1.Ingress]
+// IngressGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to IngressCache interface.
+type IngressGenericCache struct {
+	generic.CacheInterface[*v1beta1.Ingress]
 }
 
-func (c *ingressCache) AddIndexer(indexName string, indexer IngressIndexer) {
-	c.Cache.AddIndexer(indexName, generic.Indexer[*v1beta1.Ingress](indexer))
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c IngressGenericCache) AddIndexer(indexName string, indexer IngressIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1beta1.Ingress](indexer))
 }
 
 type IngressStatusHandler func(obj *v1beta1.Ingress, status v1beta1.IngressStatus) (v1beta1.IngressStatus, error)
