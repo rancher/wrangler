@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/fake"
 	k8stesting "k8s.io/client-go/testing"
 )
@@ -28,8 +28,10 @@ func Test_multiNamespaceList(t *testing.T) {
 		}},
 		"ns3": {Items: []unstructured.Unstructured{}},
 	}
-
-	baseClient := fake.NewSimpleDynamicClient(runtime.NewScheme())
+	s := runtime.NewScheme()
+	err := appsv1.SchemeBuilder.AddToScheme(s)
+	assert.NoError(t, err, "Failed to build schema.")
+	baseClient := fake.NewSimpleDynamicClient(s)
 	baseClient.PrependReactor("list", "*", func(action k8stesting.Action) (handled bool, ret runtime.Object, err error) {
 		if strings.Contains(action.GetNamespace(), "error") {
 			return true, nil, errors.New("simulated failure")
@@ -91,7 +93,7 @@ func Test_multiNamespaceList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var calls int
-			err := multiNamespaceList(context.TODO(), tt.args.namespaces, baseClient.Resource(schema.GroupVersionResource{}), labels.NewSelector(), func(obj unstructured.Unstructured) {
+			err := multiNamespaceList(context.TODO(), tt.args.namespaces, baseClient.Resource(appsv1.SchemeGroupVersion.WithResource("deployments")), labels.NewSelector(), func(obj unstructured.Unstructured) {
 				calls += 1
 			})
 
