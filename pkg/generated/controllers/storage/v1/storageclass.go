@@ -22,9 +22,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -54,25 +54,25 @@ type StorageClassController interface {
 // StorageClassClient interface for managing StorageClass resources in Kubernetes.
 type StorageClassClient interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.StorageClass) (*v1.StorageClass, error)
+	Create(obj *v1.StorageClass, options client.CreateOptions) (*v1.StorageClass, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.StorageClass) (*v1.StorageClass, error)
+	Update(obj *v1.StorageClass, options client.UpdateOptions) (*v1.StorageClass, error)
 
 	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
+	Delete(name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v1.StorageClass, error)
+	Get(name string, options client.GetOptions) (*v1.StorageClass, error)
 
 	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v1.StorageClassList, error)
+	List(opts client.ListOptions) (*v1.StorageClassList, error)
 
 	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	Watch(opts client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error)
+	Patch(name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result *v1.StorageClass, err error)
 }
 
 // StorageClassCache interface for retrieving StorageClass resources in memory.

@@ -22,6 +22,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -29,7 +30,6 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -61,28 +61,28 @@ type CustomResourceDefinitionController interface {
 // CustomResourceDefinitionClient interface for managing CustomResourceDefinition resources in Kubernetes.
 type CustomResourceDefinitionClient interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
+	Create(obj *v1.CustomResourceDefinition, options client.CreateOptions) (*v1.CustomResourceDefinition, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
+	Update(obj *v1.CustomResourceDefinition, options client.UpdateOptions) (*v1.CustomResourceDefinition, error)
 	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
+	UpdateStatus(obj *v1.CustomResourceDefinition, options client.UpdateOptions) (*v1.CustomResourceDefinition, error)
 
 	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
+	Delete(name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v1.CustomResourceDefinition, error)
+	Get(name string, options client.GetOptions) (*v1.CustomResourceDefinition, error)
 
 	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v1.CustomResourceDefinitionList, error)
+	List(opts client.ListOptions) (*v1.CustomResourceDefinitionList, error)
 
 	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	Watch(opts client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.CustomResourceDefinition, err error)
+	Patch(name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result *v1.CustomResourceDefinition, err error)
 }
 
 // CustomResourceDefinitionCache interface for retrieving CustomResourceDefinition resources in memory.
@@ -207,7 +207,7 @@ func (a *customResourceDefinitionStatusHandler) sync(key string, obj *v1.CustomR
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj, client.UpdateOptions{})
 		if err == nil {
 			err = newErr
 		}

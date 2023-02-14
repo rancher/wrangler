@@ -22,9 +22,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -54,25 +54,25 @@ type ServiceAccountController interface {
 // ServiceAccountClient interface for managing ServiceAccount resources in Kubernetes.
 type ServiceAccountClient interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.ServiceAccount) (*v1.ServiceAccount, error)
+	Create(obj *v1.ServiceAccount, options client.CreateOptions) (*v1.ServiceAccount, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.ServiceAccount) (*v1.ServiceAccount, error)
+	Update(obj *v1.ServiceAccount, options client.UpdateOptions) (*v1.ServiceAccount, error)
 
 	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	Delete(namespace, name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1.ServiceAccount, error)
+	Get(namespace, name string, options client.GetOptions) (*v1.ServiceAccount, error)
 
 	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1.ServiceAccountList, error)
+	List(namespace string, opts client.ListOptions) (*v1.ServiceAccountList, error)
 
 	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+	Watch(namespace string, opts client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result *v1.ServiceAccount, err error)
 }
 
 // ServiceAccountCache interface for retrieving ServiceAccount resources in memory.

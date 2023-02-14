@@ -22,9 +22,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -54,25 +54,25 @@ type RoleBindingController interface {
 // RoleBindingClient interface for managing RoleBinding resources in Kubernetes.
 type RoleBindingClient interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.RoleBinding) (*v1.RoleBinding, error)
+	Create(obj *v1.RoleBinding, options client.CreateOptions) (*v1.RoleBinding, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.RoleBinding) (*v1.RoleBinding, error)
+	Update(obj *v1.RoleBinding, options client.UpdateOptions) (*v1.RoleBinding, error)
 
 	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	Delete(namespace, name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1.RoleBinding, error)
+	Get(namespace, name string, options client.GetOptions) (*v1.RoleBinding, error)
 
 	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1.RoleBindingList, error)
+	List(namespace string, opts client.ListOptions) (*v1.RoleBindingList, error)
 
 	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+	Watch(namespace string, opts client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.RoleBinding, err error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result *v1.RoleBinding, err error)
 }
 
 // RoleBindingCache interface for retrieving RoleBinding resources in memory.

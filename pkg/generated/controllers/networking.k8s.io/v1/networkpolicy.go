@@ -22,6 +22,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -29,7 +30,6 @@ import (
 	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -61,28 +61,28 @@ type NetworkPolicyController interface {
 // NetworkPolicyClient interface for managing NetworkPolicy resources in Kubernetes.
 type NetworkPolicyClient interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.NetworkPolicy) (*v1.NetworkPolicy, error)
+	Create(obj *v1.NetworkPolicy, options client.CreateOptions) (*v1.NetworkPolicy, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.NetworkPolicy) (*v1.NetworkPolicy, error)
+	Update(obj *v1.NetworkPolicy, options client.UpdateOptions) (*v1.NetworkPolicy, error)
 	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1.NetworkPolicy) (*v1.NetworkPolicy, error)
+	UpdateStatus(obj *v1.NetworkPolicy, options client.UpdateOptions) (*v1.NetworkPolicy, error)
 
 	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	Delete(namespace, name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1.NetworkPolicy, error)
+	Get(namespace, name string, options client.GetOptions) (*v1.NetworkPolicy, error)
 
 	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1.NetworkPolicyList, error)
+	List(namespace string, opts client.ListOptions) (*v1.NetworkPolicyList, error)
 
 	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+	Watch(namespace string, opts client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.NetworkPolicy, err error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result *v1.NetworkPolicy, err error)
 }
 
 // NetworkPolicyCache interface for retrieving NetworkPolicy resources in memory.
@@ -207,7 +207,7 @@ func (a *networkPolicyStatusHandler) sync(key string, obj *v1.NetworkPolicy) (*v
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj, client.UpdateOptions{})
 		if err == nil {
 			err = newErr
 		}

@@ -106,31 +106,31 @@ type {{.type}}Controller interface {
 // {{.type}}Client interface for managing {{.type}} resources in Kubernetes.
 type {{.type}}Client interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(*{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
+	Create(obj *{{.version}}.{{.type}}, options client.CreateOptions) (*{{.version}}.{{.type}}, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(*{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
+	Update(obj *{{.version}}.{{.type}}, options client.UpdateOptions) (*{{.version}}.{{.type}}, error)
 {{ if .hasStatus -}}
 
 	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error)
+	UpdateStatus(obj *{{.version}}.{{.type}}, options client.UpdateOptions) (*{{.version}}.{{.type}}, error)
 {{- end }}
 
 	// Delete deletes the Object in the given name.
-	Delete({{ if .namespaced}}namespace, {{end}}name string, options *metav1.DeleteOptions) error
+	Delete({{ if .namespaced}}namespace, {{end}}name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get({{ if .namespaced}}namespace, {{end}}name string, options metav1.GetOptions) (*{{.version}}.{{.type}}, error)
+	Get({{ if .namespaced}}namespace, {{end}}name string, options client.GetOptions) (*{{.version}}.{{.type}}, error)
 	
 	// List will attempt to find multiple resources.
-	List({{ if .namespaced}}namespace string, {{end}}opts metav1.ListOptions) (*{{.version}}.{{.type}}List, error)
+	List({{ if .namespaced}}namespace string, {{end}}opts client.ListOptions) (*{{.version}}.{{.type}}List, error)
 	
 	// Watch will start watching resources.
-	Watch({{ if .namespaced}}namespace string, {{end}}opts metav1.ListOptions) (watch.Interface, error)
+	Watch({{ if .namespaced}}namespace string, {{end}}opts client.ListOptions) (watch.Interface, error)
 	
 	// Patch will patch the resource with the matching name.
-	Patch({{ if .namespaced}}namespace, {{end}}name string, pt types.PatchType, data []byte, subresources ...string) (result *{{.version}}.{{.type}}, err error)
+	Patch({{ if .namespaced}}namespace, {{end}}name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result *{{.version}}.{{.type}}, err error)
 }
 
 // {{.type}}Cache interface for retrieving {{.type}} resources in memory.
@@ -256,7 +256,7 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj, client.UpdateOptions{})
 		if err == nil {
 			err = newErr
 		}

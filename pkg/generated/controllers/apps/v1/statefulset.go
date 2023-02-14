@@ -22,6 +22,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -29,7 +30,6 @@ import (
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -61,28 +61,28 @@ type StatefulSetController interface {
 // StatefulSetClient interface for managing StatefulSet resources in Kubernetes.
 type StatefulSetClient interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.StatefulSet) (*v1.StatefulSet, error)
+	Create(obj *v1.StatefulSet, options client.CreateOptions) (*v1.StatefulSet, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.StatefulSet) (*v1.StatefulSet, error)
+	Update(obj *v1.StatefulSet, options client.UpdateOptions) (*v1.StatefulSet, error)
 	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1.StatefulSet) (*v1.StatefulSet, error)
+	UpdateStatus(obj *v1.StatefulSet, options client.UpdateOptions) (*v1.StatefulSet, error)
 
 	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	Delete(namespace, name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1.StatefulSet, error)
+	Get(namespace, name string, options client.GetOptions) (*v1.StatefulSet, error)
 
 	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1.StatefulSetList, error)
+	List(namespace string, opts client.ListOptions) (*v1.StatefulSetList, error)
 
 	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+	Watch(namespace string, opts client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StatefulSet, err error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result *v1.StatefulSet, err error)
 }
 
 // StatefulSetCache interface for retrieving StatefulSet resources in memory.
@@ -207,7 +207,7 @@ func (a *statefulSetStatusHandler) sync(key string, obj *v1.StatefulSet) (*v1.St
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj, client.UpdateOptions{})
 		if err == nil {
 			err = newErr
 		}

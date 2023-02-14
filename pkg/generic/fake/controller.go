@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/wrangler/pkg/generic"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -79,22 +79,22 @@ func (mr *MockControllerInterfaceMockRecorder[T, TList]) Cache() *gomock.Call {
 }
 
 // Create mocks base method.
-func (m *MockControllerInterface[T, TList]) Create(arg0 T) (T, error) {
+func (m *MockControllerInterface[T, TList]) Create(arg0 T, arg1 client.CreateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", arg0)
+	ret := m.ctrl.Call(m, "Create", arg0, arg1)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockControllerInterfaceMockRecorder[T, TList]) Create(arg0 interface{}) *gomock.Call {
+func (mr *MockControllerInterfaceMockRecorder[T, TList]) Create(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).Create), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).Create), arg0, arg1)
 }
 
 // Delete mocks base method.
-func (m *MockControllerInterface[T, TList]) Delete(namespace, name string, options *v1.DeleteOptions) error {
+func (m *MockControllerInterface[T, TList]) Delete(namespace, name string, options client.DeleteOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", namespace, name, options)
 	ret0, _ := ret[0].(error)
@@ -132,7 +132,7 @@ func (mr *MockControllerInterfaceMockRecorder[T, TList]) EnqueueAfter(namespace,
 }
 
 // Get mocks base method.
-func (m *MockControllerInterface[T, TList]) Get(namespace, name string, options v1.GetOptions) (T, error) {
+func (m *MockControllerInterface[T, TList]) Get(namespace, name string, options client.GetOptions) (T, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", namespace, name, options)
 	ret0, _ := ret[0].(T)
@@ -175,7 +175,7 @@ func (mr *MockControllerInterfaceMockRecorder[T, TList]) Informer() *gomock.Call
 }
 
 // List mocks base method.
-func (m *MockControllerInterface[T, TList]) List(namespace string, opts v1.ListOptions) (TList, error) {
+func (m *MockControllerInterface[T, TList]) List(namespace string, opts client.ListOptions) (TList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", namespace, opts)
 	ret0, _ := ret[0].(TList)
@@ -214,9 +214,9 @@ func (mr *MockControllerInterfaceMockRecorder[T, TList]) OnRemove(ctx, name, syn
 }
 
 // Patch mocks base method.
-func (m *MockControllerInterface[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
+func (m *MockControllerInterface[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (T, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{namespace, name, pt, data}
+	varargs := []interface{}{namespace, name, pt, data, options}
 	for _, a := range subresources {
 		varargs = append(varargs, a)
 	}
@@ -227,40 +227,40 @@ func (m *MockControllerInterface[T, TList]) Patch(namespace, name string, pt typ
 }
 
 // Patch indicates an expected call of Patch.
-func (mr *MockControllerInterfaceMockRecorder[T, TList]) Patch(namespace, name, pt, data interface{}, subresources ...interface{}) *gomock.Call {
+func (mr *MockControllerInterfaceMockRecorder[T, TList]) Patch(namespace, name, pt, data, options interface{}, subresources ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{namespace, name, pt, data}, subresources...)
+	varargs := append([]interface{}{namespace, name, pt, data, options}, subresources...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Patch", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).Patch), varargs...)
 }
 
 // Update mocks base method.
-func (m *MockControllerInterface[T, TList]) Update(arg0 T) (T, error) {
+func (m *MockControllerInterface[T, TList]) Update(arg0 T, arg1 client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", arg0)
+	ret := m.ctrl.Call(m, "Update", arg0, arg1)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockControllerInterfaceMockRecorder[T, TList]) Update(arg0 interface{}) *gomock.Call {
+func (mr *MockControllerInterfaceMockRecorder[T, TList]) Update(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).Update), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).Update), arg0, arg1)
 }
 
 // UpdateStatus mocks base method.
-func (m *MockControllerInterface[T, TList]) UpdateStatus(arg0 T) (T, error) {
+func (m *MockControllerInterface[T, TList]) UpdateStatus(arg0 T, arg1 client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateStatus", arg0)
+	ret := m.ctrl.Call(m, "UpdateStatus", arg0, arg1)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateStatus indicates an expected call of UpdateStatus.
-func (mr *MockControllerInterfaceMockRecorder[T, TList]) UpdateStatus(arg0 interface{}) *gomock.Call {
+func (mr *MockControllerInterfaceMockRecorder[T, TList]) UpdateStatus(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).UpdateStatus), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).UpdateStatus), arg0, arg1)
 }
 
 // Updater mocks base method.
@@ -278,7 +278,7 @@ func (mr *MockControllerInterfaceMockRecorder[T, TList]) Updater() *gomock.Call 
 }
 
 // Watch mocks base method.
-func (m *MockControllerInterface[T, TList]) Watch(namespace string, opts v1.ListOptions) (watch.Interface, error) {
+func (m *MockControllerInterface[T, TList]) Watch(namespace string, opts client.ListOptions) (watch.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Watch", namespace, opts)
 	ret0, _ := ret[0].(watch.Interface)
@@ -354,22 +354,22 @@ func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Cache() *g
 }
 
 // Create mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) Create(arg0 T) (T, error) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) Create(arg0 T, arg1 client.CreateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", arg0)
+	ret := m.ctrl.Call(m, "Create", arg0, arg1)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Create(arg0 interface{}) *gomock.Call {
+func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Create(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).Create), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).Create), arg0, arg1)
 }
 
 // Delete mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) Delete(name string, options *v1.DeleteOptions) error {
+func (m *MockNonNamespacedControllerInterface[T, TList]) Delete(name string, options client.DeleteOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", name, options)
 	ret0, _ := ret[0].(error)
@@ -407,7 +407,7 @@ func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) EnqueueAft
 }
 
 // Get mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) Get(name string, options v1.GetOptions) (T, error) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) Get(name string, options client.GetOptions) (T, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", name, options)
 	ret0, _ := ret[0].(T)
@@ -450,7 +450,7 @@ func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Informer()
 }
 
 // List mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) List(opts v1.ListOptions) (TList, error) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) List(opts client.ListOptions) (TList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", opts)
 	ret0, _ := ret[0].(TList)
@@ -489,9 +489,9 @@ func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) OnRemove(c
 }
 
 // Patch mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) Patch(name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (T, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{name, pt, data}
+	varargs := []interface{}{name, pt, data, options}
 	for _, a := range subresources {
 		varargs = append(varargs, a)
 	}
@@ -502,40 +502,40 @@ func (m *MockNonNamespacedControllerInterface[T, TList]) Patch(name string, pt t
 }
 
 // Patch indicates an expected call of Patch.
-func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Patch(name, pt, data interface{}, subresources ...interface{}) *gomock.Call {
+func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Patch(name, pt, data, options interface{}, subresources ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{name, pt, data}, subresources...)
+	varargs := append([]interface{}{name, pt, data, options}, subresources...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Patch", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).Patch), varargs...)
 }
 
 // Update mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) Update(arg0 T) (T, error) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) Update(arg0 T, arg1 client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", arg0)
+	ret := m.ctrl.Call(m, "Update", arg0, arg1)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Update(arg0 interface{}) *gomock.Call {
+func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Update(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).Update), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).Update), arg0, arg1)
 }
 
 // UpdateStatus mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) UpdateStatus(arg0 T) (T, error) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) UpdateStatus(arg0 T, arg1 client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateStatus", arg0)
+	ret := m.ctrl.Call(m, "UpdateStatus", arg0, arg1)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateStatus indicates an expected call of UpdateStatus.
-func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) UpdateStatus(arg0 interface{}) *gomock.Call {
+func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) UpdateStatus(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).UpdateStatus), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).UpdateStatus), arg0, arg1)
 }
 
 // Updater mocks base method.
@@ -553,7 +553,7 @@ func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) Updater() 
 }
 
 // Watch mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) Watch(opts client.ListOptions) (watch.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Watch", opts)
 	ret0, _ := ret[0].(watch.Interface)
@@ -591,22 +591,22 @@ func (m *MockClientInterface[T, TList]) EXPECT() *MockClientInterfaceMockRecorde
 }
 
 // Create mocks base method.
-func (m *MockClientInterface[T, TList]) Create(arg0 T) (T, error) {
+func (m *MockClientInterface[T, TList]) Create(arg0 T, arg1 client.CreateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", arg0)
+	ret := m.ctrl.Call(m, "Create", arg0, arg1)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockClientInterfaceMockRecorder[T, TList]) Create(arg0 interface{}) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder[T, TList]) Create(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockClientInterface[T, TList])(nil).Create), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockClientInterface[T, TList])(nil).Create), arg0, arg1)
 }
 
 // Delete mocks base method.
-func (m *MockClientInterface[T, TList]) Delete(namespace, name string, options *v1.DeleteOptions) error {
+func (m *MockClientInterface[T, TList]) Delete(namespace, name string, options client.DeleteOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", namespace, name, options)
 	ret0, _ := ret[0].(error)
@@ -620,7 +620,7 @@ func (mr *MockClientInterfaceMockRecorder[T, TList]) Delete(namespace, name, opt
 }
 
 // Get mocks base method.
-func (m *MockClientInterface[T, TList]) Get(namespace, name string, options v1.GetOptions) (T, error) {
+func (m *MockClientInterface[T, TList]) Get(namespace, name string, options client.GetOptions) (T, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", namespace, name, options)
 	ret0, _ := ret[0].(T)
@@ -635,7 +635,7 @@ func (mr *MockClientInterfaceMockRecorder[T, TList]) Get(namespace, name, option
 }
 
 // List mocks base method.
-func (m *MockClientInterface[T, TList]) List(namespace string, opts v1.ListOptions) (TList, error) {
+func (m *MockClientInterface[T, TList]) List(namespace string, opts client.ListOptions) (TList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", namespace, opts)
 	ret0, _ := ret[0].(TList)
@@ -650,9 +650,9 @@ func (mr *MockClientInterfaceMockRecorder[T, TList]) List(namespace, opts interf
 }
 
 // Patch mocks base method.
-func (m *MockClientInterface[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
+func (m *MockClientInterface[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (T, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{namespace, name, pt, data}
+	varargs := []interface{}{namespace, name, pt, data, options}
 	for _, a := range subresources {
 		varargs = append(varargs, a)
 	}
@@ -663,44 +663,44 @@ func (m *MockClientInterface[T, TList]) Patch(namespace, name string, pt types.P
 }
 
 // Patch indicates an expected call of Patch.
-func (mr *MockClientInterfaceMockRecorder[T, TList]) Patch(namespace, name, pt, data interface{}, subresources ...interface{}) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder[T, TList]) Patch(namespace, name, pt, data, options interface{}, subresources ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{namespace, name, pt, data}, subresources...)
+	varargs := append([]interface{}{namespace, name, pt, data, options}, subresources...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Patch", reflect.TypeOf((*MockClientInterface[T, TList])(nil).Patch), varargs...)
 }
 
 // Update mocks base method.
-func (m *MockClientInterface[T, TList]) Update(arg0 T) (T, error) {
+func (m *MockClientInterface[T, TList]) Update(arg0 T, options client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", arg0)
+	ret := m.ctrl.Call(m, "Update", arg0, options)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockClientInterfaceMockRecorder[T, TList]) Update(arg0 interface{}) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder[T, TList]) Update(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockClientInterface[T, TList])(nil).Update), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockClientInterface[T, TList])(nil).Update), arg0, arg1)
 }
 
 // UpdateStatus mocks base method.
-func (m *MockClientInterface[T, TList]) UpdateStatus(arg0 T) (T, error) {
+func (m *MockClientInterface[T, TList]) UpdateStatus(arg0 T, options client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateStatus", arg0)
+	ret := m.ctrl.Call(m, "UpdateStatus", arg0, options)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateStatus indicates an expected call of UpdateStatus.
-func (mr *MockClientInterfaceMockRecorder[T, TList]) UpdateStatus(arg0 interface{}) *gomock.Call {
+func (mr *MockClientInterfaceMockRecorder[T, TList]) UpdateStatus(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockClientInterface[T, TList])(nil).UpdateStatus), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockClientInterface[T, TList])(nil).UpdateStatus), arg0, arg1)
 }
 
 // Watch mocks base method.
-func (m *MockClientInterface[T, TList]) Watch(namespace string, opts v1.ListOptions) (watch.Interface, error) {
+func (m *MockClientInterface[T, TList]) Watch(namespace string, opts client.ListOptions) (watch.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Watch", namespace, opts)
 	ret0, _ := ret[0].(watch.Interface)
@@ -738,22 +738,22 @@ func (m *MockNonNamespacedClientInterface[T, TList]) EXPECT() *MockNonNamespaced
 }
 
 // Create mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) Create(arg0 T) (T, error) {
+func (m *MockNonNamespacedClientInterface[T, TList]) Create(arg0 T, options client.CreateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Create", arg0)
+	ret := m.ctrl.Call(m, "Create", arg0, options)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
-func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Create(arg0 interface{}) *gomock.Call {
+func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Create(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockNonNamespacedClientInterface[T, TList])(nil).Create), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockNonNamespacedClientInterface[T, TList])(nil).Create), arg0, arg1)
 }
 
 // Delete mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) Delete(name string, options *v1.DeleteOptions) error {
+func (m *MockNonNamespacedClientInterface[T, TList]) Delete(name string, options client.DeleteOptions) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", name, options)
 	ret0, _ := ret[0].(error)
@@ -767,7 +767,7 @@ func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Delete(name, o
 }
 
 // Get mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) Get(name string, options v1.GetOptions) (T, error) {
+func (m *MockNonNamespacedClientInterface[T, TList]) Get(name string, options client.GetOptions) (T, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", name, options)
 	ret0, _ := ret[0].(T)
@@ -782,7 +782,7 @@ func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Get(name, opti
 }
 
 // List mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) List(opts v1.ListOptions) (TList, error) {
+func (m *MockNonNamespacedClientInterface[T, TList]) List(opts client.ListOptions) (TList, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", opts)
 	ret0, _ := ret[0].(TList)
@@ -797,9 +797,9 @@ func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) List(opts inte
 }
 
 // Patch mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
+func (m *MockNonNamespacedClientInterface[T, TList]) Patch(name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (T, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{name, pt, data}
+	varargs := []interface{}{name, pt, data, options}
 	for _, a := range subresources {
 		varargs = append(varargs, a)
 	}
@@ -810,44 +810,44 @@ func (m *MockNonNamespacedClientInterface[T, TList]) Patch(name string, pt types
 }
 
 // Patch indicates an expected call of Patch.
-func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Patch(name, pt, data interface{}, subresources ...interface{}) *gomock.Call {
+func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Patch(name, pt, data, options interface{}, subresources ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{name, pt, data}, subresources...)
+	varargs := append([]interface{}{name, pt, data, options}, subresources...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Patch", reflect.TypeOf((*MockNonNamespacedClientInterface[T, TList])(nil).Patch), varargs...)
 }
 
 // Update mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) Update(arg0 T) (T, error) {
+func (m *MockNonNamespacedClientInterface[T, TList]) Update(arg0 T, options client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", arg0)
+	ret := m.ctrl.Call(m, "Update", arg0, options)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Update(arg0 interface{}) *gomock.Call {
+func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) Update(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockNonNamespacedClientInterface[T, TList])(nil).Update), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockNonNamespacedClientInterface[T, TList])(nil).Update), arg0, arg1)
 }
 
 // UpdateStatus mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) UpdateStatus(arg0 T) (T, error) {
+func (m *MockNonNamespacedClientInterface[T, TList]) UpdateStatus(arg0 T, options client.UpdateOptions) (T, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateStatus", arg0)
+	ret := m.ctrl.Call(m, "UpdateStatus", arg0, options)
 	ret0, _ := ret[0].(T)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateStatus indicates an expected call of UpdateStatus.
-func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) UpdateStatus(arg0 interface{}) *gomock.Call {
+func (mr *MockNonNamespacedClientInterfaceMockRecorder[T, TList]) UpdateStatus(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockNonNamespacedClientInterface[T, TList])(nil).UpdateStatus), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStatus", reflect.TypeOf((*MockNonNamespacedClientInterface[T, TList])(nil).UpdateStatus), arg0, arg1)
 }
 
 // Watch mocks base method.
-func (m *MockNonNamespacedClientInterface[T, TList]) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (m *MockNonNamespacedClientInterface[T, TList]) Watch(opts client.ListOptions) (watch.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Watch", opts)
 	ret0, _ := ret[0].(watch.Interface)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/moby/locker"
+	"github.com/rancher/lasso/pkg/client"
 	admissionregcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/admissionregistration.k8s.io/v1"
 	apiextcontrollers "github.com/rancher/wrangler/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	corecontrollers "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
@@ -130,7 +131,7 @@ func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.Mutati
 		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 			webhook = webhook.DeepCopy()
 			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
-			webhook, err = h.mutatingWebHooks.Update(webhook)
+			webhook, err = h.mutatingWebHooks.Update(webhook, client.UpdateOptions{})
 			if err != nil {
 				return webhook, err
 			}
@@ -168,7 +169,7 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 			webhook = webhook.DeepCopy()
 			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
-			webhook, err = h.validatingWebHooks.Update(webhook)
+			webhook, err = h.validatingWebHooks.Update(webhook, client.UpdateOptions{})
 			if err != nil {
 				return webhook, err
 			}
@@ -243,7 +244,7 @@ func (h *handler) OnCRDChange(key string, crd *apiextv1.CustomResourceDefinition
 	if !bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 		crd := crd.DeepCopy()
 		crd.Spec.Conversion.Webhook.ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
-		return h.crds.Update(crd)
+		return h.crds.Update(crd, client.UpdateOptions{})
 	}
 
 	return crd, nil
@@ -277,7 +278,7 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 		if err != nil {
 			return nil, err
 		}
-		return h.secrets.Create(secret)
+		return h.secrets.Create(secret, client.CreateOptions{})
 	} else if err != nil {
 		return nil, err
 	}
@@ -285,7 +286,7 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 	if secret, err := h.updateSecret(service, secret, dnsNames); err != nil {
 		return nil, err
 	} else if secret != nil {
-		return h.secrets.Update(secret)
+		return h.secrets.Update(secret, client.UpdateOptions{})
 	}
 
 	return secret, nil

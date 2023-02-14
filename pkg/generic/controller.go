@@ -90,57 +90,57 @@ type NonNamespacedControllerInterface[T runtime.Object, TList runtime.Object] in
 // ClientInterface is an interface to performs CRUD like operations on an Objects.
 type ClientInterface[T runtime.Object, TList runtime.Object] interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(T) (T, error)
+	Create(T, client.CreateOptions) (T, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(T) (T, error)
+	Update(T, client.UpdateOptions) (T, error)
 
 	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 	// Will always return an error if the object does not have a status field.
-	UpdateStatus(T) (T, error)
+	UpdateStatus(T, client.UpdateOptions) (T, error)
 
 	// Delete deletes the Object in the given name and namespace.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
+	Delete(namespace, name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the given name in the given namespace.
-	Get(namespace, name string, options metav1.GetOptions) (T, error)
+	Get(namespace, name string, options client.GetOptions) (T, error)
 
 	// List will attempt to find resources in the given namespace.
-	List(namespace string, opts metav1.ListOptions) (TList, error)
+	List(namespace string, options client.ListOptions) (TList, error)
 
 	// Watch will start watching resources in the given namespace.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+	Watch(namespace string, options client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name in the matching namespace.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+	Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result T, err error)
 }
 
 // NonNamespacedClientInterface is an interface to performs CRUD like operations on nonNamespaced Objects.
 type NonNamespacedClientInterface[T runtime.Object, TList runtime.Object] interface {
 	// Create creates a new object and return the newly created Object or an error.
-	Create(T) (T, error)
+	Create(T, client.CreateOptions) (T, error)
 
 	// Update updates the object and return the newly updated Object or an error.
-	Update(T) (T, error)
+	Update(T, client.UpdateOptions) (T, error)
 
 	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 	// Will always return an error if the object does not have a status field.
-	UpdateStatus(T) (T, error)
+	UpdateStatus(T, client.UpdateOptions) (T, error)
 
 	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
+	Delete(name string, options client.DeleteOptions) error
 
 	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (T, error)
+	Get(name string, options client.GetOptions) (T, error)
 
 	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (TList, error)
+	List(options client.ListOptions) (TList, error)
 
 	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
+	Watch(options client.ListOptions) (watch.Interface, error)
 
 	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+	Patch(name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (result T, err error)
 }
 
 // ObjectHandler performs operations on the given runtime.Object and returns the new runtime.Object or an error
@@ -214,7 +214,7 @@ func NewController[T RuntimeMetaObject, TList runtime.Object](gvk schema.GroupVe
 func (c *Controller[T, TList]) Updater() Updater {
 	var nilObj T
 	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(T))
+		newObj, err := c.Update(obj.(T), client.UpdateOptions{})
 		if newObj == nilObj {
 			return nil, err
 		}
@@ -271,53 +271,50 @@ func (c *Controller[T, TList]) Cache() CacheInterface[T] {
 }
 
 // Create creates a new object and return the newly created Object or an error.
-func (c *Controller[T, TList]) Create(obj T) (T, error) {
+func (c *Controller[T, TList]) Create(obj T, options client.CreateOptions) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.Create(context.TODO(), obj.GetNamespace(), obj, result, metav1.CreateOptions{})
+	return result, c.client.Create(context.TODO(), obj.GetNamespace(), obj, result, options)
 }
 
 // Update updates the object and return the newly updated Object or an error.
-func (c *Controller[T, TList]) Update(obj T) (T, error) {
+func (c *Controller[T, TList]) Update(obj T, options client.UpdateOptions) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.Update(context.TODO(), obj.GetNamespace(), obj, result, metav1.UpdateOptions{})
+	return result, c.client.Update(context.TODO(), obj.GetNamespace(), obj, result, options)
 }
 
 // UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 // Will always return an error if the object does not have a status field.
-func (c *Controller[T, TList]) UpdateStatus(obj T) (T, error) {
+func (c *Controller[T, TList]) UpdateStatus(obj T, options client.UpdateOptions) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.UpdateStatus(context.TODO(), obj.GetNamespace(), obj, result, metav1.UpdateOptions{})
+	return result, c.client.UpdateStatus(context.TODO(), obj.GetNamespace(), obj, result, options)
 }
 
 // Delete deletes the Object in the given name and Namespace.
-func (c *Controller[T, TList]) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
+func (c *Controller[T, TList]) Delete(namespace, name string, options client.DeleteOptions) error {
+	return c.client.Delete(context.TODO(), namespace, name, options)
 }
 
 // Get gets returns the given resource with the given name in the provided namespace.
-func (c *Controller[T, TList]) Get(namespace, name string, options metav1.GetOptions) (T, error) {
+func (c *Controller[T, TList]) Get(namespace, name string, options client.GetOptions) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
 	return result, c.client.Get(context.TODO(), namespace, name, result, options)
 }
 
 // List will attempt to find resources in the given namespace.
-func (c *Controller[T, TList]) List(namespace string, opts metav1.ListOptions) (TList, error) {
+func (c *Controller[T, TList]) List(namespace string, options client.ListOptions) (TList, error) {
 	result := reflect.New(c.objListType).Interface().(TList)
-	return result, c.client.List(context.TODO(), namespace, result, opts)
+	return result, c.client.List(context.TODO(), namespace, result, options)
 }
 
 // Watch will start watching resources in the given namespace.
-func (c *Controller[T, TList]) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
+func (c *Controller[T, TList]) Watch(namespace string, options client.ListOptions) (watch.Interface, error) {
+	return c.client.Watch(context.TODO(), namespace, options)
 }
 
 // Patch will patch the resource with the matching name in the matching namespace.
-func (c *Controller[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
+func (c *Controller[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
+	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, options, subresources...)
 }
 
 // NewNonNamespacedController returns a Controller controller that is not namespaced.
@@ -341,28 +338,28 @@ func (c *NonNamespacedController[T, TList]) EnqueueAfter(name string, duration t
 }
 
 // Delete calls Controller.Delete(...) with an empty namespace parameter.
-func (c *NonNamespacedController[T, TList]) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *NonNamespacedController[T, TList]) Delete(name string, options client.DeleteOptions) error {
 	return c.Controller.Delete(metav1.NamespaceAll, name, options)
 }
 
 // Get calls Controller.Get(...) with an empty namespace parameter.
-func (c *NonNamespacedController[T, TList]) Get(name string, options metav1.GetOptions) (T, error) {
+func (c *NonNamespacedController[T, TList]) Get(name string, options client.GetOptions) (T, error) {
 	return c.Controller.Get(metav1.NamespaceAll, name, options)
 }
 
 // List calls Controller.List(...) with an empty namespace parameter.
-func (c *NonNamespacedController[T, TList]) List(opts metav1.ListOptions) (TList, error) {
-	return c.Controller.List(metav1.NamespaceAll, opts)
+func (c *NonNamespacedController[T, TList]) List(options client.ListOptions) (TList, error) {
+	return c.Controller.List(metav1.NamespaceAll, options)
 }
 
 // Watch calls Controller.Watch(...) with an empty namespace parameter.
-func (c *NonNamespacedController[T, TList]) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.Controller.Watch(metav1.NamespaceAll, opts)
+func (c *NonNamespacedController[T, TList]) Watch(options client.ListOptions) (watch.Interface, error) {
+	return c.Controller.Watch(metav1.NamespaceAll, options)
 }
 
 // Patch calls the Controller.Patch(...) with an empty namespace parameter.
-func (c *NonNamespacedController[T, TList]) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
-	return c.Controller.Patch(metav1.NamespaceAll, name, pt, data, subresources...)
+func (c *NonNamespacedController[T, TList]) Patch(name string, pt types.PatchType, data []byte, options client.PatchOptions, subresources ...string) (T, error) {
+	return c.Controller.Patch(metav1.NamespaceAll, name, pt, data, options, subresources...)
 }
 
 // Cache calls Controller.Cache(...) and wraps the result in a new NonNamespacedCache.
