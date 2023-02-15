@@ -4,6 +4,7 @@ Most people writing controllers are a bit lost as they find that there is nothin
 
 Wrangler is a framework for using controllers. Controllers wrap clients, informers, listers into a simple usable controller pattern that promotes some good practices.
 
+See info on branching strategy [here](https://github.com/rancher/wrangler/wiki/Wrangler-Branching-Strategy).
 <br>
 
 ## Some Projects that use Wrangler
