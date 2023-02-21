@@ -349,7 +349,7 @@ func (g *Git) gitCmd(output io.Writer, args ...string) error {
 
 		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+fmt.Sprintf("ssh -o UserKnownHostsFile=%s", f.Name()))
 	} else {
-		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+fmt.Sprintf("ssh -o StrictHostKeyChecking=accept-new"))
+		cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+"ssh -o StrictHostKeyChecking=accept-new")
 	}
 	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0")
 
