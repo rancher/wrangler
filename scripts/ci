@@ -1,0 +1,30 @@
+#! /bin/bash
+set -e
+
+cd $(dirname $0)/..
+PATH=${PATH}:./bin
+echo "Validating"
+
+if ! command -v golangci-lint; then
+    echo Skipping validation: no golangci-lint available
+else
+    echo Running: golangci-lint
+    golangci-lint run
+fi
+
+echo Running: go generate
+go generate ./...
+
+echo Tidying up modules
+go mod tidy
+
+echo Verifying modules
+go mod verify
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "Encountered dirty repo!"
+    exit 1
+fi
+
+echo "Running Test"
+go test ./...

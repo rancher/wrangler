@@ -1,13 +1,52 @@
 ---
 kind: pipeline
+type: docker
 name: fossa
 
 steps:
-- name: fossa
-  image: rancher/drone-fossa:latest
-  settings:
-    api_key:
-      from_secret: FOSSA_API_KEY
-    when:
-      instance:
-        - drone-publish.rancher.io
+  - name: fossa
+    image: rancher/drone-fossa:latest
+    settings:
+      api_key:
+        from_secret: FOSSA_API_KEY
+      when:
+        instance:
+          - drone-publish.rancher.io
+
+---
+kind: pipeline
+type: docker
+name: amd64
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: test
+    image: registry.suse.com/bci/golang:1.19
+    commands:
+      - zypper -n install tar gzip
+      - "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.1;"
+      - ./scripts/ci
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
+
+---
+kind: pipeline
+type: docker
+name: arm64
+
+platform:
+  os: linux
+  arch: arm64
+
+steps:
+  - name: test
+    image: registry.suse.com/bci/golang:1.19
+    commands:
+      - ./scripts/ci
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock

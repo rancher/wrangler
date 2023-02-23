@@ -9,5 +9,5 @@ import (
 func TestScan(t *testing.T) {
 	cwd, _ := os.Getwd()
 	fmt.Println(cwd)
-	ScanDirectory("./testdata")
+	_, _ = ScanDirectory("./testdata")
 }
