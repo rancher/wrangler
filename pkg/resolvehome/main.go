@@ -1,9 +1,10 @@
 package resolvehome
 
 import (
-	"github.com/pkg/errors"
 	"os"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 var (
