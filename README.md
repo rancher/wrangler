@@ -15,6 +15,17 @@ Wrangler is a framework for using controllers. Controllers wrap clients, informe
 
 [gke-operator](https://github.com/rancher/gke-operator)
 
+## Versioning and Updates
+
+Wrangler releases use [semantic versioning](https://semver.org/). Patch releases occur on the latest minor release as well as on older minor releases being actively used in supported versions of [Rancher](http://github.com/rancher/rancher). That currently includes:
+
+| Wrangler Version | Rancher Version | Update Level           |
+| ---------------- | --------------- | ---------------------- |
+| 1.0.x            | 2.6.x           | Security Fixes         |
+| 1.1.x            | 2.7.x           | Bug and Security Fixes |
+
+Wrangler releases are not from the default branch. Instead they are from branches with the naming pattern `release-MAJOR.MINOR`. The default branch (i.e. master) is where changes initially go. This includes bug fixes and new features. Bug fixes are cherry-picked to release branches to be included in patch releases. When it's time to create a new minor or major release, a new release branch is created from the default branch.
+
 <br>
 
 # Table of Contents
