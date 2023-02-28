@@ -1,21 +1,6 @@
 ---
 kind: pipeline
 type: docker
-name: fossa
-
-steps:
-  - name: fossa
-    image: rancher/drone-fossa:latest
-    settings:
-      api_key:
-        from_secret: FOSSA_API_KEY
-      when:
-        instance:
-          - drone-publish.rancher.io
-
----
-kind: pipeline
-type: docker
 name: amd64
 
 platform:
