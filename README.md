@@ -277,7 +277,7 @@ syncHandler := func(id string, obj *v3.User) (*v3.User, error) {
 	return users.Update(obj)
 }
 
-users.OnChange(context.Background(), "user-example-annoate-note-handler", syncHandler)
+users.OnChange(context.Background(), "user-example-annotate-note-handler", syncHandler)
 ```
 ### How to Run Handlers
 
