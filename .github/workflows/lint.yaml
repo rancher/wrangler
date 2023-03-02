@@ -1,0 +1,38 @@
+name: golangci-lint
+
+env:
+  SETUP_GO_VERSION: '^1.19'
+
+on:
+  push:
+  pull_request:
+    tags:
+      - v*
+    branches:
+      - 'release/*'
+      - 'master'
+
+jobs:
+  golangci:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.SETUP_GO_VERSION }}
+
+      - name: Generate Golang
+        run: |
+          export PATH=$PATH:/home/runner/go/bin/
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3.4.0
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.51

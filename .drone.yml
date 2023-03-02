@@ -11,8 +11,6 @@ steps:
   - name: test
     image: registry.suse.com/bci/golang:1.19
     commands:
-      - zypper -n install tar gzip
-      - "curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.1;"
       - ./scripts/ci
     volumes:
       - name: docker
