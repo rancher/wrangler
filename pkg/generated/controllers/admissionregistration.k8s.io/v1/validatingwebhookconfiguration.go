@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/admissionregistration/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ValidatingWebhookConfigurationHandler func(string, *v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)
-
+// ValidatingWebhookConfigurationController interface for managing ValidatingWebhookConfiguration resources.
 type ValidatingWebhookConfigurationController interface {
 	generic.ControllerMeta
 	ValidatingWebhookConfigurationClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ValidatingWebhookConfigurationCache
 }
 
+// ValidatingWebhookConfigurationClient interface for managing ValidatingWebhookConfiguration resources in Kubernetes.
 type ValidatingWebhookConfigurationClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v1.ValidatingWebhookConfiguration, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v1.ValidatingWebhookConfigurationList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ValidatingWebhookConfiguration, err error)
 }
 
+// ValidatingWebhookConfigurationCache interface for retrieving ValidatingWebhookConfiguration resources in memory.
 type ValidatingWebhookConfigurationCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v1.ValidatingWebhookConfiguration, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v1.ValidatingWebhookConfiguration, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ValidatingWebhookConfigurationIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.ValidatingWebhookConfiguration, error)
 }
 
+// ValidatingWebhookConfigurationHandler is function for performing any potential modifications to a ValidatingWebhookConfiguration resource.
+type ValidatingWebhookConfigurationHandler func(string, *v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)
+
+// ValidatingWebhookConfigurationIndexer computes a set of indexed values for the provided object.
 type ValidatingWebhookConfigurationIndexer func(obj *v1.ValidatingWebhookConfiguration) ([]string, error)
 
-type validatingWebhookConfigurationController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// ValidatingWebhookConfigurationGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to ValidatingWebhookConfigurationController interface.
+type ValidatingWebhookConfigurationGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.ValidatingWebhookConfiguration, *v1.ValidatingWebhookConfigurationList]
 }
 
-func NewValidatingWebhookConfigurationController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ValidatingWebhookConfigurationController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &validatingWebhookConfigurationController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ValidatingWebhookConfigurationGenericController) OnChange(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.ValidatingWebhookConfiguration](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ValidatingWebhookConfigurationGenericController) OnRemove(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.ValidatingWebhookConfiguration](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ValidatingWebhookConfigurationGenericController) Cache() ValidatingWebhookConfigurationCache {
+	return &ValidatingWebhookConfigurationGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromValidatingWebhookConfigurationHandlerToHandler(sync ValidatingWebhookConfigurationHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.ValidatingWebhookConfiguration
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.ValidatingWebhookConfiguration))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// ValidatingWebhookConfigurationGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to ValidatingWebhookConfigurationCache interface.
+type ValidatingWebhookConfigurationGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v1.ValidatingWebhookConfiguration]
 }
 
-func (c *validatingWebhookConfigurationController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.ValidatingWebhookConfiguration))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateValidatingWebhookConfigurationDeepCopyOnChange(client ValidatingWebhookConfigurationClient, obj *v1.ValidatingWebhookConfiguration, handler func(obj *v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)) (*v1.ValidatingWebhookConfiguration, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *validatingWebhookConfigurationController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *validatingWebhookConfigurationController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *validatingWebhookConfigurationController) OnChange(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler) {
-	c.AddGenericHandler(ctx, name, FromValidatingWebhookConfigurationHandlerToHandler(sync))
-}
-
-func (c *validatingWebhookConfigurationController) OnRemove(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromValidatingWebhookConfigurationHandlerToHandler(sync)))
-}
-
-func (c *validatingWebhookConfigurationController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *validatingWebhookConfigurationController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *validatingWebhookConfigurationController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *validatingWebhookConfigurationController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *validatingWebhookConfigurationController) Cache() ValidatingWebhookConfigurationCache {
-	return &validatingWebhookConfigurationCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *validatingWebhookConfigurationController) Create(obj *v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error) {
-	result := &v1.ValidatingWebhookConfiguration{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *validatingWebhookConfigurationController) Update(obj *v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error) {
-	result := &v1.ValidatingWebhookConfiguration{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *validatingWebhookConfigurationController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *validatingWebhookConfigurationController) Get(name string, options metav1.GetOptions) (*v1.ValidatingWebhookConfiguration, error) {
-	result := &v1.ValidatingWebhookConfiguration{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *validatingWebhookConfigurationController) List(opts metav1.ListOptions) (*v1.ValidatingWebhookConfigurationList, error) {
-	result := &v1.ValidatingWebhookConfigurationList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *validatingWebhookConfigurationController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *validatingWebhookConfigurationController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.ValidatingWebhookConfiguration, error) {
-	result := &v1.ValidatingWebhookConfiguration{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type validatingWebhookConfigurationCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *validatingWebhookConfigurationCache) Get(name string) (*v1.ValidatingWebhookConfiguration, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.ValidatingWebhookConfiguration), nil
-}
-
-func (c *validatingWebhookConfigurationCache) List(selector labels.Selector) (ret []*v1.ValidatingWebhookConfiguration, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ValidatingWebhookConfiguration))
-	})
-
-	return ret, err
-}
-
-func (c *validatingWebhookConfigurationCache) AddIndexer(indexName string, indexer ValidatingWebhookConfigurationIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.ValidatingWebhookConfiguration))
-		},
-	}))
-}
-
-func (c *validatingWebhookConfigurationCache) GetByIndex(indexName, key string) (result []*v1.ValidatingWebhookConfiguration, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.ValidatingWebhookConfiguration, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.ValidatingWebhookConfiguration))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ValidatingWebhookConfigurationGenericCache) AddIndexer(indexName string, indexer ValidatingWebhookConfigurationIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.ValidatingWebhookConfiguration](indexer))
 }

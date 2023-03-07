@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type IngressHandler func(string, *v1beta1.Ingress) (*v1beta1.Ingress, error)
-
+// IngressController interface for managing Ingress resources.
 type IngressController interface {
 	generic.ControllerMeta
 	IngressClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync IngressHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync IngressHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() IngressCache
 }
 
+// IngressClient interface for managing Ingress resources in Kubernetes.
 type IngressClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1beta1.Ingress) (*v1beta1.Ingress, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1beta1.Ingress) (*v1beta1.Ingress, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1beta1.Ingress) (*v1beta1.Ingress, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1beta1.Ingress, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1beta1.IngressList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Ingress, err error)
 }
 
+// IngressCache interface for retrieving Ingress resources in memory.
 type IngressCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1beta1.Ingress, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1beta1.Ingress, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer IngressIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1beta1.Ingress, error)
 }
 
+// IngressHandler is function for performing any potential modifications to a Ingress resource.
+type IngressHandler func(string, *v1beta1.Ingress) (*v1beta1.Ingress, error)
+
+// IngressIndexer computes a set of indexed values for the provided object.
 type IngressIndexer func(obj *v1beta1.Ingress) ([]string, error)
 
-type ingressController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// IngressGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to IngressController interface.
+type IngressGenericController struct {
+	generic.ControllerInterface[*v1beta1.Ingress, *v1beta1.IngressList]
 }
 
-func NewIngressController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) IngressController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &ingressController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *IngressGenericController) OnChange(ctx context.Context, name string, sync IngressHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1beta1.Ingress](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *IngressGenericController) OnRemove(ctx context.Context, name string, sync IngressHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1beta1.Ingress](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *IngressGenericController) Cache() IngressCache {
+	return &IngressGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromIngressHandlerToHandler(sync IngressHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1beta1.Ingress
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1beta1.Ingress))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// IngressGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to IngressCache interface.
+type IngressGenericCache struct {
+	generic.CacheInterface[*v1beta1.Ingress]
 }
 
-func (c *ingressController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1beta1.Ingress))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateIngressDeepCopyOnChange(client IngressClient, obj *v1beta1.Ingress, handler func(obj *v1beta1.Ingress) (*v1beta1.Ingress, error)) (*v1beta1.Ingress, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *ingressController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *ingressController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *ingressController) OnChange(ctx context.Context, name string, sync IngressHandler) {
-	c.AddGenericHandler(ctx, name, FromIngressHandlerToHandler(sync))
-}
-
-func (c *ingressController) OnRemove(ctx context.Context, name string, sync IngressHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromIngressHandlerToHandler(sync)))
-}
-
-func (c *ingressController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *ingressController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *ingressController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *ingressController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *ingressController) Cache() IngressCache {
-	return &ingressCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *ingressController) Create(obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
-	result := &v1beta1.Ingress{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *ingressController) Update(obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
-	result := &v1beta1.Ingress{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *ingressController) UpdateStatus(obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
-	result := &v1beta1.Ingress{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *ingressController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *ingressController) Get(namespace, name string, options metav1.GetOptions) (*v1beta1.Ingress, error) {
-	result := &v1beta1.Ingress{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *ingressController) List(namespace string, opts metav1.ListOptions) (*v1beta1.IngressList, error) {
-	result := &v1beta1.IngressList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *ingressController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *ingressController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1beta1.Ingress, error) {
-	result := &v1beta1.Ingress{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type ingressCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *ingressCache) Get(namespace, name string) (*v1beta1.Ingress, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1beta1.Ingress), nil
-}
-
-func (c *ingressCache) List(namespace string, selector labels.Selector) (ret []*v1beta1.Ingress, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1beta1.Ingress))
-	})
-
-	return ret, err
-}
-
-func (c *ingressCache) AddIndexer(indexName string, indexer IngressIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1beta1.Ingress))
-		},
-	}))
-}
-
-func (c *ingressCache) GetByIndex(indexName, key string) (result []*v1beta1.Ingress, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1beta1.Ingress, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1beta1.Ingress))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c IngressGenericCache) AddIndexer(indexName string, indexer IngressIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1beta1.Ingress](indexer))
 }
 
 type IngressStatusHandler func(obj *v1beta1.Ingress, status v1beta1.IngressStatus) (v1beta1.IngressStatus, error)
 
 type IngressGeneratingHandler func(obj *v1beta1.Ingress, status v1beta1.IngressStatus) ([]runtime.Object, v1beta1.IngressStatus, error)
+
+func FromIngressHandlerToHandler(sync IngressHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1beta1.Ingress](sync))
+}
 
 func RegisterIngressStatusHandler(ctx context.Context, controller IngressController, condition condition.Cond, name string, handler IngressStatusHandler) {
 	statusHandler := &ingressStatusHandler{

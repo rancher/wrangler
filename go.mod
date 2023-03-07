@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/evanphx/json-patch v4.12.0+incompatible
 	github.com/ghodss/yaml v1.0.0
+	github.com/golang/mock v1.6.0
 	github.com/moby/locker v1.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.0.0-20221227210133-6ea88ca2fbcc

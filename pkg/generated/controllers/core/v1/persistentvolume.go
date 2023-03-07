@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type PersistentVolumeHandler func(string, *v1.PersistentVolume) (*v1.PersistentVolume, error)
-
+// PersistentVolumeController interface for managing PersistentVolume resources.
 type PersistentVolumeController interface {
 	generic.ControllerMeta
 	PersistentVolumeClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync PersistentVolumeHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync PersistentVolumeHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() PersistentVolumeCache
 }
 
+// PersistentVolumeClient interface for managing PersistentVolume resources in Kubernetes.
 type PersistentVolumeClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.PersistentVolume) (*v1.PersistentVolume, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.PersistentVolume) (*v1.PersistentVolume, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.PersistentVolume) (*v1.PersistentVolume, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v1.PersistentVolume, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v1.PersistentVolumeList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error)
 }
 
+// PersistentVolumeCache interface for retrieving PersistentVolume resources in memory.
 type PersistentVolumeCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v1.PersistentVolume, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v1.PersistentVolume, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer PersistentVolumeIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.PersistentVolume, error)
 }
 
+// PersistentVolumeHandler is function for performing any potential modifications to a PersistentVolume resource.
+type PersistentVolumeHandler func(string, *v1.PersistentVolume) (*v1.PersistentVolume, error)
+
+// PersistentVolumeIndexer computes a set of indexed values for the provided object.
 type PersistentVolumeIndexer func(obj *v1.PersistentVolume) ([]string, error)
 
-type persistentVolumeController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// PersistentVolumeGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to PersistentVolumeController interface.
+type PersistentVolumeGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.PersistentVolume, *v1.PersistentVolumeList]
 }
 
-func NewPersistentVolumeController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) PersistentVolumeController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &persistentVolumeController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *PersistentVolumeGenericController) OnChange(ctx context.Context, name string, sync PersistentVolumeHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.PersistentVolume](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *PersistentVolumeGenericController) OnRemove(ctx context.Context, name string, sync PersistentVolumeHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.PersistentVolume](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *PersistentVolumeGenericController) Cache() PersistentVolumeCache {
+	return &PersistentVolumeGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromPersistentVolumeHandlerToHandler(sync PersistentVolumeHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.PersistentVolume
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.PersistentVolume))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// PersistentVolumeGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to PersistentVolumeCache interface.
+type PersistentVolumeGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v1.PersistentVolume]
 }
 
-func (c *persistentVolumeController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.PersistentVolume))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdatePersistentVolumeDeepCopyOnChange(client PersistentVolumeClient, obj *v1.PersistentVolume, handler func(obj *v1.PersistentVolume) (*v1.PersistentVolume, error)) (*v1.PersistentVolume, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *persistentVolumeController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *persistentVolumeController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *persistentVolumeController) OnChange(ctx context.Context, name string, sync PersistentVolumeHandler) {
-	c.AddGenericHandler(ctx, name, FromPersistentVolumeHandlerToHandler(sync))
-}
-
-func (c *persistentVolumeController) OnRemove(ctx context.Context, name string, sync PersistentVolumeHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromPersistentVolumeHandlerToHandler(sync)))
-}
-
-func (c *persistentVolumeController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *persistentVolumeController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *persistentVolumeController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *persistentVolumeController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *persistentVolumeController) Cache() PersistentVolumeCache {
-	return &persistentVolumeCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *persistentVolumeController) Create(obj *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	result := &v1.PersistentVolume{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *persistentVolumeController) Update(obj *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	result := &v1.PersistentVolume{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *persistentVolumeController) UpdateStatus(obj *v1.PersistentVolume) (*v1.PersistentVolume, error) {
-	result := &v1.PersistentVolume{}
-	return result, c.client.UpdateStatus(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *persistentVolumeController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *persistentVolumeController) Get(name string, options metav1.GetOptions) (*v1.PersistentVolume, error) {
-	result := &v1.PersistentVolume{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *persistentVolumeController) List(opts metav1.ListOptions) (*v1.PersistentVolumeList, error) {
-	result := &v1.PersistentVolumeList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *persistentVolumeController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *persistentVolumeController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.PersistentVolume, error) {
-	result := &v1.PersistentVolume{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type persistentVolumeCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *persistentVolumeCache) Get(name string) (*v1.PersistentVolume, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.PersistentVolume), nil
-}
-
-func (c *persistentVolumeCache) List(selector labels.Selector) (ret []*v1.PersistentVolume, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.PersistentVolume))
-	})
-
-	return ret, err
-}
-
-func (c *persistentVolumeCache) AddIndexer(indexName string, indexer PersistentVolumeIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.PersistentVolume))
-		},
-	}))
-}
-
-func (c *persistentVolumeCache) GetByIndex(indexName, key string) (result []*v1.PersistentVolume, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.PersistentVolume, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.PersistentVolume))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c PersistentVolumeGenericCache) AddIndexer(indexName string, indexer PersistentVolumeIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.PersistentVolume](indexer))
 }
 
 type PersistentVolumeStatusHandler func(obj *v1.PersistentVolume, status v1.PersistentVolumeStatus) (v1.PersistentVolumeStatus, error)
 
 type PersistentVolumeGeneratingHandler func(obj *v1.PersistentVolume, status v1.PersistentVolumeStatus) ([]runtime.Object, v1.PersistentVolumeStatus, error)
+
+func FromPersistentVolumeHandlerToHandler(sync PersistentVolumeHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.PersistentVolume](sync))
+}
 
 func RegisterPersistentVolumeStatusHandler(ctx context.Context, controller PersistentVolumeController, condition condition.Cond, name string, handler PersistentVolumeStatusHandler) {
 	statusHandler := &persistentVolumeStatusHandler{

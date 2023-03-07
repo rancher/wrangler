@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type StatefulSetHandler func(string, *v1.StatefulSet) (*v1.StatefulSet, error)
-
+// StatefulSetController interface for managing StatefulSet resources.
 type StatefulSetController interface {
 	generic.ControllerMeta
 	StatefulSetClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync StatefulSetHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync StatefulSetHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() StatefulSetCache
 }
 
+// StatefulSetClient interface for managing StatefulSet resources in Kubernetes.
 type StatefulSetClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.StatefulSet) (*v1.StatefulSet, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.StatefulSet) (*v1.StatefulSet, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.StatefulSet) (*v1.StatefulSet, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.StatefulSet, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.StatefulSetList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StatefulSet, err error)
 }
 
+// StatefulSetCache interface for retrieving StatefulSet resources in memory.
 type StatefulSetCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.StatefulSet, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.StatefulSet, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer StatefulSetIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.StatefulSet, error)
 }
 
+// StatefulSetHandler is function for performing any potential modifications to a StatefulSet resource.
+type StatefulSetHandler func(string, *v1.StatefulSet) (*v1.StatefulSet, error)
+
+// StatefulSetIndexer computes a set of indexed values for the provided object.
 type StatefulSetIndexer func(obj *v1.StatefulSet) ([]string, error)
 
-type statefulSetController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// StatefulSetGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to StatefulSetController interface.
+type StatefulSetGenericController struct {
+	generic.ControllerInterface[*v1.StatefulSet, *v1.StatefulSetList]
 }
 
-func NewStatefulSetController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) StatefulSetController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &statefulSetController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *StatefulSetGenericController) OnChange(ctx context.Context, name string, sync StatefulSetHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.StatefulSet](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *StatefulSetGenericController) OnRemove(ctx context.Context, name string, sync StatefulSetHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.StatefulSet](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *StatefulSetGenericController) Cache() StatefulSetCache {
+	return &StatefulSetGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromStatefulSetHandlerToHandler(sync StatefulSetHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.StatefulSet
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.StatefulSet))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// StatefulSetGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to StatefulSetCache interface.
+type StatefulSetGenericCache struct {
+	generic.CacheInterface[*v1.StatefulSet]
 }
 
-func (c *statefulSetController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.StatefulSet))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateStatefulSetDeepCopyOnChange(client StatefulSetClient, obj *v1.StatefulSet, handler func(obj *v1.StatefulSet) (*v1.StatefulSet, error)) (*v1.StatefulSet, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *statefulSetController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *statefulSetController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *statefulSetController) OnChange(ctx context.Context, name string, sync StatefulSetHandler) {
-	c.AddGenericHandler(ctx, name, FromStatefulSetHandlerToHandler(sync))
-}
-
-func (c *statefulSetController) OnRemove(ctx context.Context, name string, sync StatefulSetHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromStatefulSetHandlerToHandler(sync)))
-}
-
-func (c *statefulSetController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *statefulSetController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *statefulSetController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *statefulSetController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *statefulSetController) Cache() StatefulSetCache {
-	return &statefulSetCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *statefulSetController) Create(obj *v1.StatefulSet) (*v1.StatefulSet, error) {
-	result := &v1.StatefulSet{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *statefulSetController) Update(obj *v1.StatefulSet) (*v1.StatefulSet, error) {
-	result := &v1.StatefulSet{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *statefulSetController) UpdateStatus(obj *v1.StatefulSet) (*v1.StatefulSet, error) {
-	result := &v1.StatefulSet{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *statefulSetController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *statefulSetController) Get(namespace, name string, options metav1.GetOptions) (*v1.StatefulSet, error) {
-	result := &v1.StatefulSet{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *statefulSetController) List(namespace string, opts metav1.ListOptions) (*v1.StatefulSetList, error) {
-	result := &v1.StatefulSetList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *statefulSetController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *statefulSetController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.StatefulSet, error) {
-	result := &v1.StatefulSet{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type statefulSetCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *statefulSetCache) Get(namespace, name string) (*v1.StatefulSet, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.StatefulSet), nil
-}
-
-func (c *statefulSetCache) List(namespace string, selector labels.Selector) (ret []*v1.StatefulSet, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.StatefulSet))
-	})
-
-	return ret, err
-}
-
-func (c *statefulSetCache) AddIndexer(indexName string, indexer StatefulSetIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.StatefulSet))
-		},
-	}))
-}
-
-func (c *statefulSetCache) GetByIndex(indexName, key string) (result []*v1.StatefulSet, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.StatefulSet, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.StatefulSet))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c StatefulSetGenericCache) AddIndexer(indexName string, indexer StatefulSetIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.StatefulSet](indexer))
 }
 
 type StatefulSetStatusHandler func(obj *v1.StatefulSet, status v1.StatefulSetStatus) (v1.StatefulSetStatus, error)
 
 type StatefulSetGeneratingHandler func(obj *v1.StatefulSet, status v1.StatefulSetStatus) ([]runtime.Object, v1.StatefulSetStatus, error)
+
+func FromStatefulSetHandlerToHandler(sync StatefulSetHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.StatefulSet](sync))
+}
 
 func RegisterStatefulSetStatusHandler(ctx context.Context, controller StatefulSetController, condition condition.Cond, name string, handler StatefulSetStatusHandler) {
 	statusHandler := &statefulSetStatusHandler{

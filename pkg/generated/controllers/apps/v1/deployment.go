@@ -22,8 +22,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -36,236 +34,120 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type DeploymentHandler func(string, *v1.Deployment) (*v1.Deployment, error)
-
+// DeploymentController interface for managing Deployment resources.
 type DeploymentController interface {
 	generic.ControllerMeta
 	DeploymentClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync DeploymentHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync DeploymentHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() DeploymentCache
 }
 
+// DeploymentClient interface for managing Deployment resources in Kubernetes.
 type DeploymentClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Deployment) (*v1.Deployment, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Deployment) (*v1.Deployment, error)
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
 	UpdateStatus(*v1.Deployment) (*v1.Deployment, error)
+
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Deployment, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.DeploymentList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Deployment, err error)
 }
 
+// DeploymentCache interface for retrieving Deployment resources in memory.
 type DeploymentCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Deployment, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Deployment, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer DeploymentIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Deployment, error)
 }
 
+// DeploymentHandler is function for performing any potential modifications to a Deployment resource.
+type DeploymentHandler func(string, *v1.Deployment) (*v1.Deployment, error)
+
+// DeploymentIndexer computes a set of indexed values for the provided object.
 type DeploymentIndexer func(obj *v1.Deployment) ([]string, error)
 
-type deploymentController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// DeploymentGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to DeploymentController interface.
+type DeploymentGenericController struct {
+	generic.ControllerInterface[*v1.Deployment, *v1.DeploymentList]
 }
 
-func NewDeploymentController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) DeploymentController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &deploymentController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *DeploymentGenericController) OnChange(ctx context.Context, name string, sync DeploymentHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Deployment](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *DeploymentGenericController) OnRemove(ctx context.Context, name string, sync DeploymentHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Deployment](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *DeploymentGenericController) Cache() DeploymentCache {
+	return &DeploymentGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromDeploymentHandlerToHandler(sync DeploymentHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.Deployment
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.Deployment))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// DeploymentGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to DeploymentCache interface.
+type DeploymentGenericCache struct {
+	generic.CacheInterface[*v1.Deployment]
 }
 
-func (c *deploymentController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.Deployment))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateDeploymentDeepCopyOnChange(client DeploymentClient, obj *v1.Deployment, handler func(obj *v1.Deployment) (*v1.Deployment, error)) (*v1.Deployment, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *deploymentController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *deploymentController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *deploymentController) OnChange(ctx context.Context, name string, sync DeploymentHandler) {
-	c.AddGenericHandler(ctx, name, FromDeploymentHandlerToHandler(sync))
-}
-
-func (c *deploymentController) OnRemove(ctx context.Context, name string, sync DeploymentHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromDeploymentHandlerToHandler(sync)))
-}
-
-func (c *deploymentController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *deploymentController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *deploymentController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *deploymentController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *deploymentController) Cache() DeploymentCache {
-	return &deploymentCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *deploymentController) Create(obj *v1.Deployment) (*v1.Deployment, error) {
-	result := &v1.Deployment{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *deploymentController) Update(obj *v1.Deployment) (*v1.Deployment, error) {
-	result := &v1.Deployment{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *deploymentController) UpdateStatus(obj *v1.Deployment) (*v1.Deployment, error) {
-	result := &v1.Deployment{}
-	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *deploymentController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *deploymentController) Get(namespace, name string, options metav1.GetOptions) (*v1.Deployment, error) {
-	result := &v1.Deployment{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *deploymentController) List(namespace string, opts metav1.ListOptions) (*v1.DeploymentList, error) {
-	result := &v1.DeploymentList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *deploymentController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *deploymentController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Deployment, error) {
-	result := &v1.Deployment{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type deploymentCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *deploymentCache) Get(namespace, name string) (*v1.Deployment, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.Deployment), nil
-}
-
-func (c *deploymentCache) List(namespace string, selector labels.Selector) (ret []*v1.Deployment, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Deployment))
-	})
-
-	return ret, err
-}
-
-func (c *deploymentCache) AddIndexer(indexName string, indexer DeploymentIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.Deployment))
-		},
-	}))
-}
-
-func (c *deploymentCache) GetByIndex(indexName, key string) (result []*v1.Deployment, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.Deployment, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.Deployment))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c DeploymentGenericCache) AddIndexer(indexName string, indexer DeploymentIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Deployment](indexer))
 }
 
 type DeploymentStatusHandler func(obj *v1.Deployment, status v1.DeploymentStatus) (v1.DeploymentStatus, error)
 
 type DeploymentGeneratingHandler func(obj *v1.Deployment, status v1.DeploymentStatus) ([]runtime.Object, v1.DeploymentStatus, error)
+
+func FromDeploymentHandlerToHandler(sync DeploymentHandler) generic.Handler {
+	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.Deployment](sync))
+}
 
 func RegisterDeploymentStatusHandler(ctx context.Context, controller DeploymentController, condition condition.Cond, name string, handler DeploymentStatusHandler) {
 	statusHandler := &deploymentStatusHandler{

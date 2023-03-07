@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type ServiceAccountHandler func(string, *v1.ServiceAccount) (*v1.ServiceAccount, error)
-
+// ServiceAccountController interface for managing ServiceAccount resources.
 type ServiceAccountController interface {
 	generic.ControllerMeta
 	ServiceAccountClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync ServiceAccountHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync ServiceAccountHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() ServiceAccountCache
 }
 
+// ServiceAccountClient interface for managing ServiceAccount resources in Kubernetes.
 type ServiceAccountClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.ServiceAccount) (*v1.ServiceAccount, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.ServiceAccount) (*v1.ServiceAccount, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.ServiceAccount, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.ServiceAccountList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
 }
 
+// ServiceAccountCache interface for retrieving ServiceAccount resources in memory.
 type ServiceAccountCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.ServiceAccount, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.ServiceAccount, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer ServiceAccountIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.ServiceAccount, error)
 }
 
+// ServiceAccountHandler is function for performing any potential modifications to a ServiceAccount resource.
+type ServiceAccountHandler func(string, *v1.ServiceAccount) (*v1.ServiceAccount, error)
+
+// ServiceAccountIndexer computes a set of indexed values for the provided object.
 type ServiceAccountIndexer func(obj *v1.ServiceAccount) ([]string, error)
 
-type serviceAccountController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// ServiceAccountGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ServiceAccountController interface.
+type ServiceAccountGenericController struct {
+	generic.ControllerInterface[*v1.ServiceAccount, *v1.ServiceAccountList]
 }
 
-func NewServiceAccountController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) ServiceAccountController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &serviceAccountController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *ServiceAccountGenericController) OnChange(ctx context.Context, name string, sync ServiceAccountHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.ServiceAccount](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *ServiceAccountGenericController) OnRemove(ctx context.Context, name string, sync ServiceAccountHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.ServiceAccount](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *ServiceAccountGenericController) Cache() ServiceAccountCache {
+	return &ServiceAccountGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromServiceAccountHandlerToHandler(sync ServiceAccountHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.ServiceAccount
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.ServiceAccount))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// ServiceAccountGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ServiceAccountCache interface.
+type ServiceAccountGenericCache struct {
+	generic.CacheInterface[*v1.ServiceAccount]
 }
 
-func (c *serviceAccountController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.ServiceAccount))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateServiceAccountDeepCopyOnChange(client ServiceAccountClient, obj *v1.ServiceAccount, handler func(obj *v1.ServiceAccount) (*v1.ServiceAccount, error)) (*v1.ServiceAccount, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *serviceAccountController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *serviceAccountController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *serviceAccountController) OnChange(ctx context.Context, name string, sync ServiceAccountHandler) {
-	c.AddGenericHandler(ctx, name, FromServiceAccountHandlerToHandler(sync))
-}
-
-func (c *serviceAccountController) OnRemove(ctx context.Context, name string, sync ServiceAccountHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromServiceAccountHandlerToHandler(sync)))
-}
-
-func (c *serviceAccountController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *serviceAccountController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *serviceAccountController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *serviceAccountController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *serviceAccountController) Cache() ServiceAccountCache {
-	return &serviceAccountCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *serviceAccountController) Create(obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *serviceAccountController) Update(obj *v1.ServiceAccount) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *serviceAccountController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *serviceAccountController) Get(namespace, name string, options metav1.GetOptions) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *serviceAccountController) List(namespace string, opts metav1.ListOptions) (*v1.ServiceAccountList, error) {
-	result := &v1.ServiceAccountList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *serviceAccountController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *serviceAccountController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.ServiceAccount, error) {
-	result := &v1.ServiceAccount{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type serviceAccountCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *serviceAccountCache) Get(namespace, name string) (*v1.ServiceAccount, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.ServiceAccount), nil
-}
-
-func (c *serviceAccountCache) List(namespace string, selector labels.Selector) (ret []*v1.ServiceAccount, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.ServiceAccount))
-	})
-
-	return ret, err
-}
-
-func (c *serviceAccountCache) AddIndexer(indexName string, indexer ServiceAccountIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.ServiceAccount))
-		},
-	}))
-}
-
-func (c *serviceAccountCache) GetByIndex(indexName, key string) (result []*v1.ServiceAccount, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.ServiceAccount, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.ServiceAccount))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c ServiceAccountGenericCache) AddIndexer(indexName string, indexer ServiceAccountIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.ServiceAccount](indexer))
 }

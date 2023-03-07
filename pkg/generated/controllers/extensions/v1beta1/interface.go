@@ -20,6 +20,7 @@ package v1beta1
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,6 +44,8 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) Ingress() IngressController {
-	return NewIngressController(schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, "ingresses", true, c.controllerFactory)
+func (v *version) Ingress() IngressController {
+	return &IngressGenericController{
+		generic.NewController[*v1beta1.Ingress, *v1beta1.IngressList](schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Ingress"}, "ingresses", true, v.controllerFactory),
+	}
 }

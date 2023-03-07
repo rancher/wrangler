@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/discovery/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type EndpointSliceHandler func(string, *v1.EndpointSlice) (*v1.EndpointSlice, error)
-
+// EndpointSliceController interface for managing EndpointSlice resources.
 type EndpointSliceController interface {
 	generic.ControllerMeta
 	EndpointSliceClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync EndpointSliceHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync EndpointSliceHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() EndpointSliceCache
 }
 
+// EndpointSliceClient interface for managing EndpointSlice resources in Kubernetes.
 type EndpointSliceClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.EndpointSlice) (*v1.EndpointSlice, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.EndpointSlice) (*v1.EndpointSlice, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.EndpointSlice, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.EndpointSliceList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.EndpointSlice, err error)
 }
 
+// EndpointSliceCache interface for retrieving EndpointSlice resources in memory.
 type EndpointSliceCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.EndpointSlice, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.EndpointSlice, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer EndpointSliceIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.EndpointSlice, error)
 }
 
+// EndpointSliceHandler is function for performing any potential modifications to a EndpointSlice resource.
+type EndpointSliceHandler func(string, *v1.EndpointSlice) (*v1.EndpointSlice, error)
+
+// EndpointSliceIndexer computes a set of indexed values for the provided object.
 type EndpointSliceIndexer func(obj *v1.EndpointSlice) ([]string, error)
 
-type endpointSliceController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// EndpointSliceGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to EndpointSliceController interface.
+type EndpointSliceGenericController struct {
+	generic.ControllerInterface[*v1.EndpointSlice, *v1.EndpointSliceList]
 }
 
-func NewEndpointSliceController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) EndpointSliceController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &endpointSliceController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *EndpointSliceGenericController) OnChange(ctx context.Context, name string, sync EndpointSliceHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.EndpointSlice](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *EndpointSliceGenericController) OnRemove(ctx context.Context, name string, sync EndpointSliceHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.EndpointSlice](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *EndpointSliceGenericController) Cache() EndpointSliceCache {
+	return &EndpointSliceGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromEndpointSliceHandlerToHandler(sync EndpointSliceHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.EndpointSlice
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.EndpointSlice))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// EndpointSliceGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to EndpointSliceCache interface.
+type EndpointSliceGenericCache struct {
+	generic.CacheInterface[*v1.EndpointSlice]
 }
 
-func (c *endpointSliceController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.EndpointSlice))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateEndpointSliceDeepCopyOnChange(client EndpointSliceClient, obj *v1.EndpointSlice, handler func(obj *v1.EndpointSlice) (*v1.EndpointSlice, error)) (*v1.EndpointSlice, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *endpointSliceController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *endpointSliceController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *endpointSliceController) OnChange(ctx context.Context, name string, sync EndpointSliceHandler) {
-	c.AddGenericHandler(ctx, name, FromEndpointSliceHandlerToHandler(sync))
-}
-
-func (c *endpointSliceController) OnRemove(ctx context.Context, name string, sync EndpointSliceHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromEndpointSliceHandlerToHandler(sync)))
-}
-
-func (c *endpointSliceController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *endpointSliceController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *endpointSliceController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *endpointSliceController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *endpointSliceController) Cache() EndpointSliceCache {
-	return &endpointSliceCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *endpointSliceController) Create(obj *v1.EndpointSlice) (*v1.EndpointSlice, error) {
-	result := &v1.EndpointSlice{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *endpointSliceController) Update(obj *v1.EndpointSlice) (*v1.EndpointSlice, error) {
-	result := &v1.EndpointSlice{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *endpointSliceController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *endpointSliceController) Get(namespace, name string, options metav1.GetOptions) (*v1.EndpointSlice, error) {
-	result := &v1.EndpointSlice{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *endpointSliceController) List(namespace string, opts metav1.ListOptions) (*v1.EndpointSliceList, error) {
-	result := &v1.EndpointSliceList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *endpointSliceController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *endpointSliceController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.EndpointSlice, error) {
-	result := &v1.EndpointSlice{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type endpointSliceCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *endpointSliceCache) Get(namespace, name string) (*v1.EndpointSlice, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.EndpointSlice), nil
-}
-
-func (c *endpointSliceCache) List(namespace string, selector labels.Selector) (ret []*v1.EndpointSlice, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.EndpointSlice))
-	})
-
-	return ret, err
-}
-
-func (c *endpointSliceCache) AddIndexer(indexName string, indexer EndpointSliceIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.EndpointSlice))
-		},
-	}))
-}
-
-func (c *endpointSliceCache) GetByIndex(indexName, key string) (result []*v1.EndpointSlice, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.EndpointSlice, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.EndpointSlice))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c EndpointSliceGenericCache) AddIndexer(indexName string, indexer EndpointSliceIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.EndpointSlice](indexer))
 }

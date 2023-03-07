@@ -20,6 +20,7 @@ package v1
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/generic"
 	"github.com/rancher/wrangler/pkg/schemes"
 	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -43,6 +44,8 @@ type version struct {
 	controllerFactory controller.SharedControllerFactory
 }
 
-func (c *version) NetworkPolicy() NetworkPolicyController {
-	return NewNetworkPolicyController(schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}, "networkpolicies", true, c.controllerFactory)
+func (v *version) NetworkPolicy() NetworkPolicyController {
+	return &NetworkPolicyGenericController{
+		generic.NewController[*v1.NetworkPolicy, *v1.NetworkPolicyList](schema.GroupVersionKind{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}, "networkpolicies", true, v.controllerFactory),
+	}
 }

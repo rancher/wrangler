@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type RoleHandler func(string, *v1.Role) (*v1.Role, error)
-
+// RoleController interface for managing Role resources.
 type RoleController interface {
 	generic.ControllerMeta
 	RoleClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync RoleHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync RoleHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(namespace, name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() RoleCache
 }
 
+// RoleClient interface for managing Role resources in Kubernetes.
 type RoleClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.Role) (*v1.Role, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.Role) (*v1.Role, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(namespace, name string, options metav1.GetOptions) (*v1.Role, error)
+
+	// List will attempt to find multiple resources.
 	List(namespace string, opts metav1.ListOptions) (*v1.RoleList, error)
+
+	// Watch will start watching resources.
 	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Role, err error)
 }
 
+// RoleCache interface for retrieving Role resources in memory.
 type RoleCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(namespace, name string) (*v1.Role, error)
+
+	// List will attempt to find resources from the Cache.
 	List(namespace string, selector labels.Selector) ([]*v1.Role, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer RoleIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.Role, error)
 }
 
+// RoleHandler is function for performing any potential modifications to a Role resource.
+type RoleHandler func(string, *v1.Role) (*v1.Role, error)
+
+// RoleIndexer computes a set of indexed values for the provided object.
 type RoleIndexer func(obj *v1.Role) ([]string, error)
 
-type roleController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// RoleGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to RoleController interface.
+type RoleGenericController struct {
+	generic.ControllerInterface[*v1.Role, *v1.RoleList]
 }
 
-func NewRoleController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) RoleController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &roleController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *RoleGenericController) OnChange(ctx context.Context, name string, sync RoleHandler) {
+	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Role](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *RoleGenericController) OnRemove(ctx context.Context, name string, sync RoleHandler) {
+	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Role](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *RoleGenericController) Cache() RoleCache {
+	return &RoleGenericCache{
+		c.ControllerInterface.Cache(),
 	}
 }
 
-func FromRoleHandlerToHandler(sync RoleHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.Role
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.Role))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// RoleGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to RoleCache interface.
+type RoleGenericCache struct {
+	generic.CacheInterface[*v1.Role]
 }
 
-func (c *roleController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.Role))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateRoleDeepCopyOnChange(client RoleClient, obj *v1.Role, handler func(obj *v1.Role) (*v1.Role, error)) (*v1.Role, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *roleController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *roleController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *roleController) OnChange(ctx context.Context, name string, sync RoleHandler) {
-	c.AddGenericHandler(ctx, name, FromRoleHandlerToHandler(sync))
-}
-
-func (c *roleController) OnRemove(ctx context.Context, name string, sync RoleHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromRoleHandlerToHandler(sync)))
-}
-
-func (c *roleController) Enqueue(namespace, name string) {
-	c.controller.Enqueue(namespace, name)
-}
-
-func (c *roleController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controller.EnqueueAfter(namespace, name, duration)
-}
-
-func (c *roleController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *roleController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *roleController) Cache() RoleCache {
-	return &roleCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *roleController) Create(obj *v1.Role) (*v1.Role, error) {
-	result := &v1.Role{}
-	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
-}
-
-func (c *roleController) Update(obj *v1.Role) (*v1.Role, error) {
-	result := &v1.Role{}
-	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
-}
-
-func (c *roleController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
-}
-
-func (c *roleController) Get(namespace, name string, options metav1.GetOptions) (*v1.Role, error) {
-	result := &v1.Role{}
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
-}
-
-func (c *roleController) List(namespace string, opts metav1.ListOptions) (*v1.RoleList, error) {
-	result := &v1.RoleList{}
-	return result, c.client.List(context.TODO(), namespace, result, opts)
-}
-
-func (c *roleController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
-}
-
-func (c *roleController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Role, error) {
-	result := &v1.Role{}
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type roleCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *roleCache) Get(namespace, name string) (*v1.Role, error) {
-	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.Role), nil
-}
-
-func (c *roleCache) List(namespace string, selector labels.Selector) (ret []*v1.Role, err error) {
-
-	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.Role))
-	})
-
-	return ret, err
-}
-
-func (c *roleCache) AddIndexer(indexName string, indexer RoleIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.Role))
-		},
-	}))
-}
-
-func (c *roleCache) GetByIndex(indexName, key string) (result []*v1.Role, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.Role, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.Role))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c RoleGenericCache) AddIndexer(indexName string, indexer RoleIndexer) {
+	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Role](indexer))
 }

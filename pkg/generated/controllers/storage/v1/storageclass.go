@@ -22,235 +22,111 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/tools/cache"
 )
 
-type StorageClassHandler func(string, *v1.StorageClass) (*v1.StorageClass, error)
-
+// StorageClassController interface for managing StorageClass resources.
 type StorageClassController interface {
 	generic.ControllerMeta
 	StorageClassClient
 
+	// OnChange runs the given handler when the controller detects a resource was changed.
 	OnChange(ctx context.Context, name string, sync StorageClassHandler)
+
+	// OnRemove runs the given handler when the controller detects a resource was changed.
 	OnRemove(ctx context.Context, name string, sync StorageClassHandler)
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
 	EnqueueAfter(name string, duration time.Duration)
 
+	// Cache returns a cache for the resource type T.
 	Cache() StorageClassCache
 }
 
+// StorageClassClient interface for managing StorageClass resources in Kubernetes.
 type StorageClassClient interface {
+	// Create creates a new object and return the newly created Object or an error.
 	Create(*v1.StorageClass) (*v1.StorageClass, error)
+
+	// Update updates the object and return the newly updated Object or an error.
 	Update(*v1.StorageClass) (*v1.StorageClass, error)
 
+	// Delete deletes the Object in the given name.
 	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
 	Get(name string, options metav1.GetOptions) (*v1.StorageClass, error)
+
+	// List will attempt to find multiple resources.
 	List(opts metav1.ListOptions) (*v1.StorageClassList, error)
+
+	// Watch will start watching resources.
 	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error)
 }
 
+// StorageClassCache interface for retrieving StorageClass resources in memory.
 type StorageClassCache interface {
+	// Get returns the resources with the specified name from the cache.
 	Get(name string) (*v1.StorageClass, error)
+
+	// List will attempt to find resources from the Cache.
 	List(selector labels.Selector) ([]*v1.StorageClass, error)
 
+	// AddIndexer adds  a new Indexer to the cache with the provided name.
+	// If you call this after you already have data in the store, the results are undefined.
 	AddIndexer(indexName string, indexer StorageClassIndexer)
+
+	// GetByIndex returns the stored objects whose set of indexed values
+	// for the named index includes the given indexed value.
 	GetByIndex(indexName, key string) ([]*v1.StorageClass, error)
 }
 
+// StorageClassHandler is function for performing any potential modifications to a StorageClass resource.
+type StorageClassHandler func(string, *v1.StorageClass) (*v1.StorageClass, error)
+
+// StorageClassIndexer computes a set of indexed values for the provided object.
 type StorageClassIndexer func(obj *v1.StorageClass) ([]string, error)
 
-type storageClassController struct {
-	controller    controller.SharedController
-	client        *client.Client
-	gvk           schema.GroupVersionKind
-	groupResource schema.GroupResource
+// StorageClassGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to StorageClassController interface.
+type StorageClassGenericController struct {
+	generic.NonNamespacedControllerInterface[*v1.StorageClass, *v1.StorageClassList]
 }
 
-func NewStorageClassController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) StorageClassController {
-	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
-	return &storageClassController{
-		controller: c,
-		client:     c.Client(),
-		gvk:        gvk,
-		groupResource: schema.GroupResource{
-			Group:    gvk.Group,
-			Resource: resource,
-		},
+// OnChange runs the given resource handler when the controller detects a resource was changed.
+func (c *StorageClassGenericController) OnChange(ctx context.Context, name string, sync StorageClassHandler) {
+	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.StorageClass](sync))
+}
+
+// OnRemove runs the given object handler when the controller detects a resource was changed.
+func (c *StorageClassGenericController) OnRemove(ctx context.Context, name string, sync StorageClassHandler) {
+	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.StorageClass](sync))
+}
+
+// Cache returns a cache of resources in memory.
+func (c *StorageClassGenericController) Cache() StorageClassCache {
+	return &StorageClassGenericCache{
+		c.NonNamespacedControllerInterface.Cache(),
 	}
 }
 
-func FromStorageClassHandlerToHandler(sync StorageClassHandler) generic.Handler {
-	return func(key string, obj runtime.Object) (ret runtime.Object, err error) {
-		var v *v1.StorageClass
-		if obj == nil {
-			v, err = sync(key, nil)
-		} else {
-			v, err = sync(key, obj.(*v1.StorageClass))
-		}
-		if v == nil {
-			return nil, err
-		}
-		return v, err
-	}
+// StorageClassGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to StorageClassCache interface.
+type StorageClassGenericCache struct {
+	generic.NonNamespacedCacheInterface[*v1.StorageClass]
 }
 
-func (c *storageClassController) Updater() generic.Updater {
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(obj.(*v1.StorageClass))
-		if newObj == nil {
-			return nil, err
-		}
-		return newObj, err
-	}
-}
-
-func UpdateStorageClassDeepCopyOnChange(client StorageClassClient, obj *v1.StorageClass, handler func(obj *v1.StorageClass) (*v1.StorageClass, error)) (*v1.StorageClass, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	copyObj := obj.DeepCopy()
-	newObj, err := handler(copyObj)
-	if newObj != nil {
-		copyObj = newObj
-	}
-	if obj.ResourceVersion == copyObj.ResourceVersion && !equality.Semantic.DeepEqual(obj, copyObj) {
-		return client.Update(copyObj)
-	}
-
-	return copyObj, err
-}
-
-func (c *storageClassController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
-}
-
-func (c *storageClassController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
-}
-
-func (c *storageClassController) OnChange(ctx context.Context, name string, sync StorageClassHandler) {
-	c.AddGenericHandler(ctx, name, FromStorageClassHandlerToHandler(sync))
-}
-
-func (c *storageClassController) OnRemove(ctx context.Context, name string, sync StorageClassHandler) {
-	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromStorageClassHandlerToHandler(sync)))
-}
-
-func (c *storageClassController) Enqueue(name string) {
-	c.controller.Enqueue("", name)
-}
-
-func (c *storageClassController) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter("", name, duration)
-}
-
-func (c *storageClassController) Informer() cache.SharedIndexInformer {
-	return c.controller.Informer()
-}
-
-func (c *storageClassController) GroupVersionKind() schema.GroupVersionKind {
-	return c.gvk
-}
-
-func (c *storageClassController) Cache() StorageClassCache {
-	return &storageClassCache{
-		indexer:  c.Informer().GetIndexer(),
-		resource: c.groupResource,
-	}
-}
-
-func (c *storageClassController) Create(obj *v1.StorageClass) (*v1.StorageClass, error) {
-	result := &v1.StorageClass{}
-	return result, c.client.Create(context.TODO(), "", obj, result, metav1.CreateOptions{})
-}
-
-func (c *storageClassController) Update(obj *v1.StorageClass) (*v1.StorageClass, error) {
-	result := &v1.StorageClass{}
-	return result, c.client.Update(context.TODO(), "", obj, result, metav1.UpdateOptions{})
-}
-
-func (c *storageClassController) Delete(name string, options *metav1.DeleteOptions) error {
-	if options == nil {
-		options = &metav1.DeleteOptions{}
-	}
-	return c.client.Delete(context.TODO(), "", name, *options)
-}
-
-func (c *storageClassController) Get(name string, options metav1.GetOptions) (*v1.StorageClass, error) {
-	result := &v1.StorageClass{}
-	return result, c.client.Get(context.TODO(), "", name, result, options)
-}
-
-func (c *storageClassController) List(opts metav1.ListOptions) (*v1.StorageClassList, error) {
-	result := &v1.StorageClassList{}
-	return result, c.client.List(context.TODO(), "", result, opts)
-}
-
-func (c *storageClassController) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), "", opts)
-}
-
-func (c *storageClassController) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.StorageClass, error) {
-	result := &v1.StorageClass{}
-	return result, c.client.Patch(context.TODO(), "", name, pt, data, result, metav1.PatchOptions{}, subresources...)
-}
-
-type storageClassCache struct {
-	indexer  cache.Indexer
-	resource schema.GroupResource
-}
-
-func (c *storageClassCache) Get(name string) (*v1.StorageClass, error) {
-	obj, exists, err := c.indexer.GetByKey(name)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, errors.NewNotFound(c.resource, name)
-	}
-	return obj.(*v1.StorageClass), nil
-}
-
-func (c *storageClassCache) List(selector labels.Selector) (ret []*v1.StorageClass, err error) {
-
-	err = cache.ListAll(c.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1.StorageClass))
-	})
-
-	return ret, err
-}
-
-func (c *storageClassCache) AddIndexer(indexName string, indexer StorageClassIndexer) {
-	utilruntime.Must(c.indexer.AddIndexers(map[string]cache.IndexFunc{
-		indexName: func(obj interface{}) (strings []string, e error) {
-			return indexer(obj.(*v1.StorageClass))
-		},
-	}))
-}
-
-func (c *storageClassCache) GetByIndex(indexName, key string) (result []*v1.StorageClass, err error) {
-	objs, err := c.indexer.ByIndex(indexName, key)
-	if err != nil {
-		return nil, err
-	}
-	result = make([]*v1.StorageClass, 0, len(objs))
-	for _, obj := range objs {
-		result = append(result, obj.(*v1.StorageClass))
-	}
-	return result, nil
+// AddIndexer adds  a new Indexer to the cache with the provided name.
+// If you call this after you already have data in the store, the results are undefined.
+func (c StorageClassGenericCache) AddIndexer(indexName string, indexer StorageClassIndexer) {
+	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.StorageClass](indexer))
 }
