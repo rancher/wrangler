@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
 	"github.com/rancher/lasso/pkg/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -172,7 +171,7 @@ func FromObjectHandlerToHandler[T RuntimeMetaObject](sync ObjectHandler[T]) Hand
 // Controller is used to manage objects of type T.
 type Controller[T RuntimeMetaObject, TList runtime.Object] struct {
 	controller    controller.SharedController
-	client        *client.Client
+	client        embeddedClient
 	gvk           schema.GroupVersionKind
 	groupResource schema.GroupResource
 	objType       reflect.Type
