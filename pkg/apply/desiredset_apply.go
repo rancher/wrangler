@@ -80,6 +80,7 @@ func (o *desiredSet) apply() error {
 		return err
 	}
 
+	// Create maps for labels and annotations, contains identifying hash used for rate limitting
 	labelSet, annotationSet, err := GetLabelsAndAnnotations(o.setID, o.owner)
 	if err != nil {
 		return o.err(err)
@@ -141,6 +142,7 @@ func (o *desiredSet) debugID() string {
 	})
 }
 
+// collect converts a list of runtime objects into a ObjectByGVK map
 func (o *desiredSet) collect(objList []runtime.Object) objectset.ObjectByGVK {
 	result := objectset.ObjectByGVK{}
 	for _, obj := range objList {
@@ -189,6 +191,8 @@ func GetSelectorFromOwner(setID string, owner runtime.Object) (labels.Selector, 
 	return GetSelector(ownerLabel)
 }
 
+// GetSelector returns the label selector for the owner object, which is useful
+// to list the dependents
 func GetSelector(labelSet map[string]string) (labels.Selector, error) {
 	req, err := labels.NewRequirement(LabelHash, selection.Equals, []string{labelSet[LabelHash]})
 	if err != nil {
@@ -197,6 +201,10 @@ func GetSelector(labelSet map[string]string) (labels.Selector, error) {
 	return labels.NewSelector().Add(*req), nil
 }
 
+// GetLabelsAndAnnotations returns a new map of annotations with the setID
+// and/or owner in it. It also returns a new map of labels, which contains a
+// hash over the annotations. The hash is used to identify resources that
+// belong to the same setID/owner.
 func GetLabelsAndAnnotations(setID string, owner runtime.Object) (map[string]string, map[string]string, error) {
 	if setID == "" && owner == nil {
 		return nil, nil, fmt.Errorf("set ID or owner must be set")
@@ -227,6 +235,8 @@ func GetLabelsAndAnnotations(setID string, owner runtime.Object) (map[string]str
 	return labels, annotations, nil
 }
 
+// injectLabelsAndAnnotations returns the desiredSet's objects. The given
+// labels and annotations extend and overwrite existing labels
 func (o *desiredSet) injectLabelsAndAnnotations(labels, annotations map[string]string) ([]runtime.Object, error) {
 	var result []runtime.Object
 
@@ -248,6 +258,7 @@ func (o *desiredSet) injectLabelsAndAnnotations(labels, annotations map[string]s
 	return result, nil
 }
 
+// setAnnotations overwrites the annotations in meta with the given annotations map
 func setAnnotations(meta metav1.Object, annotations map[string]string) {
 	objAnn := meta.GetAnnotations()
 	if objAnn == nil {
@@ -260,6 +271,7 @@ func setAnnotations(meta metav1.Object, annotations map[string]string) {
 	meta.SetAnnotations(objAnn)
 }
 
+// setLabels overwrites the labels in meta with the given labels map
 func setLabels(meta metav1.Object, labels map[string]string) {
 	objLabels := meta.GetLabels()
 	if objLabels == nil {
