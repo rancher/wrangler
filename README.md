@@ -17,7 +17,9 @@ Wrangler is a framework for using controllers. Controllers wrap clients, informe
 
 ## Versioning and Updates
 
-Wrangler releases use [semantic versioning](https://semver.org/). Patch releases occur on the latest minor release as well as on older minor releases being actively used in supported versions of [Rancher](http://github.com/rancher/rancher). That currently includes:
+Wrangler releases use [semantic versioning](https://semver.org/). New major releases are created for breaking changes, new minor releases are created for features, and patches are added for everything else.
+
+The most recent Major.Minor.x release and any releases being used by the most recent patch version of a [supported rancher version](https://www.suse.com/lifecycle/#rancher) will be maintained. The most recent major will receive minor releases, along with patch releases on its most up to date minor release. Older Major.Minor.x releases still in use by rancher will receive security patches at minimum. Consequently, there will be 1-3 maintained releases of the form Major.Minor.x at a time. Currently maintained versions:
 
 | Wrangler Version | Rancher Version | Update Level           |
 | ---------------- | --------------- | ---------------------- |
