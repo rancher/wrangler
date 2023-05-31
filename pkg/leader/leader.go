@@ -2,6 +2,7 @@ package leader
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -12,6 +13,13 @@ import (
 )
 
 type Callback func(cb context.Context)
+
+const defaultLeaseDuration = 45 * time.Second
+const defaultRenewDeadline = 30 * time.Second
+const defaultRetryPeriod = 2 * time.Second
+
+const developmentLeaseDuration = 45 * time.Hour
+const developmentRenewDeadline = 30 * time.Hour
 
 func RunOrDie(ctx context.Context, namespace, name string, client kubernetes.Interface, cb Callback) {
 	if namespace == "" {
@@ -43,16 +51,37 @@ func run(ctx context.Context, namespace, name string, client kubernetes.Interfac
 		logrus.Fatalf("error creating leader lock for %s: %v", name, err)
 	}
 
-	t := time.Second
-	if dl := os.Getenv("CATTLE_DEV_MODE"); dl != "" {
-		t = time.Hour
+	leaseDuration := defaultLeaseDuration
+	renewDeadline := defaultRenewDeadline
+	retryPeriod := defaultRetryPeriod
+	if d := os.Getenv("CATTLE_DEV_MODE"); d != "" {
+		leaseDuration = developmentLeaseDuration
+		renewDeadline = developmentRenewDeadline
+	}
+	if d := os.Getenv("CATTLE_ELECTION_LEASE_DURATION"); d != "" {
+		leaseDuration, err = time.ParseDuration(d)
+		if err != nil {
+			return fmt.Errorf("CATTLE_ELECTION_LEASE_DURATION value [%s] is not a valid duration: %w", d, err)
+		}
+	}
+	if d := os.Getenv("CATTLE_ELECTION_RENEW_DEADLINE"); d != "" {
+		renewDeadline, err = time.ParseDuration(d)
+		if err != nil {
+			return fmt.Errorf("CATTLE_ELECTION_RENEW_DEADLINE value [%s] is not a valid duration: %w", d, err)
+		}
+	}
+	if d := os.Getenv("CATTLE_ELECTION_RETRY_PERIOD"); d != "" {
+		retryPeriod, err = time.ParseDuration(d)
+		if err != nil {
+			return fmt.Errorf("CATTLE_ELECTION_RETRY_PERIOD value [%s] is not a valid duration: %w", d, err)
+		}
 	}
 
 	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
-		LeaseDuration: 45 * t,
-		RenewDeadline: 30 * t,
-		RetryPeriod:   2 * time.Second,
+		LeaseDuration: leaseDuration,
+		RenewDeadline: renewDeadline,
+		RetryPeriod:   retryPeriod,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				go cb(ctx)
