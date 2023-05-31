@@ -46,13 +46,9 @@ type version struct {
 }
 
 func (v *version) MutatingWebhookConfiguration() MutatingWebhookConfigurationController {
-	return &MutatingWebhookConfigurationGenericController{
-		generic.NewNonNamespacedController[*v1.MutatingWebhookConfiguration, *v1.MutatingWebhookConfigurationList](schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"}, "mutatingwebhookconfigurations", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.MutatingWebhookConfiguration, *v1.MutatingWebhookConfigurationList](schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "MutatingWebhookConfiguration"}, "mutatingwebhookconfigurations", v.controllerFactory)
 }
 
 func (v *version) ValidatingWebhookConfiguration() ValidatingWebhookConfigurationController {
-	return &ValidatingWebhookConfigurationGenericController{
-		generic.NewNonNamespacedController[*v1.ValidatingWebhookConfiguration, *v1.ValidatingWebhookConfigurationList](schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfiguration"}, "validatingwebhookconfigurations", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.ValidatingWebhookConfiguration, *v1.ValidatingWebhookConfigurationList](schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1", Kind: "ValidatingWebhookConfiguration"}, "validatingwebhookconfigurations", v.controllerFactory)
 }

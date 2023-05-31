@@ -19,118 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"time"
-
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/admissionregistration/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/rest"
 )
 
 // ValidatingWebhookConfigurationController interface for managing ValidatingWebhookConfiguration resources.
 type ValidatingWebhookConfigurationController interface {
-	generic.ControllerMeta
-	ValidatingWebhookConfigurationClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ValidatingWebhookConfigurationCache
+	generic.NonNamespacedControllerInterface[*v1.ValidatingWebhookConfiguration, *v1.ValidatingWebhookConfigurationList]
 }
 
 // ValidatingWebhookConfigurationClient interface for managing ValidatingWebhookConfiguration resources in Kubernetes.
 type ValidatingWebhookConfigurationClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v1.ValidatingWebhookConfiguration, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v1.ValidatingWebhookConfigurationList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ValidatingWebhookConfiguration, err error)
-
-	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
-	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*v1.ValidatingWebhookConfiguration, *v1.ValidatingWebhookConfigurationList], error)
+	generic.NonNamespacedClientInterface[*v1.ValidatingWebhookConfiguration, *v1.ValidatingWebhookConfigurationList]
 }
 
 // ValidatingWebhookConfigurationCache interface for retrieving ValidatingWebhookConfiguration resources in memory.
 type ValidatingWebhookConfigurationCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v1.ValidatingWebhookConfiguration, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v1.ValidatingWebhookConfiguration, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ValidatingWebhookConfigurationIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1.ValidatingWebhookConfiguration, error)
-}
-
-// ValidatingWebhookConfigurationHandler is function for performing any potential modifications to a ValidatingWebhookConfiguration resource.
-type ValidatingWebhookConfigurationHandler func(string, *v1.ValidatingWebhookConfiguration) (*v1.ValidatingWebhookConfiguration, error)
-
-// ValidatingWebhookConfigurationIndexer computes a set of indexed values for the provided object.
-type ValidatingWebhookConfigurationIndexer func(obj *v1.ValidatingWebhookConfiguration) ([]string, error)
-
-// ValidatingWebhookConfigurationGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to ValidatingWebhookConfigurationController interface.
-type ValidatingWebhookConfigurationGenericController struct {
-	generic.NonNamespacedControllerInterface[*v1.ValidatingWebhookConfiguration, *v1.ValidatingWebhookConfigurationList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ValidatingWebhookConfigurationGenericController) OnChange(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.ValidatingWebhookConfiguration](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ValidatingWebhookConfigurationGenericController) OnRemove(ctx context.Context, name string, sync ValidatingWebhookConfigurationHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.ValidatingWebhookConfiguration](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ValidatingWebhookConfigurationGenericController) Cache() ValidatingWebhookConfigurationCache {
-	return &ValidatingWebhookConfigurationGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// ValidatingWebhookConfigurationGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to ValidatingWebhookConfigurationCache interface.
-type ValidatingWebhookConfigurationGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v1.ValidatingWebhookConfiguration]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ValidatingWebhookConfigurationGenericCache) AddIndexer(indexName string, indexer ValidatingWebhookConfigurationIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.ValidatingWebhookConfiguration](indexer))
 }

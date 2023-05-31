@@ -48,25 +48,17 @@ type version struct {
 }
 
 func (v *version) ClusterRole() ClusterRoleController {
-	return &ClusterRoleGenericController{
-		generic.NewNonNamespacedController[*v1.ClusterRole, *v1.ClusterRoleList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"}, "clusterroles", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.ClusterRole, *v1.ClusterRoleList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRole"}, "clusterroles", v.controllerFactory)
 }
 
 func (v *version) ClusterRoleBinding() ClusterRoleBindingController {
-	return &ClusterRoleBindingGenericController{
-		generic.NewNonNamespacedController[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}, "clusterrolebindings", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.ClusterRoleBinding, *v1.ClusterRoleBindingList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBinding"}, "clusterrolebindings", v.controllerFactory)
 }
 
 func (v *version) Role() RoleController {
-	return &RoleGenericController{
-		generic.NewController[*v1.Role, *v1.RoleList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"}, "roles", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.Role, *v1.RoleList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "Role"}, "roles", true, v.controllerFactory)
 }
 
 func (v *version) RoleBinding() RoleBindingController {
-	return &RoleBindingGenericController{
-		generic.NewController[*v1.RoleBinding, *v1.RoleBindingList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}, "rolebindings", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.RoleBinding, *v1.RoleBindingList](schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}, "rolebindings", true, v.controllerFactory)
 }

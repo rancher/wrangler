@@ -26,6 +26,16 @@ const (
 	globalTestNodeName  = "cowboy-server"
 )
 
+var (
+	// Interface implementation complile time check
+	_ ControllerInterface[*v1.Pod, *v1.PodList]              = &Controller[*v1.Pod, *v1.PodList]{}
+	_ NonNamespacedControllerInterface[*v1.Pod, *v1.PodList] = &NonNamespacedController[*v1.Pod, *v1.PodList]{}
+	_ ClientInterface[*v1.Pod, *v1.PodList]                  = &Controller[*v1.Pod, *v1.PodList]{}
+	_ NonNamespacedClientInterface[*v1.Pod, *v1.PodList]     = &NonNamespacedController[*v1.Pod, *v1.PodList]{}
+	_ CacheInterface[*v1.Pod]                                = &Cache[*v1.Pod]{}
+	_ NonNamespacedCacheInterface[*v1.Pod]                   = &NonNamespacedCache[*v1.Pod]{}
+)
+
 var errExpected = fmt.Errorf("test-error")
 
 func TestController_Get(parentT *testing.T) {

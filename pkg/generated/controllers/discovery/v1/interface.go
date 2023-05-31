@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) EndpointSlice() EndpointSliceController {
-	return &EndpointSliceGenericController{
-		generic.NewController[*v1.EndpointSlice, *v1.EndpointSliceList](schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}, "endpointslices", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.EndpointSlice, *v1.EndpointSliceList](schema.GroupVersionKind{Group: "discovery.k8s.io", Version: "v1", Kind: "EndpointSlice"}, "endpointslices", true, v.controllerFactory)
 }

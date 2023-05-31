@@ -47,19 +47,13 @@ type version struct {
 }
 
 func (v *version) DaemonSet() DaemonSetController {
-	return &DaemonSetGenericController{
-		generic.NewController[*v1.DaemonSet, *v1.DaemonSetList](schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "DaemonSet"}, "daemonsets", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.DaemonSet, *v1.DaemonSetList](schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "DaemonSet"}, "daemonsets", true, v.controllerFactory)
 }
 
 func (v *version) Deployment() DeploymentController {
-	return &DeploymentGenericController{
-		generic.NewController[*v1.Deployment, *v1.DeploymentList](schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, "deployments", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.Deployment, *v1.DeploymentList](schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"}, "deployments", true, v.controllerFactory)
 }
 
 func (v *version) StatefulSet() StatefulSetController {
-	return &StatefulSetGenericController{
-		generic.NewController[*v1.StatefulSet, *v1.StatefulSetList](schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}, "statefulsets", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.StatefulSet, *v1.StatefulSetList](schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "StatefulSet"}, "statefulsets", true, v.controllerFactory)
 }
