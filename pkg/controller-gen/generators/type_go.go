@@ -131,6 +131,9 @@ type {{.type}}Client interface {
 	
 	// Patch will patch the resource with the matching name.
 	Patch({{ if .namespaced}}namespace, {{end}}name string, pt types.PatchType, data []byte, subresources ...string) (result *{{.version}}.{{.type}}, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.{{ if not .namespaced}}NonNamespaced{{end}}ClientInterface[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List], error)
 }
 
 // {{.type}}Cache interface for retrieving {{.type}} resources in memory.
