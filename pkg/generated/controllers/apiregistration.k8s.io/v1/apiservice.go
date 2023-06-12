@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -83,6 +84,9 @@ type APIServiceClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.APIService, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*v1.APIService, *v1.APIServiceList], error)
 }
 
 // APIServiceCache interface for retrieving APIService resources in memory.

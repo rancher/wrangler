@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 // EndpointSliceController interface for managing EndpointSlice resources.
@@ -73,6 +74,9 @@ type EndpointSliceClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.EndpointSlice, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.ClientInterface[*v1.EndpointSlice, *v1.EndpointSliceList], error)
 }
 
 // EndpointSliceCache interface for retrieving EndpointSlice resources in memory.

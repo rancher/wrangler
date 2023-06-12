@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 // ConfigMapController interface for managing ConfigMap resources.
@@ -73,6 +74,9 @@ type ConfigMapClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ConfigMap, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.ClientInterface[*v1.ConfigMap, *v1.ConfigMapList], error)
 }
 
 // ConfigMapCache interface for retrieving ConfigMap resources in memory.

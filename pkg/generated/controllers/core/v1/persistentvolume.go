@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 // PersistentVolumeController interface for managing PersistentVolume resources.
@@ -83,6 +84,9 @@ type PersistentVolumeClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.PersistentVolume, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*v1.PersistentVolume, *v1.PersistentVolumeList], error)
 }
 
 // PersistentVolumeCache interface for retrieving PersistentVolume resources in memory.

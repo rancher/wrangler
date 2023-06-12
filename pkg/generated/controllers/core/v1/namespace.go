@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 // NamespaceController interface for managing Namespace resources.
@@ -83,6 +84,9 @@ type NamespaceClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*v1.Namespace, *v1.NamespaceList], error)
 }
 
 // NamespaceCache interface for retrieving Namespace resources in memory.

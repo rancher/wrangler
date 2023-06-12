@@ -11,6 +11,7 @@ This package has four entry points for creating a mock controller, client, or ca
 - `NewCacheInterface[T runtime.Object](*gomock.Controller)`
 - `NewNonNamespaceCacheInterface[T runtime.Object](*gomock.Controller)`
 
+## Examples
 
 Example use of generic/fake with a generated Deployment Controller.
 ``` golang
@@ -22,7 +23,7 @@ type DeploymentController interface {
 	OnRemove(ctx context.Context, name string, sync DeploymentHandler)
 	Enqueue(namespace, name string)
 	EnqueueAfter(namespace, name string, duration time.Duration)
-	Cache() DeploymentCaches
+	Cache() DeploymentGenericCache
 }
 ```
 ``` golang
@@ -63,3 +64,30 @@ func TestController(t *testing.T){
     testDeployCtrl.Enqueue("unexpected-namespace", "unexpected-name")
 }
 ```
+
+### NonNamespacedController
+```golang
+ctrl := gomock.NewController(t)
+
+mock := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
+
+mock.EXPECT().List(gomock.Any()).Return(nil, nil)
+
+roleTemplateController := RoleTemplateGenericController{mock}
+```
+
+## Fake Generation
+This package was generated with `mockgen -package fake -destination ./controller.go -source ../controller.go` and `mockgen -package fake -destination ./cache.go -source ../cache.go`
+
+Due to an open issue with mockgen https://github.com/golang/mock/issues/649
+`controller.go` must be modified for the generation to succeed.
+1. Comment out the `comparable` in RuntimeMetaObject
+2. Remove `[T, TList]` on the embedded client interface for ControllerInterface and NonNamespacedControllerInterface. This will cause the file to no longer build but the generation will succeed.
+   
+    ``` golang
+        type ControllerInterface[T RuntimeMetaObject, TList runtime.Object interface {
+            ControllerMeta
+            ClientInterface //[T, TList]
+
+    ```
+

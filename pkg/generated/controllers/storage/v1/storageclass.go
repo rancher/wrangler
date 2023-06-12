@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 // StorageClassController interface for managing StorageClass resources.
@@ -73,6 +74,9 @@ type StorageClassClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.StorageClass, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*v1.StorageClass, *v1.StorageClassList], error)
 }
 
 // StorageClassCache interface for retrieving StorageClass resources in memory.

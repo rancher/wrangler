@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 // SecretController interface for managing Secret resources.
@@ -73,6 +74,9 @@ type SecretClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Secret, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.ClientInterface[*v1.Secret, *v1.SecretList], error)
 }
 
 // SecretCache interface for retrieving Secret resources in memory.

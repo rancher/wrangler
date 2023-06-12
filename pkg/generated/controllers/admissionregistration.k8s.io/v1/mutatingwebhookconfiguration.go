@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 )
 
 // MutatingWebhookConfigurationController interface for managing MutatingWebhookConfiguration resources.
@@ -73,6 +74,9 @@ type MutatingWebhookConfigurationClient interface {
 
 	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.MutatingWebhookConfiguration, err error)
+
+	// WithImpersonation returns a new client that will use the provided impersonation config for new request.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*v1.MutatingWebhookConfiguration, *v1.MutatingWebhookConfigurationList], error)
 }
 
 // MutatingWebhookConfigurationCache interface for retrieving MutatingWebhookConfiguration resources in memory.

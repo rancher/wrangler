@@ -331,7 +331,7 @@ func NewTestController(ctrl *gomock.Controller, testClient embeddedClient) *Cont
 	mockFactory.EXPECT().ForResourceKind(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockController)
 	newController := NewController[*v1.Pod, *v1.PodList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", true, mockFactory)
 	// override the nil controller client with the test client
-	newController.client = testClient
+	newController.embeddedClient = testClient
 	return newController
 }
 
@@ -343,6 +343,6 @@ func NewTestNonNamespacedController(ctrl *gomock.Controller, testClient embedded
 	mockFactory.EXPECT().ForResourceKind(gomock.Any(), gomock.Any(), gomock.Any()).Return(mockController)
 	newController := NewNonNamespacedController[*v1.Pod, *v1.PodList](schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", mockFactory)
 	// override the nil controller client with the test client
-	newController.client = testClient
+	newController.embeddedClient = testClient
 	return newController
 }
