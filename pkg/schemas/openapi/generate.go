@@ -160,6 +160,9 @@ func schemaToProps(schema *types.Schema, schemas *types.Schemas, inflight map[st
 	}
 
 	if inflight[schema.ID] {
+		jsp.AdditionalProperties = &v1.JSONSchemaPropsOrBool{
+			Allows: true,
+		}
 		return jsp, nil
 	}
 
