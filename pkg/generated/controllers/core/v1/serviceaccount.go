@@ -19,114 +19,21 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"time"
-
 	"github.com/rancher/wrangler/pkg/generic"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // ServiceAccountController interface for managing ServiceAccount resources.
 type ServiceAccountController interface {
-	generic.ControllerMeta
-	ServiceAccountClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ServiceAccountHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ServiceAccountHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() ServiceAccountCache
+	generic.ControllerInterface[*v1.ServiceAccount, *v1.ServiceAccountList]
 }
 
 // ServiceAccountClient interface for managing ServiceAccount resources in Kubernetes.
 type ServiceAccountClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.ServiceAccount) (*v1.ServiceAccount, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.ServiceAccount) (*v1.ServiceAccount, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1.ServiceAccount, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1.ServiceAccountList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServiceAccount, err error)
+	generic.ClientInterface[*v1.ServiceAccount, *v1.ServiceAccountList]
 }
 
 // ServiceAccountCache interface for retrieving ServiceAccount resources in memory.
 type ServiceAccountCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v1.ServiceAccount, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v1.ServiceAccount, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer ServiceAccountIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1.ServiceAccount, error)
-}
-
-// ServiceAccountHandler is function for performing any potential modifications to a ServiceAccount resource.
-type ServiceAccountHandler func(string, *v1.ServiceAccount) (*v1.ServiceAccount, error)
-
-// ServiceAccountIndexer computes a set of indexed values for the provided object.
-type ServiceAccountIndexer func(obj *v1.ServiceAccount) ([]string, error)
-
-// ServiceAccountGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to ServiceAccountController interface.
-type ServiceAccountGenericController struct {
-	generic.ControllerInterface[*v1.ServiceAccount, *v1.ServiceAccountList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *ServiceAccountGenericController) OnChange(ctx context.Context, name string, sync ServiceAccountHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.ServiceAccount](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ServiceAccountGenericController) OnRemove(ctx context.Context, name string, sync ServiceAccountHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.ServiceAccount](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *ServiceAccountGenericController) Cache() ServiceAccountCache {
-	return &ServiceAccountGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// ServiceAccountGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to ServiceAccountCache interface.
-type ServiceAccountGenericCache struct {
 	generic.CacheInterface[*v1.ServiceAccount]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c ServiceAccountGenericCache) AddIndexer(indexName string, indexer ServiceAccountIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.ServiceAccount](indexer))
 }

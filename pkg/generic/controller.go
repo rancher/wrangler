@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -45,7 +46,7 @@ type RuntimeMetaObject interface {
 }
 
 // ControllerInterface interface for managing K8s Objects.
-type ControllerInterface[T runtime.Object, TList runtime.Object] interface {
+type ControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	ControllerMeta
 	ClientInterface[T, TList]
 
@@ -66,7 +67,7 @@ type ControllerInterface[T runtime.Object, TList runtime.Object] interface {
 }
 
 // NonNamespacedControllerInterface interface for managing non namespaced K8s Objects.
-type NonNamespacedControllerInterface[T runtime.Object, TList runtime.Object] interface {
+type NonNamespacedControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	ControllerMeta
 	NonNamespacedClientInterface[T, TList]
 
@@ -87,7 +88,7 @@ type NonNamespacedControllerInterface[T runtime.Object, TList runtime.Object] in
 }
 
 // ClientInterface is an interface to performs CRUD like operations on an Objects.
-type ClientInterface[T runtime.Object, TList runtime.Object] interface {
+type ClientInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	// Create creates a new object and return the newly created Object or an error.
 	Create(T) (T, error)
 
@@ -112,10 +113,13 @@ type ClientInterface[T runtime.Object, TList runtime.Object] interface {
 
 	// Patch will patch the resource with the matching name in the matching namespace.
 	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+
+	// WithImpersonation returns a new copy of the client that uses impersonation.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (ClientInterface[T, TList], error)
 }
 
 // NonNamespacedClientInterface is an interface to performs CRUD like operations on nonNamespaced Objects.
-type NonNamespacedClientInterface[T runtime.Object, TList runtime.Object] interface {
+type NonNamespacedClientInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	// Create creates a new object and return the newly created Object or an error.
 	Create(T) (T, error)
 
@@ -140,6 +144,9 @@ type NonNamespacedClientInterface[T runtime.Object, TList runtime.Object] interf
 
 	// Patch will patch the resource with the matching name.
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+
+	// WithImpersonation returns a new copy of the client that uses impersonation.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (NonNamespacedClientInterface[T, TList], error)
 }
 
 // ObjectHandler performs operations on the given runtime.Object and returns the new runtime.Object or an error
@@ -170,8 +177,8 @@ func FromObjectHandlerToHandler[T RuntimeMetaObject](sync ObjectHandler[T]) Hand
 
 // Controller is used to manage objects of type T.
 type Controller[T RuntimeMetaObject, TList runtime.Object] struct {
-	controller    controller.SharedController
-	client        embeddedClient
+	controller controller.SharedController
+	embeddedClient
 	gvk           schema.GroupVersionKind
 	groupResource schema.GroupResource
 	objType       reflect.Type
@@ -180,7 +187,7 @@ type Controller[T RuntimeMetaObject, TList runtime.Object] struct {
 
 // NonNamespacedController is a Controller for non namespaced resources. This controller provides similar function definitions as Controller except the namespace parameter is omitted.
 type NonNamespacedController[T RuntimeMetaObject, TList runtime.Object] struct {
-	Controller[T, TList]
+	*Controller[T, TList]
 }
 
 // NewController creates a new controller for the given Object type and ObjectList type.
@@ -197,9 +204,9 @@ func NewController[T RuntimeMetaObject, TList runtime.Object](gvk schema.GroupVe
 		panic(fmt.Sprintf("Controller requires Object TList to be a pointer not %v", objListPtrType))
 	}
 	return &Controller[T, TList]{
-		controller: sharedCtrl,
-		client:     sharedCtrl.Client(),
-		gvk:        gvk,
+		controller:     sharedCtrl,
+		embeddedClient: sharedCtrl.Client(),
+		gvk:            gvk,
 		groupResource: schema.GroupResource{
 			Group:    gvk.Group,
 			Resource: resource,
@@ -272,20 +279,20 @@ func (c *Controller[T, TList]) Cache() CacheInterface[T] {
 // Create creates a new object and return the newly created Object or an error.
 func (c *Controller[T, TList]) Create(obj T) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.Create(context.TODO(), obj.GetNamespace(), obj, result, metav1.CreateOptions{})
+	return result, c.embeddedClient.Create(context.TODO(), obj.GetNamespace(), obj, result, metav1.CreateOptions{})
 }
 
 // Update updates the object and return the newly updated Object or an error.
 func (c *Controller[T, TList]) Update(obj T) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.Update(context.TODO(), obj.GetNamespace(), obj, result, metav1.UpdateOptions{})
+	return result, c.embeddedClient.Update(context.TODO(), obj.GetNamespace(), obj, result, metav1.UpdateOptions{})
 }
 
 // UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
 // Will always return an error if the object does not have a status field.
 func (c *Controller[T, TList]) UpdateStatus(obj T) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.UpdateStatus(context.TODO(), obj.GetNamespace(), obj, result, metav1.UpdateOptions{})
+	return result, c.embeddedClient.UpdateStatus(context.TODO(), obj.GetNamespace(), obj, result, metav1.UpdateOptions{})
 }
 
 // Delete deletes the Object in the given name and Namespace.
@@ -293,30 +300,48 @@ func (c *Controller[T, TList]) Delete(namespace, name string, options *metav1.De
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.client.Delete(context.TODO(), namespace, name, *options)
+	return c.embeddedClient.Delete(context.TODO(), namespace, name, *options)
 }
 
 // Get gets returns the given resource with the given name in the provided namespace.
 func (c *Controller[T, TList]) Get(namespace, name string, options metav1.GetOptions) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.Get(context.TODO(), namespace, name, result, options)
+	return result, c.embeddedClient.Get(context.TODO(), namespace, name, result, options)
 }
 
 // List will attempt to find resources in the given namespace.
 func (c *Controller[T, TList]) List(namespace string, opts metav1.ListOptions) (TList, error) {
 	result := reflect.New(c.objListType).Interface().(TList)
-	return result, c.client.List(context.TODO(), namespace, result, opts)
+	return result, c.embeddedClient.List(context.TODO(), namespace, result, opts)
 }
 
 // Watch will start watching resources in the given namespace.
 func (c *Controller[T, TList]) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.client.Watch(context.TODO(), namespace, opts)
+	return c.embeddedClient.Watch(context.TODO(), namespace, opts)
 }
 
 // Patch will patch the resource with the matching name in the matching namespace.
 func (c *Controller[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
-	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
+	return result, c.embeddedClient.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
+}
+
+// WithImpersonation returns a new copy of the client that uses impersonation.
+func (c *Controller[T, TList]) WithImpersonation(impersonate rest.ImpersonationConfig) (ClientInterface[T, TList], error) {
+	newClient, err := c.embeddedClient.WithImpersonation(impersonate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make new client: %w", err)
+	}
+
+	// return a new controller with a new embeddedClient
+	return &Controller[T, TList]{
+		controller:     c.controller,
+		embeddedClient: newClient,
+		objType:        c.objType,
+		objListType:    c.objListType,
+		gvk:            c.gvk,
+		groupResource:  c.groupResource,
+	}, nil
 }
 
 // NewNonNamespacedController returns a Controller controller that is not namespaced.
@@ -324,19 +349,20 @@ func (c *Controller[T, TList]) Patch(namespace, name string, pt types.PatchType,
 func NewNonNamespacedController[T RuntimeMetaObject, TList runtime.Object](gvk schema.GroupVersionKind, resource string,
 	controller controller.SharedControllerFactory,
 ) *NonNamespacedController[T, TList] {
+	ctrl := NewController[T, TList](gvk, resource, false, controller)
 	return &NonNamespacedController[T, TList]{
-		Controller: *NewController[T, TList](gvk, resource, false, controller),
+		Controller: ctrl,
 	}
 }
 
 // Enqueue calls Controller.Enqueue(...) with an empty namespace parameter.
 func (c *NonNamespacedController[T, TList]) Enqueue(name string) {
-	c.controller.Enqueue(metav1.NamespaceAll, name)
+	c.Controller.Enqueue(metav1.NamespaceAll, name)
 }
 
 // EnqueueAfter calls Controller.EnqueueAfter(...) with an empty namespace parameter.
 func (c *NonNamespacedController[T, TList]) EnqueueAfter(name string, duration time.Duration) {
-	c.controller.EnqueueAfter(metav1.NamespaceAll, name, duration)
+	c.Controller.EnqueueAfter(metav1.NamespaceAll, name, duration)
 }
 
 // Delete calls Controller.Delete(...) with an empty namespace parameter.
@@ -364,7 +390,21 @@ func (c *NonNamespacedController[T, TList]) Patch(name string, pt types.PatchTyp
 	return c.Controller.Patch(metav1.NamespaceAll, name, pt, data, subresources...)
 }
 
-// Cache calls Controller.Cache(...) and wraps the result in a new NonNamespacedCache.
+// WithImpersonation returns a new copy of the client that uses impersonation.
+func (c *NonNamespacedController[T, TList]) WithImpersonation(impersonate rest.ImpersonationConfig) (NonNamespacedClientInterface[T, TList], error) {
+	newClient, err := c.Controller.WithImpersonation(impersonate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make new client: %w", err)
+	}
+	// get the underlying controller so we can wrap it in a NonNamespacedController
+	newCtrl, ok := newClient.(*Controller[T, TList])
+	if !ok {
+		return nil, fmt.Errorf("failed to make new client from: %T", newCtrl)
+	}
+	return &NonNamespacedController[T, TList]{newCtrl}, nil
+}
+
+// Cache calls ControllerInterface.Cache(...) and wraps the result in a new NonNamespacedCache.
 func (c *NonNamespacedController[T, TList]) Cache() NonNamespacedCacheInterface[T] {
 	return &NonNamespacedCache[T]{
 		CacheInterface: c.Controller.Cache(),

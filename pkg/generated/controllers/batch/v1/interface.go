@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) Job() JobController {
-	return &JobGenericController{
-		generic.NewController[*v1.Job, *v1.JobList](schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}, "jobs", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.Job, *v1.JobList](schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"}, "jobs", true, v.controllerFactory)
 }

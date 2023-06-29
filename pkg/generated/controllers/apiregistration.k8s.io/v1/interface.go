@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) APIService() APIServiceController {
-	return &APIServiceGenericController{
-		generic.NewNonNamespacedController[*v1.APIService, *v1.APIServiceList](schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "v1", Kind: "APIService"}, "apiservices", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.APIService, *v1.APIServiceList](schema.GroupVersionKind{Group: "apiregistration.k8s.io", Version: "v1", Kind: "APIService"}, "apiservices", v.controllerFactory)
 }

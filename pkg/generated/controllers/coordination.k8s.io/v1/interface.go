@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) Lease() LeaseController {
-	return &LeaseGenericController{
-		generic.NewController[*v1.Lease, *v1.LeaseList](schema.GroupVersionKind{Group: "coordination.k8s.io", Version: "v1", Kind: "Lease"}, "leases", true, v.controllerFactory),
-	}
+	return generic.NewController[*v1.Lease, *v1.LeaseList](schema.GroupVersionKind{Group: "coordination.k8s.io", Version: "v1", Kind: "Lease"}, "leases", true, v.controllerFactory)
 }

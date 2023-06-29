@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) StorageClass() StorageClassController {
-	return &StorageClassGenericController{
-		generic.NewNonNamespacedController[*v1.StorageClass, *v1.StorageClassList](schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}, "storageclasses", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.StorageClass, *v1.StorageClassList](schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}, "storageclasses", v.controllerFactory)
 }

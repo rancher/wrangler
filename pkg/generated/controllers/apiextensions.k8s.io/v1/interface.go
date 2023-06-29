@@ -45,7 +45,5 @@ type version struct {
 }
 
 func (v *version) CustomResourceDefinition() CustomResourceDefinitionController {
-	return &CustomResourceDefinitionGenericController{
-		generic.NewNonNamespacedController[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList](schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}, "customresourcedefinitions", v.controllerFactory),
-	}
+	return generic.NewNonNamespacedController[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList](schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}, "customresourcedefinitions", v.controllerFactory)
 }

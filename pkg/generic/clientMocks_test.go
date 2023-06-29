@@ -9,10 +9,12 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
+	client "github.com/rancher/lasso/pkg/client"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	rest "k8s.io/client-go/rest"
 )
 
 // MockembeddedClient is a mock of embeddedClient interface.
@@ -154,4 +156,19 @@ func (m *MockembeddedClient) Watch(ctx context.Context, namespace string, opts v
 func (mr *MockembeddedClientMockRecorder) Watch(ctx, namespace, opts interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockembeddedClient)(nil).Watch), ctx, namespace, opts)
+}
+
+// WithImpersonation mocks base method.
+func (m *MockembeddedClient) WithImpersonation(impersonate rest.ImpersonationConfig) (*client.Client, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WithImpersonation", impersonate)
+	ret0, _ := ret[0].(*client.Client)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WithImpersonation indicates an expected call of WithImpersonation.
+func (mr *MockembeddedClientMockRecorder) WithImpersonation(impersonate interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WithImpersonation", reflect.TypeOf((*MockembeddedClient)(nil).WithImpersonation), impersonate)
 }

@@ -29,125 +29,28 @@ import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // CustomResourceDefinitionController interface for managing CustomResourceDefinition resources.
 type CustomResourceDefinitionController interface {
-	generic.ControllerMeta
-	CustomResourceDefinitionClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync CustomResourceDefinitionHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync CustomResourceDefinitionHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() CustomResourceDefinitionCache
+	generic.NonNamespacedControllerInterface[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList]
 }
 
 // CustomResourceDefinitionClient interface for managing CustomResourceDefinition resources in Kubernetes.
 type CustomResourceDefinitionClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(name string, options metav1.GetOptions) (*v1.CustomResourceDefinition, error)
-
-	// List will attempt to find multiple resources.
-	List(opts metav1.ListOptions) (*v1.CustomResourceDefinitionList, error)
-
-	// Watch will start watching resources.
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.CustomResourceDefinition, err error)
+	generic.NonNamespacedClientInterface[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList]
 }
 
 // CustomResourceDefinitionCache interface for retrieving CustomResourceDefinition resources in memory.
 type CustomResourceDefinitionCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(name string) (*v1.CustomResourceDefinition, error)
-
-	// List will attempt to find resources from the Cache.
-	List(selector labels.Selector) ([]*v1.CustomResourceDefinition, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer CustomResourceDefinitionIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1.CustomResourceDefinition, error)
-}
-
-// CustomResourceDefinitionHandler is function for performing any potential modifications to a CustomResourceDefinition resource.
-type CustomResourceDefinitionHandler func(string, *v1.CustomResourceDefinition) (*v1.CustomResourceDefinition, error)
-
-// CustomResourceDefinitionIndexer computes a set of indexed values for the provided object.
-type CustomResourceDefinitionIndexer func(obj *v1.CustomResourceDefinition) ([]string, error)
-
-// CustomResourceDefinitionGenericController wraps wrangler/pkg/generic.NonNamespacedController so that the function definitions adhere to CustomResourceDefinitionController interface.
-type CustomResourceDefinitionGenericController struct {
-	generic.NonNamespacedControllerInterface[*v1.CustomResourceDefinition, *v1.CustomResourceDefinitionList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *CustomResourceDefinitionGenericController) OnChange(ctx context.Context, name string, sync CustomResourceDefinitionHandler) {
-	c.NonNamespacedControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.CustomResourceDefinition](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *CustomResourceDefinitionGenericController) OnRemove(ctx context.Context, name string, sync CustomResourceDefinitionHandler) {
-	c.NonNamespacedControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.CustomResourceDefinition](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *CustomResourceDefinitionGenericController) Cache() CustomResourceDefinitionCache {
-	return &CustomResourceDefinitionGenericCache{
-		c.NonNamespacedControllerInterface.Cache(),
-	}
-}
-
-// CustomResourceDefinitionGenericCache wraps wrangler/pkg/generic.NonNamespacedCache so the function definitions adhere to CustomResourceDefinitionCache interface.
-type CustomResourceDefinitionGenericCache struct {
 	generic.NonNamespacedCacheInterface[*v1.CustomResourceDefinition]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c CustomResourceDefinitionGenericCache) AddIndexer(indexName string, indexer CustomResourceDefinitionIndexer) {
-	c.NonNamespacedCacheInterface.AddIndexer(indexName, generic.Indexer[*v1.CustomResourceDefinition](indexer))
 }
 
 type CustomResourceDefinitionStatusHandler func(obj *v1.CustomResourceDefinition, status v1.CustomResourceDefinitionStatus) (v1.CustomResourceDefinitionStatus, error)
 
 type CustomResourceDefinitionGeneratingHandler func(obj *v1.CustomResourceDefinition, status v1.CustomResourceDefinitionStatus) ([]runtime.Object, v1.CustomResourceDefinitionStatus, error)
-
-func FromCustomResourceDefinitionHandlerToHandler(sync CustomResourceDefinitionHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.CustomResourceDefinition](sync))
-}
 
 func RegisterCustomResourceDefinitionStatusHandler(ctx context.Context, controller CustomResourceDefinitionController, condition condition.Cond, name string, handler CustomResourceDefinitionStatusHandler) {
 	statusHandler := &customResourceDefinitionStatusHandler{
@@ -155,7 +58,7 @@ func RegisterCustomResourceDefinitionStatusHandler(ctx context.Context, controll
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromCustomResourceDefinitionHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterCustomResourceDefinitionGeneratingHandler(ctx context.Context, controller CustomResourceDefinitionController, apply apply.Apply,

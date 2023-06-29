@@ -29,125 +29,28 @@ import (
 	v1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 // JobController interface for managing Job resources.
 type JobController interface {
-	generic.ControllerMeta
-	JobClient
-
-	// OnChange runs the given handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync JobHandler)
-
-	// OnRemove runs the given handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync JobHandler)
-
-	// Enqueue adds the resource with the given name to the worker queue of the controller.
-	Enqueue(namespace, name string)
-
-	// EnqueueAfter runs Enqueue after the provided duration.
-	EnqueueAfter(namespace, name string, duration time.Duration)
-
-	// Cache returns a cache for the resource type T.
-	Cache() JobCache
+	generic.ControllerInterface[*v1.Job, *v1.JobList]
 }
 
 // JobClient interface for managing Job resources in Kubernetes.
 type JobClient interface {
-	// Create creates a new object and return the newly created Object or an error.
-	Create(*v1.Job) (*v1.Job, error)
-
-	// Update updates the object and return the newly updated Object or an error.
-	Update(*v1.Job) (*v1.Job, error)
-	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
-	// Will always return an error if the object does not have a status field.
-	UpdateStatus(*v1.Job) (*v1.Job, error)
-
-	// Delete deletes the Object in the given name.
-	Delete(namespace, name string, options *metav1.DeleteOptions) error
-
-	// Get will attempt to retrieve the resource with the specified name.
-	Get(namespace, name string, options metav1.GetOptions) (*v1.Job, error)
-
-	// List will attempt to find multiple resources.
-	List(namespace string, opts metav1.ListOptions) (*v1.JobList, error)
-
-	// Watch will start watching resources.
-	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
-
-	// Patch will patch the resource with the matching name.
-	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Job, err error)
+	generic.ClientInterface[*v1.Job, *v1.JobList]
 }
 
 // JobCache interface for retrieving Job resources in memory.
 type JobCache interface {
-	// Get returns the resources with the specified name from the cache.
-	Get(namespace, name string) (*v1.Job, error)
-
-	// List will attempt to find resources from the Cache.
-	List(namespace string, selector labels.Selector) ([]*v1.Job, error)
-
-	// AddIndexer adds  a new Indexer to the cache with the provided name.
-	// If you call this after you already have data in the store, the results are undefined.
-	AddIndexer(indexName string, indexer JobIndexer)
-
-	// GetByIndex returns the stored objects whose set of indexed values
-	// for the named index includes the given indexed value.
-	GetByIndex(indexName, key string) ([]*v1.Job, error)
-}
-
-// JobHandler is function for performing any potential modifications to a Job resource.
-type JobHandler func(string, *v1.Job) (*v1.Job, error)
-
-// JobIndexer computes a set of indexed values for the provided object.
-type JobIndexer func(obj *v1.Job) ([]string, error)
-
-// JobGenericController wraps wrangler/pkg/generic.Controller so that the function definitions adhere to JobController interface.
-type JobGenericController struct {
-	generic.ControllerInterface[*v1.Job, *v1.JobList]
-}
-
-// OnChange runs the given resource handler when the controller detects a resource was changed.
-func (c *JobGenericController) OnChange(ctx context.Context, name string, sync JobHandler) {
-	c.ControllerInterface.OnChange(ctx, name, generic.ObjectHandler[*v1.Job](sync))
-}
-
-// OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *JobGenericController) OnRemove(ctx context.Context, name string, sync JobHandler) {
-	c.ControllerInterface.OnRemove(ctx, name, generic.ObjectHandler[*v1.Job](sync))
-}
-
-// Cache returns a cache of resources in memory.
-func (c *JobGenericController) Cache() JobCache {
-	return &JobGenericCache{
-		c.ControllerInterface.Cache(),
-	}
-}
-
-// JobGenericCache wraps wrangler/pkg/generic.Cache so the function definitions adhere to JobCache interface.
-type JobGenericCache struct {
 	generic.CacheInterface[*v1.Job]
-}
-
-// AddIndexer adds  a new Indexer to the cache with the provided name.
-// If you call this after you already have data in the store, the results are undefined.
-func (c JobGenericCache) AddIndexer(indexName string, indexer JobIndexer) {
-	c.CacheInterface.AddIndexer(indexName, generic.Indexer[*v1.Job](indexer))
 }
 
 type JobStatusHandler func(obj *v1.Job, status v1.JobStatus) (v1.JobStatus, error)
 
 type JobGeneratingHandler func(obj *v1.Job, status v1.JobStatus) ([]runtime.Object, v1.JobStatus, error)
-
-func FromJobHandlerToHandler(sync JobHandler) generic.Handler {
-	return generic.FromObjectHandlerToHandler(generic.ObjectHandler[*v1.Job](sync))
-}
 
 func RegisterJobStatusHandler(ctx context.Context, controller JobController, condition condition.Cond, name string, handler JobStatusHandler) {
 	statusHandler := &jobStatusHandler{
@@ -155,7 +58,7 @@ func RegisterJobStatusHandler(ctx context.Context, controller JobController, con
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, FromJobHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
 func RegisterJobGeneratingHandler(ctx context.Context, controller JobController, apply apply.Apply,

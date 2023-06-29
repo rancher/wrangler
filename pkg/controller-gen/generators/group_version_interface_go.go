@@ -92,9 +92,7 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 		}
 		body := `
 		func (v *version) {{.type}}() {{.type}}Controller {
-			return &{{.type}}GenericController {
-				generic.New{{ if not .namespaced}}NonNamespaced{{end}}Controller[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List](schema.GroupVersionKind{Group: "{{.group}}", Version: "{{.version}}", Kind: "{{.type}}"}, "{{.pluralLower}}", {{ if .namespaced}}true, {{end}}v.controllerFactory),
-			} 
+			return generic.New{{ if not .namespaced}}NonNamespaced{{end}}Controller[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List](schema.GroupVersionKind{Group: "{{.group}}", Version: "{{.version}}", Kind: "{{.type}}"}, "{{.pluralLower}}", {{ if .namespaced}}true, {{end}}v.controllerFactory)
 		}
 		`
 		sw.Do(body, m)
