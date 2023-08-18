@@ -19,18 +19,8 @@ limitations under the License.
 package v1
 
 import (
-	"context"
-	"time"
-
-	"github.com/rancher/wrangler/pkg/apply"
-	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/kv"
 	v1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // NetworkPolicyController interface for managing NetworkPolicy resources.
@@ -46,116 +36,4 @@ type NetworkPolicyClient interface {
 // NetworkPolicyCache interface for retrieving NetworkPolicy resources in memory.
 type NetworkPolicyCache interface {
 	generic.CacheInterface[*v1.NetworkPolicy]
-}
-
-type NetworkPolicyStatusHandler func(obj *v1.NetworkPolicy, status v1.NetworkPolicyStatus) (v1.NetworkPolicyStatus, error)
-
-type NetworkPolicyGeneratingHandler func(obj *v1.NetworkPolicy, status v1.NetworkPolicyStatus) ([]runtime.Object, v1.NetworkPolicyStatus, error)
-
-func RegisterNetworkPolicyStatusHandler(ctx context.Context, controller NetworkPolicyController, condition condition.Cond, name string, handler NetworkPolicyStatusHandler) {
-	statusHandler := &networkPolicyStatusHandler{
-		client:    controller,
-		condition: condition,
-		handler:   handler,
-	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
-}
-
-func RegisterNetworkPolicyGeneratingHandler(ctx context.Context, controller NetworkPolicyController, apply apply.Apply,
-	condition condition.Cond, name string, handler NetworkPolicyGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
-	statusHandler := &networkPolicyGeneratingHandler{
-		NetworkPolicyGeneratingHandler: handler,
-		apply:                          apply,
-		name:                           name,
-		gvk:                            controller.GroupVersionKind(),
-	}
-	if opts != nil {
-		statusHandler.opts = *opts
-	}
-	controller.OnChange(ctx, name, statusHandler.Remove)
-	RegisterNetworkPolicyStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
-}
-
-type networkPolicyStatusHandler struct {
-	client    NetworkPolicyClient
-	condition condition.Cond
-	handler   NetworkPolicyStatusHandler
-}
-
-func (a *networkPolicyStatusHandler) sync(key string, obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
-	if obj == nil {
-		return obj, nil
-	}
-
-	origStatus := obj.Status.DeepCopy()
-	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
-	if err != nil {
-		// Revert to old status on error
-		newStatus = *origStatus.DeepCopy()
-	}
-
-	if a.condition != "" {
-		if errors.IsConflict(err) {
-			a.condition.SetError(&newStatus, "", nil)
-		} else {
-			a.condition.SetError(&newStatus, "", err)
-		}
-	}
-	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
-		if a.condition != "" {
-			// Since status has changed, update the lastUpdatedTime
-			a.condition.LastUpdated(&newStatus, time.Now().UTC().Format(time.RFC3339))
-		}
-
-		var newErr error
-		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
-		if err == nil {
-			err = newErr
-		}
-		if newErr == nil {
-			obj = newObj
-		}
-	}
-	return obj, err
-}
-
-type networkPolicyGeneratingHandler struct {
-	NetworkPolicyGeneratingHandler
-	apply apply.Apply
-	opts  generic.GeneratingHandlerOptions
-	gvk   schema.GroupVersionKind
-	name  string
-}
-
-func (a *networkPolicyGeneratingHandler) Remove(key string, obj *v1.NetworkPolicy) (*v1.NetworkPolicy, error) {
-	if obj != nil {
-		return obj, nil
-	}
-
-	obj = &v1.NetworkPolicy{}
-	obj.Namespace, obj.Name = kv.RSplit(key, "/")
-	obj.SetGroupVersionKind(a.gvk)
-
-	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
-		WithOwner(obj).
-		WithSetID(a.name).
-		ApplyObjects()
-}
-
-func (a *networkPolicyGeneratingHandler) Handle(obj *v1.NetworkPolicy, status v1.NetworkPolicyStatus) (v1.NetworkPolicyStatus, error) {
-	if !obj.DeletionTimestamp.IsZero() {
-		return status, nil
-	}
-
-	objs, newStatus, err := a.NetworkPolicyGeneratingHandler(obj, status)
-	if err != nil {
-		return newStatus, err
-	}
-
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
-		WithOwner(obj).
-		WithSetID(a.name).
-		ApplyObjects(objs...)
 }
