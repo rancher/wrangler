@@ -14,6 +14,11 @@ import (
 
 type Callback func(cb context.Context)
 
+const devModeEnvKey = "CATTLE_DEV_MODE"
+const leaseDurationEnvKey = "CATTLE_ELECTION_LEASE_DURATION"
+const renewDeadlineEnvKey = "CATTLE_ELECTION_RENEW_DEADLINE"
+const retryPeriodEnvKey = "CATTLE_ELECTION_RETRY_PERIOD"
+
 const defaultLeaseDuration = 45 * time.Second
 const defaultRenewDeadline = 30 * time.Second
 const defaultRetryPeriod = 2 * time.Second
@@ -91,26 +96,26 @@ func computeConfig(rl resourcelock.Interface, cbs leaderelection.LeaderCallbacks
 	renewDeadline := defaultRenewDeadline
 	retryPeriod := defaultRetryPeriod
 	var err error
-	if d := os.Getenv("CATTLE_DEV_MODE"); d != "" {
+	if d := os.Getenv(devModeEnvKey); d != "" {
 		leaseDuration = developmentLeaseDuration
 		renewDeadline = developmentRenewDeadline
 	}
-	if d := os.Getenv("CATTLE_ELECTION_LEASE_DURATION"); d != "" {
+	if d := os.Getenv(leaseDurationEnvKey); d != "" {
 		leaseDuration, err = time.ParseDuration(d)
 		if err != nil {
-			return nil, fmt.Errorf("CATTLE_ELECTION_LEASE_DURATION value [%s] is not a valid duration: %w", d, err)
+			return nil, fmt.Errorf("%s value [%s] is not a valid duration: %w", leaseDurationEnvKey, d, err)
 		}
 	}
-	if d := os.Getenv("CATTLE_ELECTION_RENEW_DEADLINE"); d != "" {
+	if d := os.Getenv(renewDeadlineEnvKey); d != "" {
 		renewDeadline, err = time.ParseDuration(d)
 		if err != nil {
-			return nil, fmt.Errorf("CATTLE_ELECTION_RENEW_DEADLINE value [%s] is not a valid duration: %w", d, err)
+			return nil, fmt.Errorf("%s value [%s] is not a valid duration: %w", renewDeadlineEnvKey, d, err)
 		}
 	}
-	if d := os.Getenv("CATTLE_ELECTION_RETRY_PERIOD"); d != "" {
+	if d := os.Getenv(retryPeriodEnvKey); d != "" {
 		retryPeriod, err = time.ParseDuration(d)
 		if err != nil {
-			return nil, fmt.Errorf("CATTLE_ELECTION_RETRY_PERIOD value [%s] is not a valid duration: %w", d, err)
+			return nil, fmt.Errorf("%s value [%s] is not a valid duration: %w", retryPeriodEnvKey, d, err)
 		}
 	}
 
