@@ -129,6 +129,13 @@ func Test_computeConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			for _, e := range []string{leaseDurationEnvKey, renewDeadlineEnvKey, retryPeriodEnvKey} {
+				err := os.Unsetenv(e)
+				if err != nil {
+					t.Errorf("could not Unsetenv: %v", err)
+					return
+				}
+			}
 			for _, e := range tt.envs {
 				err := os.Setenv(e.key, e.value)
 				if err != nil {
