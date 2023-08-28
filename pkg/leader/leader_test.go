@@ -50,7 +50,7 @@ func Test_computeConfig(t *testing.T) {
 				cbs: leaderelection.LeaderCallbacks{},
 			},
 			envs: []env{
-				{key: "CATTLE_DEV_MODE", value: "true"},
+				{key: devModeEnvKey, value: "true"},
 			},
 			want: &leaderelection.LeaderElectionConfig{
 				Lock:            nil,
@@ -69,10 +69,10 @@ func Test_computeConfig(t *testing.T) {
 				cbs: leaderelection.LeaderCallbacks{},
 			},
 			envs: []env{
-				{key: "CATTLE_DEV_MODE", value: "true"},
-				{key: "CATTLE_ELECTION_LEASE_DURATION", value: "1s"},
-				{key: "CATTLE_ELECTION_RENEW_DEADLINE", value: "2s"},
-				{key: "CATTLE_ELECTION_RETRY_PERIOD", value: "3m"},
+				{key: devModeEnvKey, value: "true"},
+				{key: leaseDurationEnvKey, value: "1s"},
+				{key: renewDeadlineEnvKey, value: "2s"},
+				{key: retryPeriodEnvKey, value: "3m"},
 			},
 			want: &leaderelection.LeaderElectionConfig{
 				Lock:            nil,
@@ -91,9 +91,9 @@ func Test_computeConfig(t *testing.T) {
 				cbs: leaderelection.LeaderCallbacks{},
 			},
 			envs: []env{
-				{key: "CATTLE_ELECTION_LEASE_DURATION", value: "bomb"},
-				{key: "CATTLE_ELECTION_RENEW_DEADLINE", value: "2s"},
-				{key: "CATTLE_ELECTION_RETRY_PERIOD", value: "3m"},
+				{key: leaseDurationEnvKey, value: "bomb"},
+				{key: renewDeadlineEnvKey, value: "2s"},
+				{key: retryPeriodEnvKey, value: "3m"},
 			},
 			want:    nil,
 			wantErr: true,
@@ -105,9 +105,9 @@ func Test_computeConfig(t *testing.T) {
 				cbs: leaderelection.LeaderCallbacks{},
 			},
 			envs: []env{
-				{key: "CATTLE_ELECTION_LEASE_DURATION", value: "1s"},
-				{key: "CATTLE_ELECTION_RENEW_DEADLINE", value: "bomb"},
-				{key: "CATTLE_ELECTION_RETRY_PERIOD", value: "3m"},
+				{key: leaseDurationEnvKey, value: "1s"},
+				{key: renewDeadlineEnvKey, value: "bomb"},
+				{key: retryPeriodEnvKey, value: "3m"},
 			},
 			want:    nil,
 			wantErr: true,
@@ -119,9 +119,9 @@ func Test_computeConfig(t *testing.T) {
 				cbs: leaderelection.LeaderCallbacks{},
 			},
 			envs: []env{
-				{key: "CATTLE_ELECTION_LEASE_DURATION", value: "1s"},
-				{key: "CATTLE_ELECTION_RENEW_DEADLINE", value: "2s"},
-				{key: "CATTLE_ELECTION_RETRY_PERIOD", value: "bomb"},
+				{key: leaseDurationEnvKey, value: "1s"},
+				{key: renewDeadlineEnvKey, value: "2s"},
+				{key: retryPeriodEnvKey, value: "bomb"},
 			},
 			want:    nil,
 			wantErr: true,
