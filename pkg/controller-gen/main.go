@@ -10,8 +10,8 @@ import (
 
 	"k8s.io/gengo/generator"
 
-	cgargs "github.com/rancher/wrangler/pkg/controller-gen/args"
-	"github.com/rancher/wrangler/pkg/controller-gen/generators"
+	cgargs "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/generators"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	csargs "k8s.io/code-generator/cmd/client-gen/args"

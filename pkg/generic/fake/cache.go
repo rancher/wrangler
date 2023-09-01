@@ -8,7 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	generic "github.com/rancher/wrangler/pkg/generic"
+	generic "github.com/rancher/wrangler/v2/pkg/generic"
 	labels "k8s.io/apimachinery/pkg/labels"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )

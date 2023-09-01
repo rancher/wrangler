@@ -1,10 +1,10 @@
 package schemas
 
 import (
-	"github.com/rancher/wrangler/pkg/data"
-	"github.com/rancher/wrangler/pkg/data/convert"
-	"github.com/rancher/wrangler/pkg/merr"
-	"github.com/rancher/wrangler/pkg/schemas/definition"
+	"github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/data/convert"
+	"github.com/rancher/wrangler/v2/pkg/merr"
+	"github.com/rancher/wrangler/v2/pkg/schemas/definition"
 )
 
 type Mapper interface {

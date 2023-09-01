@@ -3,7 +3,7 @@ package summary
 import (
 	"strings"
 
-	"github.com/rancher/wrangler/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/data"
 )
 
 func checkCattleReady(obj data.Object, condition []Condition, summary Summary) Summary {

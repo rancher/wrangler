@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/wrangler/pkg/data"
-	"github.com/rancher/wrangler/pkg/data/convert"
-	types "github.com/rancher/wrangler/pkg/schemas"
-	"github.com/rancher/wrangler/pkg/schemas/definition"
+	"github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/data/convert"
+	types "github.com/rancher/wrangler/v2/pkg/schemas"
+	"github.com/rancher/wrangler/v2/pkg/schemas/definition"
 )
 
 type Move struct {

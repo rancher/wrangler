@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
+	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 )
