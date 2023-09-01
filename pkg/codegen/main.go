@@ -19,6 +19,7 @@ import (
 
 func main() {
 	controllergen.Run(args.Options{
+		ImportPackage: "github.com/rancher/wrangler/v2/pkg/generated",
 		OutputPackage: "github.com/rancher/wrangler/pkg/generated",
 		Boilerplate:   "scripts/boilerplate.go.txt",
 		Groups: map[string]args.Group{
