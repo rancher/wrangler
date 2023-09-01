@@ -3,8 +3,8 @@ package fake_test
 import (
 	"testing"
 
-	"github.com/rancher/wrangler/pkg/generic"
-	"github.com/rancher/wrangler/pkg/generic/fake"
+	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generic/fake"
 	v1 "k8s.io/api/core/v1"
 )
 

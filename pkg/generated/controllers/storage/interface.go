@@ -20,7 +20,7 @@ package storage
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
-	v1 "github.com/rancher/wrangler/pkg/generated/controllers/storage/v1"
+	v1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/storage/v1"
 )
 
 type Interface interface {

@@ -3,7 +3,7 @@ package definition
 import (
 	"strings"
 
-	"github.com/rancher/wrangler/pkg/data/convert"
+	"github.com/rancher/wrangler/v2/pkg/data/convert"
 )
 
 func IsMapType(fieldType string) bool {

@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/wrangler/v2/pkg/generic"
 	"github.com/sirupsen/logrus"
 )
 

@@ -3,7 +3,7 @@ package mappers
 import (
 	"fmt"
 
-	types "github.com/rancher/wrangler/pkg/schemas"
+	types "github.com/rancher/wrangler/v2/pkg/schemas"
 )
 
 func ValidateField(field string, schema *types.Schema) error {

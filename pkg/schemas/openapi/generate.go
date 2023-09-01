@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	types "github.com/rancher/wrangler/pkg/schemas"
-	"github.com/rancher/wrangler/pkg/schemas/definition"
+	types "github.com/rancher/wrangler/v2/pkg/schemas"
+	"github.com/rancher/wrangler/v2/pkg/schemas/definition"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
