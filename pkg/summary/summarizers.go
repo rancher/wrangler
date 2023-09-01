@@ -4,9 +4,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/wrangler/pkg/data"
-	"github.com/rancher/wrangler/pkg/data/convert"
-	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/data/convert"
+	"github.com/rancher/wrangler/v2/pkg/kv"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kstatus "sigs.k8s.io/cli-utils/pkg/kstatus/status"
 )

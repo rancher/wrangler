@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/rancher/wrangler/pkg/apply/injectors"
-	"github.com/rancher/wrangler/pkg/objectset"
+	"github.com/rancher/wrangler/v2/pkg/apply/injectors"
+	"github.com/rancher/wrangler/v2/pkg/objectset"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
