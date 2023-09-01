@@ -30,11 +30,11 @@ import (
 
 func Run(opts cgargs.Options) {
 	customArgs := &cgargs.CustomArgs{
-		Options:      opts,
-		TypesByGroup: map[schema.GroupVersion][]*types.Name{},
-		Package:      opts.OutputPackage,
+		ImportPackage: opts.ImportPackage,
+		Options:       opts,
+		TypesByGroup:  map[schema.GroupVersion][]*types.Name{},
+		Package:       opts.OutputPackage,
 	}
-
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
 	genericArgs.CustomArgs = customArgs
 	genericArgs.GoHeaderFilePath = opts.Boilerplate
