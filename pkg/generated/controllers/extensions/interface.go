@@ -20,7 +20,7 @@ package extensions
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
-	v1beta1 "github.com/rancher/wrangler/pkg/generated/controllers/extensions/v1beta1"
+	v1beta1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/extensions/v1beta1"
 )
 
 type Interface interface {

@@ -1,8 +1,8 @@
 package mappers
 
 import (
-	"github.com/rancher/wrangler/pkg/data"
-	"github.com/rancher/wrangler/pkg/schemas"
+	"github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v2/pkg/schemas"
 )
 
 type EmptyMapper struct {

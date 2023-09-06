@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
-	"github.com/rancher/wrangler/pkg/name"
+	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"github.com/rancher/wrangler/v2/pkg/name"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"

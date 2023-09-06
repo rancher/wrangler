@@ -1,7 +1,7 @@
 package unstructured
 
 import (
-	"github.com/rancher/wrangler/pkg/data/convert"
+	"github.com/rancher/wrangler/v2/pkg/data/convert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
