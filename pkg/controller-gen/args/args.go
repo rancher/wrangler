@@ -6,6 +6,7 @@ import (
 )
 
 type CustomArgs struct {
+	// Package is the directory path where generated code output will be located
 	Package       string
 	ImportPackage string
 	TypesByGroup  map[schema.GroupVersion][]*types.Name
@@ -15,6 +16,7 @@ type CustomArgs struct {
 
 type Options struct {
 	ImportPackage string
+	// OutputPackage is the directory path where generated code output will be located
 	OutputPackage string
 	Groups        map[string]Group
 	Boilerplate   string
