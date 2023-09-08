@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/wrangler/pkg/gvk"
+	"github.com/rancher/wrangler/v2/pkg/gvk"
 
-	"github.com/rancher/wrangler/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/kv"
 
 	"github.com/pkg/errors"
-	namer "github.com/rancher/wrangler/pkg/name"
+	namer "github.com/rancher/wrangler/v2/pkg/name"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

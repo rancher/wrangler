@@ -20,7 +20,7 @@ package apiregistration
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
-	v1 "github.com/rancher/wrangler/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	v1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/apiregistration.k8s.io/v1"
 )
 
 type Interface interface {

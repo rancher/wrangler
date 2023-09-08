@@ -3,7 +3,7 @@ package mappers
 import (
 	"fmt"
 
-	types "github.com/rancher/wrangler/pkg/schemas"
+	types "github.com/rancher/wrangler/v2/pkg/schemas"
 )
 
 type Copy struct {
