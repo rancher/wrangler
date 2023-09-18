@@ -1,5 +1,9 @@
 package data
 
+import (
+	"strconv"
+)
+
 func RemoveValue(data map[string]interface{}, keys ...string) (interface{}, bool) {
 	for i, key := range keys {
 		if i == len(keys)-1 {
@@ -18,16 +22,36 @@ func GetValueN(data map[string]interface{}, keys ...string) interface{} {
 	return val
 }
 
-func GetValue(data map[string]interface{}, keys ...string) (interface{}, bool) {
+func GetValue(data interface{}, keys ...string) (interface{}, bool) {
 	for i, key := range keys {
 		if i == len(keys)-1 {
-			val, ok := data[key]
-			return val, ok
+			if dataMap, ok := data.(map[string]interface{}); ok {
+				val, ok := dataMap[key]
+				return val, ok
+			}
+			if dataSlice, ok := data.([]interface{}); ok {
+				return itemByIndex(dataSlice, key)
+			}
 		}
-		data, _ = data[key].(map[string]interface{})
+		if dataMap, ok := data.(map[string]interface{}); ok {
+			data, _ = dataMap[key]
+		} else if dataSlice, ok := data.([]interface{}); ok {
+			data, _ = itemByIndex(dataSlice, key)
+		}
 	}
 
 	return nil, false
+}
+
+func itemByIndex(dataSlice []interface{}, key string) (interface{}, bool) {
+	keyInt, err := strconv.Atoi(key)
+	if err != nil {
+		return nil, false
+	}
+	if keyInt >= len(dataSlice) || keyInt < 0 {
+		return nil, false
+	}
+	return dataSlice[keyInt], true
 }
 
 func PutValue(data map[string]interface{}, val interface{}, keys ...string) {
