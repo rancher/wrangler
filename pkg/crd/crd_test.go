@@ -6,14 +6,22 @@ package crd
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 var errTest = errors.New("test Error")
@@ -302,6 +310,186 @@ func TestBatchCreateCRDs(t *testing.T) {
 			}
 			if err := BatchCreateCRDs(context.Background(), mock, tt.selector, waitDuration, tt.toCreateCRDs); (err != nil) != tt.wantErr {
 				t.Errorf("BatchCreateCRDs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCreateCRDWithColumns(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr bool
+		columns []apiextv1.CustomResourceColumnDefinition
+		crd     func() CRD
+	}{
+		{
+			name:    "Basic CRD with no printer column",
+			wantErr: false,
+			crd: func() CRD {
+				type ExampleSpec struct {
+					Source   string `json:"source,omitempty"`
+					Checksum string `json:"checksum,omitempty"`
+				}
+
+				type Example struct {
+					metav1.TypeMeta   `json:",inline"`
+					metav1.ObjectMeta `json:"metadata,omitempty"`
+
+					Spec ExampleSpec `json:"spec,omitempty"`
+				}
+
+				example := Example{}
+				return NamespacedType("Example.example.com/v1").WithSchemaFromStruct(example).WithColumnsFromStruct(example)
+			},
+		},
+		{
+			name:    "Basic CRD with single printer column",
+			wantErr: false,
+			columns: []apiextv1.CustomResourceColumnDefinition{
+				{Name: "Source", Type: "string", Format: "", Description: "", Priority: 0, JSONPath: ".spec.source"},
+			},
+			crd: func() CRD {
+				type ExampleSpec struct {
+					Source   string `json:"source,omitempty" column:""`
+					Checksum string `json:"checksum,omitempty"`
+				}
+
+				type Example struct {
+					metav1.TypeMeta   `json:",inline"`
+					metav1.ObjectMeta `json:"metadata,omitempty"`
+
+					Spec ExampleSpec `json:"spec,omitempty"`
+				}
+
+				example := Example{}
+				return NamespacedType("Example.example.com/v1").WithSchemaFromStruct(example).WithColumnsFromStruct(example)
+			},
+		},
+		{
+			name:    "Basic CRD with single printer column and custom name",
+			wantErr: false,
+			columns: []apiextv1.CustomResourceColumnDefinition{
+				{Name: "ExampleSource", Type: "string", Format: "", Description: "", Priority: 0, JSONPath: ".spec.source"},
+			},
+			crd: func() CRD {
+				type ExampleSpec struct {
+					Source   string `json:"source,omitempty" column:"name=ExampleSource"`
+					Checksum string `json:"checksum,omitempty"`
+				}
+
+				type Example struct {
+					metav1.TypeMeta   `json:",inline"`
+					metav1.ObjectMeta `json:"metadata,omitempty"`
+
+					Spec ExampleSpec `json:"spec,omitempty"`
+				}
+
+				example := Example{}
+				return NamespacedType("Example.example.com/v1").WithSchemaFromStruct(example).WithColumnsFromStruct(example)
+			},
+		},
+		{
+			name:    "Basic CRD with struct field columns",
+			wantErr: false,
+			columns: []apiextv1.CustomResourceColumnDefinition{
+				{Name: "Time", Type: "string", Format: "date-time", Description: "", Priority: 0, JSONPath: ".spec.time"},
+				{Name: "Quantity", Type: "string", Format: "", Description: "", Priority: 0, JSONPath: ".spec.quantity"},
+			},
+			crd: func() CRD {
+				type ExampleSpec struct {
+					Time     *metav1.Time       `json:"time,omitempty" column:""`
+					Quantity *resource.Quantity `json:"quantity,omitempty" column:""`
+					Checksum string             `json:"checksum,omitempty"`
+				}
+
+				type Example struct {
+					metav1.TypeMeta   `json:",inline"`
+					metav1.ObjectMeta `json:"metadata,omitempty"`
+
+					Spec ExampleSpec `json:"spec,omitempty"`
+				}
+
+				example := Example{}
+				return NamespacedType("Example.example.com/v1").WithSchemaFromStruct(example).WithColumnsFromStruct(example)
+			},
+		},
+		{
+			name:    "Complex CRD with mix of struct and basic field columns",
+			wantErr: false,
+			columns: []apiextv1.CustomResourceColumnDefinition{
+				{Name: "Time", Type: "string", Format: "date-time", Description: "", Priority: 0, JSONPath: ".spec.time"},
+				{Name: "Quantity", Type: "string", Format: "", Description: "", Priority: 0, JSONPath: ".spec.quantity"},
+				{Name: "Byte", Type: "string", Format: "byte", Description: "", Priority: 0, JSONPath: ".status.checksum"},
+				{Name: "Password", Type: "string", Format: "password", Description: "", Priority: 0, JSONPath: ".status.password"},
+				{Name: "Boolean", Type: "boolean", Format: "", Description: "", Priority: 0, JSONPath: ".status.boolean"},
+				{Name: "Float", Type: "number", Format: "", Description: "", Priority: 0, JSONPath: ".status.float"},
+				{Name: "Integer", Type: "integer", Format: "", Description: "", Priority: 0, JSONPath: ".status.integer"},
+				{Name: "IntOrString", Type: "string", Format: "", Description: "", Priority: 0, JSONPath: ".status.intOrString"},
+			},
+			crd: func() CRD {
+				type ExampleSpec struct {
+					Time     *metav1.Time       `json:"time,omitempty" column:""`
+					Quantity *resource.Quantity `json:"quantity,omitempty" column:""`
+				}
+
+				type ExampleStatus struct {
+					Byte        string              `json:"checksum,omitempty" column:"format=byte"`
+					Password    string              `json:"password,omitempty" column:"format=password"`
+					Boolean     *bool               `json:"boolean,omitempty" column:""`
+					Float       *float32            `json:"float,omitempty" column:""`
+					Integer     *int32              `json:"integer,omitempty" column:""`
+					IntOrString *intstr.IntOrString `json:"intOrString,omitempty" column:""`
+				}
+
+				type Example struct {
+					metav1.TypeMeta   `json:",inline"`
+					metav1.ObjectMeta `json:"metadata,omitempty"`
+
+					Spec   ExampleSpec   `json:"spec,omitempty"`
+					Status ExampleStatus `json:"status,omitempty"`
+				}
+
+				example := Example{}
+				return NamespacedType("Example.example.com/v1").WithSchemaFromStruct(example).WithColumnsFromStruct(example)
+			},
+		},
+	}
+
+	for i := range tests {
+		tt := &tests[i]
+		t.Run(tt.name, func(t *testing.T) {
+			o, err := tt.crd().ToCustomResourceDefinition()
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ToCustomResourceDefinition() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			unstructuredCRD, ok := o.(*unstructured.Unstructured)
+			if !ok {
+				t.Fatal("could not convert CRD runtime.Object to *unstructured.Unstructured")
+			}
+			var v1CRD *apiextv1.CustomResourceDefinition
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredCRD.UnstructuredContent(), &v1CRD); err != nil {
+				t.Fatalf("Failed to convert CRD *unstructured.Unstructured to *apiextv1.CustomResourceDefinition: %v", err)
+			}
+
+			if len(v1CRD.Spec.Versions) == 0 {
+				t.Errorf("CRD has no schema versions")
+			}
+
+			fldPath := field.NewPath("spec")
+			for _, version := range v1CRD.Spec.Versions {
+				for i := range version.AdditionalPrinterColumns {
+					apc := &apiextensions.CustomResourceColumnDefinition{}
+					if err := apiextv1.Convert_v1_CustomResourceColumnDefinition_To_apiextensions_CustomResourceColumnDefinition(&version.AdditionalPrinterColumns[i], apc, nil); err != nil {
+						t.Errorf("Failed to convert apiextv1.CustomResourceColumnDefinition to apiextensions.CustomResourceColumnDefinition for validation: %v", err)
+					}
+					if errs := validation.ValidateCustomResourceColumnDefinition(apc, fldPath.Child("additionalPrinterColumns").Index(i)); len(errs) > 0 {
+						t.Errorf("AdditionalPrinterColumn definition validation failed: %s", errs.ToAggregate().Error())
+					}
+				}
+
+				if !reflect.DeepEqual(tt.columns, version.AdditionalPrinterColumns) {
+					t.Errorf("AdditionalPrinterColumns = %#v,\n\t\twanted columns = %#v", version.AdditionalPrinterColumns, tt.columns)
+				}
 			}
 		})
 	}
