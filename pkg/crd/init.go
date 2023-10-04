@@ -26,11 +26,17 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 
 	// Ensure the gvks are loaded so that apply works correctly
 	_ "github.com/rancher/wrangler/v2/pkg/generated/controllers/apiextensions.k8s.io/v1"
+)
+
+var (
+	// Ref: https://github.com/kubernetes/apiextensions-apiserver/blob/v0.28.0/pkg/apis/apiextensions/validation/validation.go#L53
+	customResourceColumnDefinitionFormats = sets.NewString("int32", "int64", "float", "double", "byte", "date", "date-time", "password")
 )
 
 const CRDKind = "CustomResourceDefinition"
@@ -111,10 +117,17 @@ func fieldName(f reflect.StructField) string {
 	return name
 }
 
-func tagToColumn(f reflect.StructField) (apiextv1.CustomResourceColumnDefinition, bool) {
+func tagToColumn(f reflect.StructField, kind reflect.Kind, format, path string) (apiextv1.CustomResourceColumnDefinition, bool) {
+	// Column definitions support only a subset of the full OpenAPI schema formats
+	if !customResourceColumnDefinitionFormats.Has(format) {
+		format = ""
+	}
+
 	c := apiextv1.CustomResourceColumnDefinition{
-		Name: f.Name,
-		Type: "string",
+		Name:     f.Name,
+		Type:     kindToType(kind),
+		Format:   format,
+		JSONPath: path,
 	}
 
 	columnDef, ok := f.Tag.Lookup("column")
@@ -143,6 +156,45 @@ func tagToColumn(f reflect.StructField) (apiextv1.CustomResourceColumnDefinition
 	return c, true
 }
 
+func kindToType(k reflect.Kind) string {
+	// Ref: https://github.com/kubernetes/apiserver/blob/v0.28.0/pkg/endpoints/installer.go#L1178
+	switch s := k.String(); s {
+	case "bool", "*bool":
+		return "boolean"
+	case "uint8", "*uint8", "int", "*int", "int32", "*int32", "int64", "*int64", "uint32", "*uint32", "uint64", "*uint64":
+		return "integer"
+	case "float64", "*float64", "float32", "*float32":
+		return "number"
+	case "byte", "*byte":
+		return "string"
+	case "[]string", "[]*string":
+		return "string"
+	case "[]int32", "[]*int32":
+		return "integer"
+	default:
+		return s
+	}
+}
+
+type openAPISchemaProvider interface {
+	OpenAPISchemaType() []string
+	OpenAPISchemaFormat() string
+}
+
+func openAPISchema(t reflect.Type) (reflect.Kind, string) {
+	var format string
+	if o, ok := reflect.New(t).Interface().(openAPISchemaProvider); ok {
+		format = o.OpenAPISchemaFormat()
+		if st := o.OpenAPISchemaType(); len(st) > 0 {
+			switch st[0] {
+			case "string":
+				return reflect.String, format
+			}
+		}
+	}
+	return reflect.Invalid, format
+}
+
 func readCustomColumns(t reflect.Type, path string) (result []apiextv1.CustomResourceColumnDefinition) {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -155,14 +207,18 @@ func readCustomColumns(t reflect.Type, path string) (result []apiextv1.CustomRes
 		if t.Kind() == reflect.Ptr {
 			t = t.Elem()
 		}
-		if t.Kind() == reflect.Struct {
+		if kind, format := openAPISchema(t); kind != reflect.Invalid {
+			if col, ok := tagToColumn(f, kind, format, path+fieldName); ok {
+				result = append(result, col)
+			}
+		} else if t.Kind() == reflect.Struct {
 			if f.Anonymous {
 				result = append(result, readCustomColumns(t, path)...)
 			} else {
-				result = append(result, readCustomColumns(t, path+"."+fieldName)...)
+				result = append(result, readCustomColumns(t, path+fieldName+".")...)
 			}
 		} else {
-			if col, ok := tagToColumn(f); ok {
+			if col, ok := tagToColumn(f, t.Kind(), "", path+fieldName); ok {
 				result = append(result, col)
 			}
 		}
