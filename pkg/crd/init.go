@@ -109,10 +109,11 @@ func fieldName(f reflect.StructField) string {
 	return name
 }
 
-func tagToColumn(f reflect.StructField) (apiextv1.CustomResourceColumnDefinition, bool) {
+func tagToColumn(f reflect.StructField, k reflect.Kind, path string) (apiextv1.CustomResourceColumnDefinition, bool) {
 	c := apiextv1.CustomResourceColumnDefinition{
-		Name: f.Name,
-		Type: "string",
+		Name:     f.Name,
+		Type:     k.String(),
+		JSONPath: path,
 	}
 
 	columnDef, ok := f.Tag.Lookup("column")
@@ -141,6 +142,23 @@ func tagToColumn(f reflect.StructField) (apiextv1.CustomResourceColumnDefinition
 	return c, true
 }
 
+type openAPISchemaProvider interface {
+	OpenAPISchemaType() []string
+	OpenAPISchemaFormat() string
+}
+
+func openAPISchemaKind(t reflect.Type) reflect.Kind {
+	if o, ok := reflect.New(t).Interface().(openAPISchemaProvider); ok {
+		if st := o.OpenAPISchemaType(); len(st) > 0 {
+			switch st[0] {
+			case "string":
+				return reflect.String
+			}
+		}
+	}
+	return reflect.Invalid
+}
+
 func readCustomColumns(t reflect.Type, path string) (result []apiextv1.CustomResourceColumnDefinition) {
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
@@ -153,14 +171,18 @@ func readCustomColumns(t reflect.Type, path string) (result []apiextv1.CustomRes
 		if t.Kind() == reflect.Ptr {
 			t = t.Elem()
 		}
-		if t.Kind() == reflect.Struct {
+		if k := openAPISchemaKind(t); k != reflect.Invalid {
+			if col, ok := tagToColumn(f, k, path+fieldName); ok {
+				result = append(result, col)
+			}
+		} else if t.Kind() == reflect.Struct {
 			if f.Anonymous {
 				result = append(result, readCustomColumns(t, path)...)
 			} else {
-				result = append(result, readCustomColumns(t, path+"."+fieldName)...)
+				result = append(result, readCustomColumns(t, path+fieldName+".")...)
 			}
 		} else {
-			if col, ok := tagToColumn(f); ok {
+			if col, ok := tagToColumn(f, t.Kind(), path+fieldName); ok {
 				result = append(result, col)
 			}
 		}
