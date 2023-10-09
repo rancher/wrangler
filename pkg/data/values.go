@@ -1,9 +1,15 @@
+// Package data contains functions for working with unstructured values like []interface or map[string]interface{}.
+// It allows reading/writing to these values without having to convert to structured items.
 package data
 
 import (
 	"strconv"
 )
 
+// RemoveValue removes a value from data. Keys should be in order denoting the path to the value in the nested
+// structure of the map. For example, passing []string{"metadata", "annotations"} will make the function remove the
+// "annotations" key from the "metadata" sub-map. Returns the removed value (if any) and a bool indicating if the value
+// was found.
 func RemoveValue(data map[string]interface{}, keys ...string) (interface{}, bool) {
 	for i, key := range keys {
 		if i == len(keys)-1 {
@@ -22,6 +28,11 @@ func GetValueN(data map[string]interface{}, keys ...string) interface{} {
 	return val
 }
 
+// GetValue retrieves a value from the provided collection, which must be a map[string]interface or a []interface.
+// Keys are always strings.
+// For a map, a key denotes the key in the map whose value we want to retrieve.
+// For the slice, it denotes the index (starting at 0) of the value we want to retrieve.
+// Returns the retrieved value (if any) and a bool indicating if the value was found.
 func GetValue(data interface{}, keys ...string) (interface{}, bool) {
 	for i, key := range keys {
 		if i == len(keys)-1 {
@@ -54,6 +65,8 @@ func itemByIndex(dataSlice []interface{}, key string) (interface{}, bool) {
 	return dataSlice[keyInt], true
 }
 
+// PutValue updates the value of a given map at the index specified by keys that denote the path to the value in the
+// nested structure of the map. If there is no current entry at a key, a new map is created for that value.
 func PutValue(data map[string]interface{}, val interface{}, keys ...string) {
 	if data == nil {
 		return

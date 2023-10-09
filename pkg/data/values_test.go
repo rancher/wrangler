@@ -82,7 +82,7 @@ func TestGetValue(t *testing.T) {
 			wantSuccess: true,
 		},
 		{
-			name: "get index of top levelslice",
+			name: "get index of top level slice",
 			data: []interface{}{
 				"alice",
 				"bob",
@@ -90,6 +90,26 @@ func TestGetValue(t *testing.T) {
 			},
 			keys:        []string{"2"},
 			wantValue:   "eve",
+			wantSuccess: true,
+		},
+		{
+			name: "slice of maps",
+			data: []interface{}{
+				map[string]interface{}{
+					"notthisone": "val",
+				},
+				map[string]interface{}{
+					"parent": map[string]interface{}{
+						"children": []interface{}{
+							"alice",
+							"bob",
+							"eve",
+						},
+					},
+				},
+			},
+			keys:        []string{"1", "parent", "children", "0"},
+			wantValue:   "alice",
 			wantSuccess: true,
 		},
 		{
@@ -119,6 +139,75 @@ func TestGetValue(t *testing.T) {
 				},
 			},
 			keys:        []string{"parent", "children", "-3"},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name: "index not parseable to int",
+			data: map[string]interface{}{
+				"parent": map[string]interface{}{
+					"children": []interface{}{
+						"alice",
+						"bob",
+						"eve",
+					},
+				},
+			},
+			keys:        []string{"parent", "children", "notanint"},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name: "slice blank index",
+			data: []interface{}{
+				"bob",
+			},
+			keys:        []string{""},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name: "slice no index",
+			data: []interface{}{
+				"bob",
+			},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name: "keys nested too far",
+			data: []interface{}{
+				"alice",
+				"bob",
+				"eve",
+			},
+			keys:        []string{"2", "1"},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name: "map blank key with value",
+			data: map[string]interface{}{
+				"": "bob",
+			},
+			keys:        []string{""},
+			wantValue:   "bob",
+			wantSuccess: true,
+		},
+		{
+			name: "map blank key no value",
+			data: map[string]interface{}{
+				"alice": "bob",
+			},
+			keys:        []string{""},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name: "map no key",
+			data: map[string]interface{}{
+				"": "bob",
+			},
 			wantValue:   nil,
 			wantSuccess: false,
 		},
