@@ -47,6 +47,9 @@ type desiredSet struct {
 
 	createPlan bool
 	plan       Plan
+
+	fastApply       bool
+	replacingFields []string
 }
 
 func (o *desiredSet) err(err error) error {
@@ -237,5 +240,22 @@ func (o desiredSet) WithNoDeleteGVK(gvks ...schema.GroupVersionKind) Apply {
 
 func (o desiredSet) WithContext(ctx context.Context) Apply {
 	o.ctx = ctx
+	return o
+}
+
+// WithFastApply configures Apply to use 2-way merging, which is less CPU intensive than the default 3-way merging.
+// WithFastApply has the same behavior as Apply (including honoring strategic merge patch tags) apart from one case:
+//
+// When applying an object with a nil field, WithFastApply will ignore the corresponding field in the cluster object.
+// If clearing of the corresponding field is wanted, specify its path in dotted notation in replacingFields and
+// WithFastApply will generate a deletion patch for that field on nil.
+//
+// Note that basic Apply decides whether to clear such a field or not depending on the **immediately previous** Apply.
+// If the field set nil was also nil in the previous Apply, then it is not cleared, otherwise it is. Additionally,
+// basic Apply is not guaranteed to work as expected in all cases in presence of nil fields because of limitations of
+// the underlying algorithms (JSON Merge Patch, Strategic Merge Patch). For more details see desiredset_compare_test.go
+func (o desiredSet) WithFastApply(replacingFields ...string) Apply {
+	o.fastApply = true
+	o.replacingFields = replacingFields
 	return o
 }
