@@ -153,7 +153,7 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal bool, oldObject, newObject runtime.Object, diffPatches [][]byte) (bool, error) {
+func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal, fastApply bool, diffPatches [][]byte, oldObject, newObject runtime.Object) (bool, error) {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
 		return false, err
@@ -161,7 +161,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 
 	var original []byte
 
-	if !ignoreOriginal {
+	if !ignoreOriginal && !fastApply {
 		original, err = getOriginalBytes(gvk, oldMetadata)
 		if err != nil {
 			return false, err
@@ -203,7 +203,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 			return false, err
 		}
 		var originalObject runtime.Object
-		if !ignoreOriginal {
+		if !ignoreOriginal && !fastApply {
 			originalObject, err = getOriginalObject(gvk, oldMetadata)
 			if err != nil {
 				return false, err
@@ -248,7 +248,7 @@ func (o *desiredSet) compareObjects(gvk schema.GroupVersionKind, reconciler Reco
 		GroupVersionKind: gvk,
 	}]...)
 
-	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, oldObject, newObject, diffPatches); err != nil {
+	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, o.fastApply, diffPatches, oldObject, newObject); err != nil {
 		return err
 	} else if !ran {
 		logrus.Debugf("DesiredSet - No change(2) %s %s/%s for %s", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID)
