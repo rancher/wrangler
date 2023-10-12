@@ -284,7 +284,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 
 	createF := func(k objectset.ObjectKey) {
 		obj := objs[k]
-		obj, err := prepareObjectForCreate(gvk, obj)
+		obj, err := prepareObjectForCreate(gvk, obj, o.fastApply)
 		if err != nil {
 			o.err(errors.Wrapf(err, "failed to prepare create %s %s for %s", k, gvk, debugID))
 			return

@@ -45,12 +45,7 @@ var (
 	}
 )
 
-func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (runtime.Object, error) {
-	serialized, err := serializeApplied(obj)
-	if err != nil {
-		return nil, err
-	}
-
+func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object, fastApply bool) (runtime.Object, error) {
 	obj = obj.DeepCopyObject()
 	m, err := meta.Accessor(obj)
 	if err != nil {
@@ -61,8 +56,15 @@ func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (ru
 		annotations = map[string]string{}
 	}
 
-	annotations[LabelApplied] = appliedToAnnotation(serialized)
-	m.SetAnnotations(annotations)
+	if !fastApply {
+		serialized, err := serializeApplied(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		annotations[LabelApplied] = appliedToAnnotation(serialized)
+		m.SetAnnotations(annotations)
+	}
 
 	typed, err := meta.TypeAccessor(obj)
 	if err != nil {
@@ -168,7 +170,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		}
 	}
 
-	modified, err := getModifiedBytes(gvk, newObject)
+	modified, err := getModifiedBytes(gvk, newObject, fastApply)
 	if err != nil {
 		return false, err
 	}
@@ -198,7 +200,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 
 	logrus.Debugf("DesiredSet - Patch %s %s/%s for %s -- [PATCH:%s, ORIGINAL:%s, MODIFIED:%s, CURRENT:%s]", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID, patch, original, modified, current)
 	if reconciler != nil {
-		newObject, err := prepareObjectForCreate(gvk, newObject)
+		newObject, err := prepareObjectForCreate(gvk, newObject, fastApply)
 		if err != nil {
 			return false, err
 		}
@@ -287,7 +289,7 @@ func getOriginalObject(gvk schema.GroupVersionKind, obj v1.Object) (runtime.Obje
 	removeCreationTimestamp(mapObj)
 	return prepareObjectForCreate(gvk, &unstructured.Unstructured{
 		Object: mapObj,
-	})
+	}, false)
 }
 
 func getOriginalBytes(gvk schema.GroupVersionKind, obj v1.Object) ([]byte, error) {
@@ -301,8 +303,8 @@ func getOriginalBytes(gvk schema.GroupVersionKind, obj v1.Object) ([]byte, error
 	return json.Marshal(objCopy)
 }
 
-func getModifiedBytes(gvk schema.GroupVersionKind, obj runtime.Object) ([]byte, error) {
-	obj, err := prepareObjectForCreate(gvk, obj)
+func getModifiedBytes(gvk schema.GroupVersionKind, obj runtime.Object, fastApply bool) ([]byte, error) {
+	obj, err := prepareObjectForCreate(gvk, obj, fastApply)
 	if err != nil {
 		return nil, err
 	}
