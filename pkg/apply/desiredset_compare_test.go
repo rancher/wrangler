@@ -267,7 +267,7 @@ func Test_doPatchJSONMergePatch3way(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			patchType, patch, err := doPatch(tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current, [][]byte{})
+			patchType, patch, err := doPatch(tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current, [][]byte{}, false)
 			if !tt.wantErr(t, err, fmt.Sprintf("doPatch(%v, %v, %v, %v)", tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current)) {
 				return
 			}
@@ -541,12 +541,342 @@ func Test_doPatchStrategicMergePatch3way(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			patchType, patch, err := doPatch(tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current, [][]byte{})
+			patchType, patch, err := doPatch(tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current, [][]byte{}, false)
 			if !tt.wantErr(t, err, fmt.Sprintf("doPatch(%v, %v, %v, %v)", tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current)) {
 				return
 			}
 			assert.Equalf(t, tt.patchType, patchType, "doPatch(%v, %v, %v, %v)", tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current)
 			assert.Equalf(t, string(tt.patch), string(patch), "doPatch(%v, %v, %v, %v)", tt.args.gvk, tt.args.original, tt.args.modified, tt.args.current)
+		})
+	}
+}
+
+func Test_doPatchJSONMergePatch2way(t *testing.T) {
+	type args struct {
+		gvk      schema.GroupVersionKind
+		modified []byte
+		current  []byte
+	}
+	tests := []struct {
+		name      string
+		args      args
+		patchType types.PatchType
+		patch     []byte
+		wantErr   assert.ErrorAssertionFunc
+	}{
+		// 2-way JSON Merge Patch
+		// expected behavior:
+		//  - no change between modified and current: nothing to do
+		//  - changed non-objects (primitive types and arrays) from modified to current: replace value
+		//  - changed objects from modified to current:
+		//    - if a key is in both modified and current but the corresponding value changed: replace value
+		//    - if a key is in modified but not current: add key
+		//    - if a key is not in modified but is in current: remove key
+		{
+			name: "2wayEmptyMapNoChangesThenDoNothing",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{}, t),
+				current:  toTestCRDBytes(map[string]any{}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte("{}"),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayFullMapNoChangesThenDoNothing",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{"one": "one"}, t),
+				current:  toTestCRDBytes(map[string]any{"one": "one"}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte("{}"),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayPrimitiveChangedThenReplaceValue",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{"one": "one"}, t),
+				current:  toTestCRDBytes(map[string]any{"one": "two"}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte(`{"data":{"one":"one"}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayArrayChangedThenReplaceValue",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{"one": []string{"one"}}, t),
+				current:  toTestCRDBytes(map[string]any{"one": []string{"two", "three"}}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte(`{"data":{"one":["one"]}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayObjectKeyInModifiedAndInCurrentThenReplaceValue",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{"one": "one"}, t),
+				current:  toTestCRDBytes(map[string]any{"one": "two"}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte(`{"data":{"one":"one"}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayObjectKeyInModifiedAndNotInCurrentThenAddKey",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{"one": "one"}, t),
+				current:  toTestCRDBytes(map[string]any{}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte(`{"data":{"one":"one"}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayObjectKeyNotInModifiedAndInCurrentThenRemoveKey",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{}, t),
+				current:  toTestCRDBytes(map[string]any{"one": "one"}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte(`{"data":{"one":null}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayNullNotInModifiedInCurrentThenDelete",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{}, t),
+				current:  toTestCRDBytes(map[string]any{"a": nil}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte(`{"data":{"a":null}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayNullInModifiedNotInCurrentThenNeedlesslyDelete",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{"a": nil}, t),
+				current:  toTestCRDBytes(map[string]any{}, t),
+			},
+			patchType: types.MergePatchType,
+			// This is not really wanted, but tolerated.
+			// The patch deletes an "a" field that does not actually exist in current, it will do no harm but makes
+			// the patch non-empty, which could lead to apply cycles in controllers.
+			// OTOH, the JSON Merge Patch RFC explicitly states it
+			// is not meant to be used with null values:
+			// "This design means that merge patch documents are suitable for
+			//   describing modifications to JSON documents that primarily use objects
+			//   for their structure and do not make use of explicit null values.  The
+			//   merge patch format is not appropriate for all JSON syntaxes."
+			// from: https://tools.ietf.org/html/rfc7386#section-1
+			// Therefore this is undefined behavior, so it can't be treated as a bug.
+			patch:   []byte(`{"data":{"a":null}}`),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "2wayNullInModifiedInCurrentThenDoNothing",
+			args: args{
+				gvk:      testCRDGVK,
+				modified: toTestCRDBytes(map[string]any{"a": nil}, t),
+				current:  toTestCRDBytes(map[string]any{"a": nil}, t),
+			},
+			patchType: types.MergePatchType,
+			patch:     []byte(`{}`),
+			wantErr:   assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			patchType, patch, err := doPatch(tt.args.gvk, []byte{}, tt.args.modified, tt.args.current, [][]byte{}, true)
+			if !tt.wantErr(t, err, fmt.Sprintf("doPatch(%v, %v, %v, %v)", tt.args.gvk, []byte{}, tt.args.modified, tt.args.current)) {
+				return
+			}
+			assert.Equalf(t, tt.patchType, patchType, "doPatch(%v, %v, %v, %v)", tt.args.gvk, nil, tt.args.modified, tt.args.current)
+			assert.Equalf(t, string(tt.patch), string(patch), "doPatch(%v, %v, %v, %v)", tt.args.gvk, nil, tt.args.modified, tt.args.current)
+		})
+	}
+}
+
+func Test_doPatchStrategicMergePatch2way(t *testing.T) {
+	type args struct {
+		gvk      schema.GroupVersionKind
+		modified []byte
+		current  []byte
+	}
+	tests := []struct {
+		name      string
+		args      args
+		patchType types.PatchType
+		patch     []byte
+		wantErr   assert.ErrorAssertionFunc
+	}{
+		// 2-way Strategic Merge Patch
+		// expected behavior:
+		//  - no change between original, modified and current: nothing to do
+		//  - changed non-objects (primitive types and arrays) from modified to current: replace value
+		//  - changed objects from modified to current:
+		//    - if a key is in both modified and current but the corresponding value changed: replace value
+		//    - if a key is in modified but not current: add key
+		//    - if a key is not in modified but is in current: remove key
+		//  - if a patchStrategy tag is defined, it should be honored
+		{
+			name: "2wayEmptyMapNoChangesThenDoNothing",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBytes(map[string]string{}, t),
+				current:  toConfigMapBytes(map[string]string{}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte("{}"),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayFullMapNoChangesThenDoNothing",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBytes(map[string]string{"one": "one"}, t),
+				current:  toConfigMapBytes(map[string]string{"one": "one"}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte("{}"),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayPrimitiveChangedThenReplaceValue",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBytes(map[string]string{"one": "one"}, t),
+				current:  toConfigMapBytes(map[string]string{"one": "two"}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{"data":{"one":"one"}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayArrayChangedThenReplaceValue",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBinaryDataBytes(map[string][]byte{"one": {1}}, t),
+				current:  toConfigMapBinaryDataBytes(map[string][]byte{"one": {2, 3}}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{"binaryData":{"one":"AQ=="}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayObjectKeyInModifiedAndInCurrentThenReplaceValue",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBytes(map[string]string{"one": "one"}, t),
+				current:  toConfigMapBytes(map[string]string{"one": "two"}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{"data":{"one":"one"}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayObjectKeyInModifiedAndNotInCurrentThenAddKey",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBytes(map[string]string{"one": "one"}, t),
+				current:  toConfigMapBytes(map[string]string{}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{"data":{"one":"one"}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayObjectKeyNotInModifiedAndInCurrentThenRemoveKey",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBytes(map[string]string{}, t),
+				current:  toConfigMapBytes(map[string]string{"one": "one"}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{"data":null}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayPatchStrategyDefinedThenHonorIt",
+			args: args{
+				gvk: podGVK,
+				modified: toPodBytes([]v1.Volume{
+					{Name: "two"},
+					{Name: "three", VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "I am new"}}},
+				}, t),
+				current: toPodBytes([]v1.Volume{
+					{Name: "two", VolumeSource: v1.VolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "do not lose me"}}},
+					{Name: "four"},
+				}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{"spec":{"$setElementOrder/volumes":[{"name":"two"},{"name":"three"}],"volumes":[{"$retainKeys":["name"],"hostPath":null,"name":"two"},{"hostPath":{"path":"I am new"},"name":"three"},{"$patch":"delete","name":"four"}]}}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayNullNotInModifiedInCurrentThenDelete",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBinaryDataBytes(map[string][]byte{}, t),
+				current:  toConfigMapBinaryDataBytes(map[string][]byte{"a": nil}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{"binaryData":null}`),
+			wantErr:   assert.NoError,
+		},
+		{
+			name: "2wayNullInModifiedNotInCurrentThenNeedlesslyDelete",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBinaryDataBytes(map[string][]byte{"a": nil}, t),
+				current:  toConfigMapBinaryDataBytes(map[string][]byte{}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			// This is not really wanted, but tolerated.
+			// The patch deletes an "a" field that does not actually exist in current, it will do no harm but makes
+			// the patch non-empty, which could lead to apply cycles in controllers.
+			// OTOH, the JSON Merge Patch RFC explicitly states it
+			// is not meant to be used with null values:
+			// "This design means that merge patch documents are suitable for
+			//   describing modifications to JSON documents that primarily use objects
+			//   for their structure and do not make use of explicit null values.  The
+			//   merge patch format is not appropriate for all JSON syntaxes."
+			// from: https://tools.ietf.org/html/rfc7386#section-1
+			// Therefore this is undefined behavior, so it can't be treated as a bug.
+			patch:   []byte(`{"binaryData":{"a":null}}`),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "2wayNullInModifiedInCurrentThenDoNothing",
+			args: args{
+				gvk:      configMapGVK,
+				modified: toConfigMapBinaryDataBytes(map[string][]byte{"a": nil}, t),
+				current:  toConfigMapBinaryDataBytes(map[string][]byte{"a": nil}, t),
+			},
+			patchType: types.StrategicMergePatchType,
+			patch:     []byte(`{}`),
+			wantErr:   assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			patchType, patch, err := doPatch(tt.args.gvk, []byte{}, tt.args.modified, tt.args.current, [][]byte{}, true)
+			if !tt.wantErr(t, err, fmt.Sprintf("doPatch(%v, %v, %v, %v)", tt.args.gvk, []byte{}, tt.args.modified, tt.args.current)) {
+				return
+			}
+			assert.Equalf(t, tt.patchType, patchType, "doPatch(%v, %v, %v, %v)", tt.args.gvk, nil, tt.args.modified, tt.args.current)
+			assert.Equalf(t, string(tt.patch), string(patch), "doPatch(%v, %v, %v, %v)", tt.args.gvk, nil, tt.args.modified, tt.args.current)
 		})
 	}
 }
