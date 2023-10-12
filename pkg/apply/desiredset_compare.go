@@ -180,7 +180,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		return false, err
 	}
 
-	patchType, patch, err := doPatch(gvk, original, modified, current, diffPatches)
+	patchType, patch, err := doPatch(gvk, original, modified, current, diffPatches, fastApply)
 	if err != nil {
 		return false, errors.Wrap(err, "patch generation")
 	}
@@ -426,7 +426,7 @@ func stripIgnores(original, modified, current []byte, patches [][]byte) ([]byte,
 }
 
 // doPatch is adapted from "kubectl apply"
-func doPatch(gvk schema.GroupVersionKind, original, modified, current []byte, diffPatch [][]byte) (types.PatchType, []byte, error) {
+func doPatch(gvk schema.GroupVersionKind, original, modified, current []byte, diffPatch [][]byte, fastApply bool) (types.PatchType, []byte, error) {
 	var (
 		patchType types.PatchType
 		patch     []byte
@@ -442,10 +442,18 @@ func doPatch(gvk schema.GroupVersionKind, original, modified, current []byte, di
 		return patchType, nil, err
 	}
 
-	if patchType == types.StrategicMergePatchType {
-		patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, true)
+	if fastApply {
+		if patchType == types.StrategicMergePatchType {
+			patch, err = strategicpatch.CreateTwoWayMergePatchUsingLookupPatchMeta(current, modified, lookupPatchMeta)
+		} else {
+			patch, err = jsonpatch.CreateMergePatch(current, modified)
+		}
 	} else {
-		patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current)
+		if patchType == types.StrategicMergePatchType {
+			patch, err = strategicpatch.CreateThreeWayMergePatch(original, modified, current, lookupPatchMeta, true)
+		} else {
+			patch, err = jsonmergepatch.CreateThreeWayJSONMergePatch(original, modified, current)
+		}
 	}
 
 	if err != nil {
