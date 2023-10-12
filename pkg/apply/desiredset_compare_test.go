@@ -551,6 +551,74 @@ func Test_doPatchStrategicMergePatch3way(t *testing.T) {
 	}
 }
 
+func Test_sanitizePatch(t *testing.T) {
+	type args struct {
+		patch                     []byte
+		removeObjectSetAnnotation bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []byte
+		wantErr assert.ErrorAssertionFunc
+	}{
+		{
+			name: "EmptyPatch",
+			args: args{
+				patch:                     []byte(`{}`),
+				removeObjectSetAnnotation: false,
+			},
+			want:    []byte(`{}`),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "UnexpectedType",
+			args: args{
+				patch:                     []byte(`{1: "one"}`),
+				removeObjectSetAnnotation: false,
+			},
+			want:    nil,
+			wantErr: assert.Error,
+		},
+		{
+			name: "RemoveUnwantedFields",
+			args: args{
+				patch:                     []byte(`{"kind": "patched", "apiVersion": "patched", "status": "patched", "metadata": {"creationTimestamp": "patched", "preserve": "this"}, "preserve": "this too"}`),
+				removeObjectSetAnnotation: false,
+			},
+			want:    []byte(`{"metadata":{"preserve":"this"},"preserve":"this too"}`),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "RemoveObjectSetAnnotation",
+			args: args{
+				patch:                     []byte(`{"metadata": {"annotations": {"objectset.rio.cattle.io/test": "delete me"}}}`),
+				removeObjectSetAnnotation: true,
+			},
+			want:    []byte(`{}`),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "DoNotRemoveObjectSetAnnotation",
+			args: args{
+				patch:                     []byte(`{"metadata": {"annotations": {"objectset.rio.cattle.io/test": "do not delete me"}}}`),
+				removeObjectSetAnnotation: false,
+			},
+			want:    []byte(`{"metadata": {"annotations": {"objectset.rio.cattle.io/test": "do not delete me"}}}`),
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := sanitizePatch(tt.args.patch, tt.args.removeObjectSetAnnotation)
+			if !tt.wantErr(t, err, fmt.Sprintf("sanitizePatch(%v, %v)", tt.args.patch, tt.args.removeObjectSetAnnotation)) {
+				return
+			}
+			assert.Equalf(t, string(tt.want), string(got), "sanitizePatch(%v, %v)", tt.args.patch, tt.args.removeObjectSetAnnotation)
+		})
+	}
+}
+
 // Utilities
 
 // testCRDGVK is the GVK of a CustomResourceDefinition, which uses MergePatchType (because it is not registered)
