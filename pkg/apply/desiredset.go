@@ -3,10 +3,10 @@ package apply
 import (
 	"context"
 
-	"github.com/rancher/wrangler/pkg/apply/injectors"
-	"github.com/rancher/wrangler/pkg/kv"
-	"github.com/rancher/wrangler/pkg/merr"
-	"github.com/rancher/wrangler/pkg/objectset"
+	"github.com/rancher/wrangler/v2/pkg/apply/injectors"
+	"github.com/rancher/wrangler/v2/pkg/kv"
+	"github.com/rancher/wrangler/v2/pkg/merr"
+	"github.com/rancher/wrangler/v2/pkg/objectset"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	args2 "github.com/rancher/wrangler/pkg/controller-gen/args"
+	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -37,7 +37,11 @@ func (f *interfaceGo) Imports(context *generator.Context) []string {
 		if gv.Group != f.group {
 			continue
 		}
-		packages = append(packages, fmt.Sprintf("%s \"%s/controllers/%s/%s\"", gv.Version, f.customArgs.Package,
+		pkg := f.customArgs.ImportPackage
+		if pkg == "" {
+			pkg = f.customArgs.Package
+		}
+		packages = append(packages, fmt.Sprintf("%s \"%s/controllers/%s/%s\"", gv.Version, pkg,
 			groupPackageName(gv.Group, f.customArgs.Options.Groups[gv.Group].OutputControllerPackageName), gv.Version))
 	}
 
