@@ -268,7 +268,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 
 		reconciler = nil
 		patcher = func(namespace, name string, pt types2.PatchType, data []byte) (runtime.Object, error) {
-			data, err := sanitizePatch(data, true)
+			data, err := sanitizePatch(data, true, o.fastApply, o.replacingFields)
 			if err != nil {
 				return nil, err
 			}

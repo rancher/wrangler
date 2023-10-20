@@ -100,7 +100,7 @@ func emptyMaps(data map[string]interface{}, keys ...string) bool {
 	return true
 }
 
-func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error) {
+func sanitizePatch(patch []byte, removeObjectSetAnnotation bool, fastApply bool, replacingFields []string) ([]byte, error) {
 	mod := false
 	data := map[string]interface{}{}
 	err := json.Unmarshal(patch, &data)
@@ -144,6 +144,13 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 		}
 	}
 
+	if fastApply {
+		// no patch should ever delete fields unless replacingFields says so
+		// -> remove deletions from patch if they do not match replacingFields
+		removed := removeDeletionsFromPatch("", data, replacingFields)
+		mod = mod || removed
+	}
+
 	if emptyMaps(data, "metadata", "annotations") {
 		return []byte("{}"), nil
 	}
@@ -155,7 +162,75 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal, fastApply bool, diffPatches [][]byte, oldObject, newObject runtime.Object) (bool, error) {
+// hasPrefixIn returns true if any prefixes match s
+func hasPrefixIn(s string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(s, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// removeDeletionsFromPatch removes deletions from JSON Merge Patch or a Strategic Merge Patch, excluding exclusions
+// returns true if the patch was modified
+func removeDeletionsFromPatch(prefix string, data map[string]any, exclusions []string) bool {
+	modified := false
+
+	for field, value := range data {
+		excludedFromDeletion := hasPrefixIn(prefix+field, exclusions)
+
+		// delete JSON Merge Patch style deletions that should not be retained
+		// see https://datatracker.ietf.org/doc/html/rfc7386
+		if value == nil {
+			if !excludedFromDeletion {
+				delete(data, field)
+				modified = true
+				continue
+			}
+		}
+
+		// delete Strategic Merge Patch style deletions that should not be retained
+		// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-api-machinery/strategic-merge-patch.md#delete-directive
+		// if the field is not in the retaining map, remove it
+		if mapValue, ok := value.(map[string]any); ok {
+			if patchValue, ok := mapValue["$patch"]; ok {
+				if stringValue, ok := patchValue.(string); ok && stringValue == "delete" {
+					if !excludedFromDeletion {
+						delete(data, field)
+						modified = true
+						continue
+					}
+				}
+			}
+		}
+
+		// sub-fields of excluded fields are also excluded, skip to the next
+		if excludedFromDeletion {
+			continue
+		}
+
+		// else call recursively depending on value type
+		if mapValue, ok := value.(map[string]interface{}); ok {
+			// item is a map, recurse
+			mapModified := removeDeletionsFromPatch(prefix+field+".", mapValue, exclusions)
+			modified = modified || mapModified
+		} else if listValue, ok := value.([]interface{}); ok {
+			for _, item := range listValue {
+				// list item is an object, recurse
+				if mapValue, ok := item.(map[string]interface{}); ok {
+					mapModified := removeDeletionsFromPatch(prefix+field+".", mapValue, exclusions)
+					modified = modified || mapModified
+					continue
+				}
+			}
+		}
+	}
+
+	return modified
+}
+
+func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal, fastApply bool, replacingFields []string, diffPatches [][]byte, oldObject, newObject runtime.Object) (bool, error) {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
 		return false, err
@@ -189,7 +264,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 		return false, nil
 	}
 
-	patch, err = sanitizePatch(patch, false)
+	patch, err = sanitizePatch(patch, false, fastApply, replacingFields)
 	if err != nil {
 		return false, err
 	}
@@ -250,7 +325,7 @@ func (o *desiredSet) compareObjects(gvk schema.GroupVersionKind, reconciler Reco
 		GroupVersionKind: gvk,
 	}]...)
 
-	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, o.fastApply, diffPatches, oldObject, newObject); err != nil {
+	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, o.fastApply, o.replacingFields, diffPatches, oldObject, newObject); err != nil {
 		return err
 	} else if !ran {
 		logrus.Debugf("DesiredSet - No change(2) %s %s/%s for %s", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID)

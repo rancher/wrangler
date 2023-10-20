@@ -885,6 +885,8 @@ func Test_sanitizePatch(t *testing.T) {
 	type args struct {
 		patch                     []byte
 		removeObjectSetAnnotation bool
+		fastApply                 bool
+		replacingFields           []string
 	}
 	tests := []struct {
 		name    string
@@ -897,6 +899,7 @@ func Test_sanitizePatch(t *testing.T) {
 			args: args{
 				patch:                     []byte(`{}`),
 				removeObjectSetAnnotation: false,
+				replacingFields:           []string{},
 			},
 			want:    []byte(`{}`),
 			wantErr: assert.NoError,
@@ -906,6 +909,7 @@ func Test_sanitizePatch(t *testing.T) {
 			args: args{
 				patch:                     []byte(`{1: "one"}`),
 				removeObjectSetAnnotation: false,
+				replacingFields:           []string{},
 			},
 			want:    nil,
 			wantErr: assert.Error,
@@ -915,6 +919,7 @@ func Test_sanitizePatch(t *testing.T) {
 			args: args{
 				patch:                     []byte(`{"kind": "patched", "apiVersion": "patched", "status": "patched", "metadata": {"creationTimestamp": "patched", "preserve": "this"}, "preserve": "this too"}`),
 				removeObjectSetAnnotation: false,
+				replacingFields:           []string{},
 			},
 			want:    []byte(`{"metadata":{"preserve":"this"},"preserve":"this too"}`),
 			wantErr: assert.NoError,
@@ -924,6 +929,7 @@ func Test_sanitizePatch(t *testing.T) {
 			args: args{
 				patch:                     []byte(`{"metadata": {"annotations": {"objectset.rio.cattle.io/test": "delete me"}}}`),
 				removeObjectSetAnnotation: true,
+				replacingFields:           []string{},
 			},
 			want:    []byte(`{}`),
 			wantErr: assert.NoError,
@@ -933,18 +939,180 @@ func Test_sanitizePatch(t *testing.T) {
 			args: args{
 				patch:                     []byte(`{"metadata": {"annotations": {"objectset.rio.cattle.io/test": "do not delete me"}}}`),
 				removeObjectSetAnnotation: false,
+				replacingFields:           []string{},
 			},
 			want:    []byte(`{"metadata": {"annotations": {"objectset.rio.cattle.io/test": "do not delete me"}}}`),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "RemoveJSONPatchDeletions",
+			args: args{
+				patch:                     []byte(`{"a":{"b":[{"c":[{"d":null},{"e":null},{"f":"leave f alone"}]}]},"z":"leave z alone"}`),
+				removeObjectSetAnnotation: true,
+				fastApply:                 true,
+				replacingFields:           []string{"a.b.c.e", "a.b.c.f"},
+			},
+			want:    []byte(`{"a":{"b":[{"c":[{},{"e":null},{"f":"leave f alone"}]}]},"z":"leave z alone"}`),
+			wantErr: assert.NoError,
+		},
+		{
+			name: "RemoveStrategicPatchDeletions",
+			args: args{
+				patch:                     []byte(`{"a":{"b":[{"c":[{"d":{"$patch": "delete"}},{"e":{"$patch": "delete"}},{"f":"leave f alone"}]}]},"z":"leave z alone"}`),
+				removeObjectSetAnnotation: true,
+				fastApply:                 true,
+				replacingFields:           []string{"a.b.c.e", "a.b.c.f"},
+			},
+			want:    []byte(`{"a":{"b":[{"c":[{},{"e":{"$patch":"delete"}},{"f":"leave f alone"}]}]},"z":"leave z alone"}`),
 			wantErr: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := sanitizePatch(tt.args.patch, tt.args.removeObjectSetAnnotation)
+			got, err := sanitizePatch(tt.args.patch, tt.args.removeObjectSetAnnotation, tt.args.fastApply, tt.args.replacingFields)
 			if !tt.wantErr(t, err, fmt.Sprintf("sanitizePatch(%v, %v)", tt.args.patch, tt.args.removeObjectSetAnnotation)) {
 				return
 			}
 			assert.Equalf(t, string(tt.want), string(got), "sanitizePatch(%v, %v)", tt.args.patch, tt.args.removeObjectSetAnnotation)
+		})
+	}
+}
+
+func Test_removeDeletionsFromPatch(t *testing.T) {
+	type args struct {
+		data      string
+		retaining []string
+	}
+	tests := []struct {
+		name         string
+		args         args
+		modified     bool
+		modifiedData string
+	}{
+		{
+			name: "JSONMergePatchNonExistingField",
+			args: args{
+				data:      `{"a":"z","c":"d"}`,
+				retaining: []string{"containers"},
+			},
+			modified:     false,
+			modifiedData: `{"a":"z","c":"d"}`,
+		},
+		{
+			name: "JSONMergePatchNonExistingFieldWithDeletion",
+			args: args{
+				data:      `{"a":"z","c": {"f": null}}`,
+				retaining: []string{"containers"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c":{}}`,
+		},
+		{
+			name: "JSONMergePatchRetainDeletion",
+			args: args{
+				data:      `{"a":"z","c":{"f": null}}`,
+				retaining: []string{"c.f"},
+			},
+			modified:     false,
+			modifiedData: `{"a":"z","c":{"f":null}}`,
+		},
+		{
+			name: "JSONMergePatchRetainDeletionRecursively",
+			args: args{
+				data:      `{"a":"z","c":{"f": null}}`,
+				retaining: []string{"c"},
+			},
+			modified:     false,
+			modifiedData: `{"a":"z","c":{"f":null}}`,
+		},
+		{
+			name: "JSONMergePatchDeleteDeletion",
+			args: args{
+				data:      `{"a":"z","c":{"f":null}}`,
+				retaining: []string{"a"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c":{}}`,
+		},
+		{
+			name: "JSONMergePatchDeleteDeletionWithOverspecificRetaining",
+			args: args{
+				data:      `{"a":"z","c":{"f":null}}`,
+				retaining: []string{"a", "c.f.blabla"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c":{}}`,
+		},
+		{
+			name: "JSONMergePatchDeleteFromArrayField",
+			args: args{
+				data:      `{"a":"z","c": [{"f": null}, {"g": null}]}`,
+				retaining: []string{"a", "c.g", "c.f.h"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c": [{},{"g": null}]}`,
+		},
+
+		{
+			name: "JSONStrategicMergePatchNonExistingFieldWithDeletion",
+			args: args{
+				data:      `{"a":"z","c":{"f":{"$patch": "delete"}}}`,
+				retaining: []string{"containers"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c":{}}`,
+		},
+		{
+			name: "JSONMergePatchRetainDeletion",
+			args: args{
+				data:      `{"a":"z","c":{"f":{"$patch":"delete"}}}`,
+				retaining: []string{"c.f"},
+			},
+			modifiedData: `{"a":"z","c":{"f":{"$patch":"delete"}}}`,
+		},
+		{
+			name: "JSONMergePatchRetainDeletionRecursively",
+			args: args{
+				data:      `{"a":"z","c":{"f":{"$patch":"delete"}}}`,
+				retaining: []string{"c"},
+			},
+			modifiedData: `{"a":"z","c":{"f":{"$patch":"delete"}}}`,
+		},
+		{
+			name: "JSONStrategicMergePatchDeleteDeletion",
+			args: args{
+				data:      `{"a":"z","c": {"f": {"$patch": "delete"}}}`,
+				retaining: []string{"a"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c":{}}`,
+		},
+		{
+			name: "JSONStrategicMergePatchDeleteDeletionWithOverspecificRetaining",
+			args: args{
+				data:      `{"a":"z","c":{"f":{"$patch":"delete"}}}`,
+				retaining: []string{"a", "c.f.blabla"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c":{}}`,
+		},
+		{
+			name: "JSONStrategicMergePatchDeleteFromArrayField",
+			args: args{
+				data:      `{"a":"z","c": [{"f": {"$patch": "delete"}}, {"g": {"$patch": "delete"}}]}`,
+				retaining: []string{"a", "c.g", "c.f.h"},
+			},
+			modified:     true,
+			modifiedData: `{"a":"z","c": [{},{"g": {"$patch": "delete"}}]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := toMap(tt.args.data, t)
+			assert.Equalf(t, tt.modified, removeDeletionsFromPatch("", data, tt.args.retaining), "removeDeletionsFromPatch(%v, %v)", data, tt.args.retaining)
+
+			modifiedData := toMap(tt.modifiedData, t)
+			assert.Equalf(t, modifiedData, data, "removeDeletionsFromPatch(%v, %v)", data, tt.args.retaining)
 		})
 	}
 }
@@ -975,6 +1143,17 @@ func toBytes(obj any, t *testing.T) []byte {
 		t.Fatalf("failed to marshal %v: %v", obj, err)
 	}
 	return res
+}
+
+// toMap converts a JSON string to a map
+func toMap(data string, t *testing.T) map[string]any {
+	t.Helper()
+	var obj map[string]any
+	err := json.Unmarshal([]byte(data), &obj)
+	if err != nil {
+		t.Fatalf("failed to unmarshal %v: %v", data, err)
+	}
+	return obj
 }
 
 // configMapGVK is the GVK of a ConfigMap, which uses StrategicMergePatchType
