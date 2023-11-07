@@ -173,10 +173,11 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 
 type {{.lowerName}}GeneratingHandler struct {
 	{{.type}}GeneratingHandler
-	apply apply.Apply
-	opts  generic.GeneratingHandlerOptions
-	gvk   schema.GroupVersionKind
-	name  string
+	apply      apply.Apply
+	opts       generic.GeneratingHandlerOptions
+	gvk        schema.GroupVersionKind
+	name       string
+	seen       sync.Map
 }
 
 func (a *{{.lowerName}}GeneratingHandler) Remove(key string, obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
@@ -187,6 +188,10 @@ func (a *{{.lowerName}}GeneratingHandler) Remove(key string, obj *{{.version}}.{
 	obj = &{{.version}}.{{.type}}{}
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
+
+	if a.opts.UniqueApplyForResourceVersion {
+		a.seen.Delete(key)
+	}
 
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
@@ -200,14 +205,38 @@ func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, st
 	}
 
 	objs, newStatus, err := a.{{.type}}GeneratingHandler(obj, status)
-	if err != nil {
+	if err != nil || !a.isNewResourceVersion(obj) {
 		return newStatus, err
 	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
+	if err == nil {
+		a.seenResourceVersion(obj)
+	}
+	return newStatus, err
+}
+
+func (a *{{.lowerName}}GeneratingHandler) isNewResourceVersion(obj *{{.version}}.{{.type}}) bool {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return true
+	}
+
+	// Apply once per resource version
+	key := obj.Namespace + "/" + obj.Name
+	previous, ok := a.seen.Load(key)
+	return !ok || previous != obj.ResourceVersion
+}
+
+func (a *{{.lowerName}}GeneratingHandler) seenResourceVersion(obj *{{.version}}.{{.type}}) {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return
+	}
+
+	key := obj.Namespace + "/" + obj.Name
+	a.seen.Store(key, obj.ResourceVersion)
 }
 {{- end }}
 `
