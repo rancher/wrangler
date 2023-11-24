@@ -20,6 +20,7 @@ package v1
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/rancher/wrangler/v2/pkg/apply"
@@ -127,6 +128,7 @@ type serviceGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
+	seen  sync.Map
 }
 
 func (a *serviceGeneratingHandler) Remove(key string, obj *v1.Service) (*v1.Service, error) {
@@ -137,6 +139,10 @@ func (a *serviceGeneratingHandler) Remove(key string, obj *v1.Service) (*v1.Serv
 	obj = &v1.Service{}
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
+
+	if a.opts.UniqueApplyForResourceVersion {
+		a.seen.Delete(key)
+	}
 
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
@@ -150,12 +156,36 @@ func (a *serviceGeneratingHandler) Handle(obj *v1.Service, status v1.ServiceStat
 	}
 
 	objs, newStatus, err := a.ServiceGeneratingHandler(obj, status)
-	if err != nil {
+	if err != nil || !a.isNewResourceVersion(obj) {
 		return newStatus, err
 	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
+	if err == nil {
+		a.seenResourceVersion(obj)
+	}
+	return newStatus, err
+}
+
+func (a *serviceGeneratingHandler) isNewResourceVersion(obj *v1.Service) bool {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return true
+	}
+
+	// Apply once per resource version
+	key := obj.Namespace + "/" + obj.Name
+	previous, ok := a.seen.Load(key)
+	return !ok || previous != obj.ResourceVersion
+}
+
+func (a *serviceGeneratingHandler) seenResourceVersion(obj *v1.Service) {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return
+	}
+
+	key := obj.Namespace + "/" + obj.Name
+	a.seen.Store(key, obj.ResourceVersion)
 }

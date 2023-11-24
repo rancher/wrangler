@@ -20,6 +20,7 @@ package v1beta1
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/rancher/wrangler/v2/pkg/apply"
@@ -127,6 +128,7 @@ type ingressGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
+	seen  sync.Map
 }
 
 func (a *ingressGeneratingHandler) Remove(key string, obj *v1beta1.Ingress) (*v1beta1.Ingress, error) {
@@ -137,6 +139,10 @@ func (a *ingressGeneratingHandler) Remove(key string, obj *v1beta1.Ingress) (*v1
 	obj = &v1beta1.Ingress{}
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
+
+	if a.opts.UniqueApplyForResourceVersion {
+		a.seen.Delete(key)
+	}
 
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
@@ -150,12 +156,36 @@ func (a *ingressGeneratingHandler) Handle(obj *v1beta1.Ingress, status v1beta1.I
 	}
 
 	objs, newStatus, err := a.IngressGeneratingHandler(obj, status)
-	if err != nil {
+	if err != nil || !a.isNewResourceVersion(obj) {
 		return newStatus, err
 	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
+	if err == nil {
+		a.seenResourceVersion(obj)
+	}
+	return newStatus, err
+}
+
+func (a *ingressGeneratingHandler) isNewResourceVersion(obj *v1beta1.Ingress) bool {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return true
+	}
+
+	// Apply once per resource version
+	key := obj.Namespace + "/" + obj.Name
+	previous, ok := a.seen.Load(key)
+	return !ok || previous != obj.ResourceVersion
+}
+
+func (a *ingressGeneratingHandler) seenResourceVersion(obj *v1beta1.Ingress) {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return
+	}
+
+	key := obj.Namespace + "/" + obj.Name
+	a.seen.Store(key, obj.ResourceVersion)
 }
