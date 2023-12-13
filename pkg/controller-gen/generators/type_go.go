@@ -219,7 +219,7 @@ func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, st
 	if err != nil {
 		return newStatus, err
 	}
-	a.seenResourceVersion(obj)
+	a.storeResourceVersion(obj)
 	return newStatus, nil
 }
 
@@ -234,7 +234,7 @@ func (a *{{.lowerName}}GeneratingHandler) isNewResourceVersion(obj *{{.version}}
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *{{.lowerName}}GeneratingHandler) seenResourceVersion(obj *{{.version}}.{{.type}}) {
+func (a *{{.lowerName}}GeneratingHandler) storeResourceVersion(obj *{{.version}}.{{.type}}) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}
