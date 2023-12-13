@@ -213,10 +213,11 @@ func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, st
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.seenResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *{{.lowerName}}GeneratingHandler) isNewResourceVersion(obj *{{.version}}.{{.type}}) bool {
