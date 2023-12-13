@@ -17,7 +17,7 @@ import (
 )
 
 func TestUniqueApplyForResourceVersion(t *testing.T) {
-	const n = 3
+	const numOfHandlerCalls = 3
 	type args struct {
 		opts *generic.GeneratingHandlerOptions
 	}
@@ -31,7 +31,7 @@ func TestUniqueApplyForResourceVersion(t *testing.T) {
 			args: args{
 				opts: &generic.GeneratingHandlerOptions{UniqueApplyForResourceVersion: false},
 			},
-			expectedApplyCount: n,
+			expectedApplyCount: numOfHandlerCalls,
 		},
 		{
 			name: "enabled",
@@ -59,7 +59,7 @@ func TestUniqueApplyForResourceVersion(t *testing.T) {
 				},
 			}
 			key := service.Namespace + "/" + service.Name
-			for i := 0; i < n; i++ {
+			for i := 0; i < numOfHandlerCalls; i++ {
 				if _, err := h(key, service); err != nil {
 					t.Error(err)
 				}
