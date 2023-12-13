@@ -156,18 +156,22 @@ func (a *nodeGeneratingHandler) Handle(obj *v1.Node, status v1.NodeStatus) (v1.N
 	}
 
 	objs, newStatus, err := a.NodeGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *nodeGeneratingHandler) isNewResourceVersion(obj *v1.Node) bool {
@@ -181,7 +185,7 @@ func (a *nodeGeneratingHandler) isNewResourceVersion(obj *v1.Node) bool {
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *nodeGeneratingHandler) seenResourceVersion(obj *v1.Node) {
+func (a *nodeGeneratingHandler) storeResourceVersion(obj *v1.Node) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

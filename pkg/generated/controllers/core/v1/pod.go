@@ -156,18 +156,22 @@ func (a *podGeneratingHandler) Handle(obj *v1.Pod, status v1.PodStatus) (v1.PodS
 	}
 
 	objs, newStatus, err := a.PodGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *podGeneratingHandler) isNewResourceVersion(obj *v1.Pod) bool {
@@ -181,7 +185,7 @@ func (a *podGeneratingHandler) isNewResourceVersion(obj *v1.Pod) bool {
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *podGeneratingHandler) seenResourceVersion(obj *v1.Pod) {
+func (a *podGeneratingHandler) storeResourceVersion(obj *v1.Pod) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

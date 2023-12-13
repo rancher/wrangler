@@ -156,18 +156,22 @@ func (a *daemonSetGeneratingHandler) Handle(obj *v1.DaemonSet, status v1.DaemonS
 	}
 
 	objs, newStatus, err := a.DaemonSetGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *daemonSetGeneratingHandler) isNewResourceVersion(obj *v1.DaemonSet) bool {
@@ -181,7 +185,7 @@ func (a *daemonSetGeneratingHandler) isNewResourceVersion(obj *v1.DaemonSet) boo
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *daemonSetGeneratingHandler) seenResourceVersion(obj *v1.DaemonSet) {
+func (a *daemonSetGeneratingHandler) storeResourceVersion(obj *v1.DaemonSet) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

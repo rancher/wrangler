@@ -156,18 +156,22 @@ func (a *statefulSetGeneratingHandler) Handle(obj *v1.StatefulSet, status v1.Sta
 	}
 
 	objs, newStatus, err := a.StatefulSetGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *statefulSetGeneratingHandler) isNewResourceVersion(obj *v1.StatefulSet) bool {
@@ -181,7 +185,7 @@ func (a *statefulSetGeneratingHandler) isNewResourceVersion(obj *v1.StatefulSet)
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *statefulSetGeneratingHandler) seenResourceVersion(obj *v1.StatefulSet) {
+func (a *statefulSetGeneratingHandler) storeResourceVersion(obj *v1.StatefulSet) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

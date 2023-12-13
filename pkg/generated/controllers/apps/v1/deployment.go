@@ -156,18 +156,22 @@ func (a *deploymentGeneratingHandler) Handle(obj *v1.Deployment, status v1.Deplo
 	}
 
 	objs, newStatus, err := a.DeploymentGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *deploymentGeneratingHandler) isNewResourceVersion(obj *v1.Deployment) bool {
@@ -181,7 +185,7 @@ func (a *deploymentGeneratingHandler) isNewResourceVersion(obj *v1.Deployment) b
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *deploymentGeneratingHandler) seenResourceVersion(obj *v1.Deployment) {
+func (a *deploymentGeneratingHandler) storeResourceVersion(obj *v1.Deployment) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

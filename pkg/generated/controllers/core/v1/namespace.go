@@ -156,18 +156,22 @@ func (a *namespaceGeneratingHandler) Handle(obj *v1.Namespace, status v1.Namespa
 	}
 
 	objs, newStatus, err := a.NamespaceGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *namespaceGeneratingHandler) isNewResourceVersion(obj *v1.Namespace) bool {
@@ -181,7 +185,7 @@ func (a *namespaceGeneratingHandler) isNewResourceVersion(obj *v1.Namespace) boo
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *namespaceGeneratingHandler) seenResourceVersion(obj *v1.Namespace) {
+func (a *namespaceGeneratingHandler) storeResourceVersion(obj *v1.Namespace) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

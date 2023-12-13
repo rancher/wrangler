@@ -156,18 +156,22 @@ func (a *jobGeneratingHandler) Handle(obj *v1.Job, status v1.JobStatus) (v1.JobS
 	}
 
 	objs, newStatus, err := a.JobGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *jobGeneratingHandler) isNewResourceVersion(obj *v1.Job) bool {
@@ -181,7 +185,7 @@ func (a *jobGeneratingHandler) isNewResourceVersion(obj *v1.Job) bool {
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *jobGeneratingHandler) seenResourceVersion(obj *v1.Job) {
+func (a *jobGeneratingHandler) storeResourceVersion(obj *v1.Job) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

@@ -156,18 +156,22 @@ func (a *aPIServiceGeneratingHandler) Handle(obj *v1.APIService, status v1.APISe
 	}
 
 	objs, newStatus, err := a.APIServiceGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *aPIServiceGeneratingHandler) isNewResourceVersion(obj *v1.APIService) bool {
@@ -181,7 +185,7 @@ func (a *aPIServiceGeneratingHandler) isNewResourceVersion(obj *v1.APIService) b
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *aPIServiceGeneratingHandler) seenResourceVersion(obj *v1.APIService) {
+func (a *aPIServiceGeneratingHandler) storeResourceVersion(obj *v1.APIService) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

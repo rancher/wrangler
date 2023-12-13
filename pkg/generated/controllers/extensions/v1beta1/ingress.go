@@ -156,18 +156,22 @@ func (a *ingressGeneratingHandler) Handle(obj *v1beta1.Ingress, status v1beta1.I
 	}
 
 	objs, newStatus, err := a.IngressGeneratingHandler(obj, status)
-	if err != nil || !a.isNewResourceVersion(obj) {
+	if err != nil {
 		return newStatus, err
+	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
 	}
 
 	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
-	if err == nil {
-		a.seenResourceVersion(obj)
+	if err != nil {
+		return newStatus, err
 	}
-	return newStatus, err
+	a.storeResourceVersion(obj)
+	return newStatus, nil
 }
 
 func (a *ingressGeneratingHandler) isNewResourceVersion(obj *v1beta1.Ingress) bool {
@@ -181,7 +185,7 @@ func (a *ingressGeneratingHandler) isNewResourceVersion(obj *v1beta1.Ingress) bo
 	return !ok || previous != obj.ResourceVersion
 }
 
-func (a *ingressGeneratingHandler) seenResourceVersion(obj *v1beta1.Ingress) {
+func (a *ingressGeneratingHandler) storeResourceVersion(obj *v1beta1.Ingress) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}
