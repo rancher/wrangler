@@ -49,10 +49,14 @@ type DaemonSetCache interface {
 	generic.CacheInterface[*v1.DaemonSet]
 }
 
+// DaemonSetStatusHandler is executed for every added or modified DaemonSet. Should return the new status to be updated
 type DaemonSetStatusHandler func(obj *v1.DaemonSet, status v1.DaemonSetStatus) (v1.DaemonSetStatus, error)
 
+// DaemonSetGeneratingHandler is the top-level handler that is executed for every DaemonSet event. It extends DaemonSetStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type DaemonSetGeneratingHandler func(obj *v1.DaemonSet, status v1.DaemonSetStatus) ([]runtime.Object, v1.DaemonSetStatus, error)
 
+// RegisterDaemonSetStatusHandler configures a DaemonSetController to execute a DaemonSetStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterDaemonSetStatusHandler(ctx context.Context, controller DaemonSetController, condition condition.Cond, name string, handler DaemonSetStatusHandler) {
 	statusHandler := &daemonSetStatusHandler{
 		client:    controller,
@@ -62,6 +66,8 @@ func RegisterDaemonSetStatusHandler(ctx context.Context, controller DaemonSetCon
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterDaemonSetGeneratingHandler configures a DaemonSetController to execute a DaemonSetGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterDaemonSetGeneratingHandler(ctx context.Context, controller DaemonSetController, apply apply.Apply,
 	condition condition.Cond, name string, handler DaemonSetGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &daemonSetGeneratingHandler{
@@ -83,6 +89,7 @@ type daemonSetStatusHandler struct {
 	handler   DaemonSetStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *daemonSetStatusHandler) sync(key string, obj *v1.DaemonSet) (*v1.DaemonSet, error) {
 	if obj == nil {
 		return obj, nil
@@ -131,6 +138,7 @@ type daemonSetGeneratingHandler struct {
 	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *daemonSetGeneratingHandler) Remove(key string, obj *v1.DaemonSet) (*v1.DaemonSet, error) {
 	if obj != nil {
 		return obj, nil
@@ -150,6 +158,7 @@ func (a *daemonSetGeneratingHandler) Remove(key string, obj *v1.DaemonSet) (*v1.
 		ApplyObjects()
 }
 
+// Handle executes the configured DaemonSetGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *daemonSetGeneratingHandler) Handle(obj *v1.DaemonSet, status v1.DaemonSetStatus) (v1.DaemonSetStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -174,6 +183,8 @@ func (a *daemonSetGeneratingHandler) Handle(obj *v1.DaemonSet, status v1.DaemonS
 	return newStatus, nil
 }
 
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *daemonSetGeneratingHandler) isNewResourceVersion(obj *v1.DaemonSet) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
@@ -185,6 +196,8 @@ func (a *daemonSetGeneratingHandler) isNewResourceVersion(obj *v1.DaemonSet) boo
 	return !ok || previous != obj.ResourceVersion
 }
 
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *daemonSetGeneratingHandler) storeResourceVersion(obj *v1.DaemonSet) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return

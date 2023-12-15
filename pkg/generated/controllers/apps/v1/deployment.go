@@ -49,10 +49,14 @@ type DeploymentCache interface {
 	generic.CacheInterface[*v1.Deployment]
 }
 
+// DeploymentStatusHandler is executed for every added or modified Deployment. Should return the new status to be updated
 type DeploymentStatusHandler func(obj *v1.Deployment, status v1.DeploymentStatus) (v1.DeploymentStatus, error)
 
+// DeploymentGeneratingHandler is the top-level handler that is executed for every Deployment event. It extends DeploymentStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type DeploymentGeneratingHandler func(obj *v1.Deployment, status v1.DeploymentStatus) ([]runtime.Object, v1.DeploymentStatus, error)
 
+// RegisterDeploymentStatusHandler configures a DeploymentController to execute a DeploymentStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterDeploymentStatusHandler(ctx context.Context, controller DeploymentController, condition condition.Cond, name string, handler DeploymentStatusHandler) {
 	statusHandler := &deploymentStatusHandler{
 		client:    controller,
@@ -62,6 +66,8 @@ func RegisterDeploymentStatusHandler(ctx context.Context, controller DeploymentC
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterDeploymentGeneratingHandler configures a DeploymentController to execute a DeploymentGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterDeploymentGeneratingHandler(ctx context.Context, controller DeploymentController, apply apply.Apply,
 	condition condition.Cond, name string, handler DeploymentGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &deploymentGeneratingHandler{
@@ -83,6 +89,7 @@ type deploymentStatusHandler struct {
 	handler   DeploymentStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *deploymentStatusHandler) sync(key string, obj *v1.Deployment) (*v1.Deployment, error) {
 	if obj == nil {
 		return obj, nil
@@ -131,6 +138,7 @@ type deploymentGeneratingHandler struct {
 	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *deploymentGeneratingHandler) Remove(key string, obj *v1.Deployment) (*v1.Deployment, error) {
 	if obj != nil {
 		return obj, nil
@@ -150,6 +158,7 @@ func (a *deploymentGeneratingHandler) Remove(key string, obj *v1.Deployment) (*v
 		ApplyObjects()
 }
 
+// Handle executes the configured DeploymentGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *deploymentGeneratingHandler) Handle(obj *v1.Deployment, status v1.DeploymentStatus) (v1.DeploymentStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -174,6 +183,8 @@ func (a *deploymentGeneratingHandler) Handle(obj *v1.Deployment, status v1.Deplo
 	return newStatus, nil
 }
 
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *deploymentGeneratingHandler) isNewResourceVersion(obj *v1.Deployment) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
@@ -185,6 +196,8 @@ func (a *deploymentGeneratingHandler) isNewResourceVersion(obj *v1.Deployment) b
 	return !ok || previous != obj.ResourceVersion
 }
 
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *deploymentGeneratingHandler) storeResourceVersion(obj *v1.Deployment) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return

@@ -49,10 +49,14 @@ type JobCache interface {
 	generic.CacheInterface[*v1.Job]
 }
 
+// JobStatusHandler is executed for every added or modified Job. Should return the new status to be updated
 type JobStatusHandler func(obj *v1.Job, status v1.JobStatus) (v1.JobStatus, error)
 
+// JobGeneratingHandler is the top-level handler that is executed for every Job event. It extends JobStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type JobGeneratingHandler func(obj *v1.Job, status v1.JobStatus) ([]runtime.Object, v1.JobStatus, error)
 
+// RegisterJobStatusHandler configures a JobController to execute a JobStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterJobStatusHandler(ctx context.Context, controller JobController, condition condition.Cond, name string, handler JobStatusHandler) {
 	statusHandler := &jobStatusHandler{
 		client:    controller,
@@ -62,6 +66,8 @@ func RegisterJobStatusHandler(ctx context.Context, controller JobController, con
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterJobGeneratingHandler configures a JobController to execute a JobGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterJobGeneratingHandler(ctx context.Context, controller JobController, apply apply.Apply,
 	condition condition.Cond, name string, handler JobGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &jobGeneratingHandler{
@@ -83,6 +89,7 @@ type jobStatusHandler struct {
 	handler   JobStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *jobStatusHandler) sync(key string, obj *v1.Job) (*v1.Job, error) {
 	if obj == nil {
 		return obj, nil
@@ -131,6 +138,7 @@ type jobGeneratingHandler struct {
 	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *jobGeneratingHandler) Remove(key string, obj *v1.Job) (*v1.Job, error) {
 	if obj != nil {
 		return obj, nil
@@ -150,6 +158,7 @@ func (a *jobGeneratingHandler) Remove(key string, obj *v1.Job) (*v1.Job, error) 
 		ApplyObjects()
 }
 
+// Handle executes the configured JobGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *jobGeneratingHandler) Handle(obj *v1.Job, status v1.JobStatus) (v1.JobStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -174,6 +183,8 @@ func (a *jobGeneratingHandler) Handle(obj *v1.Job, status v1.JobStatus) (v1.JobS
 	return newStatus, nil
 }
 
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *jobGeneratingHandler) isNewResourceVersion(obj *v1.Job) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
@@ -185,6 +196,8 @@ func (a *jobGeneratingHandler) isNewResourceVersion(obj *v1.Job) bool {
 	return !ok || previous != obj.ResourceVersion
 }
 
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *jobGeneratingHandler) storeResourceVersion(obj *v1.Job) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return

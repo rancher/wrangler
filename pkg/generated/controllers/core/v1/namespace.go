@@ -49,10 +49,14 @@ type NamespaceCache interface {
 	generic.NonNamespacedCacheInterface[*v1.Namespace]
 }
 
+// NamespaceStatusHandler is executed for every added or modified Namespace. Should return the new status to be updated
 type NamespaceStatusHandler func(obj *v1.Namespace, status v1.NamespaceStatus) (v1.NamespaceStatus, error)
 
+// NamespaceGeneratingHandler is the top-level handler that is executed for every Namespace event. It extends NamespaceStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type NamespaceGeneratingHandler func(obj *v1.Namespace, status v1.NamespaceStatus) ([]runtime.Object, v1.NamespaceStatus, error)
 
+// RegisterNamespaceStatusHandler configures a NamespaceController to execute a NamespaceStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterNamespaceStatusHandler(ctx context.Context, controller NamespaceController, condition condition.Cond, name string, handler NamespaceStatusHandler) {
 	statusHandler := &namespaceStatusHandler{
 		client:    controller,
@@ -62,6 +66,8 @@ func RegisterNamespaceStatusHandler(ctx context.Context, controller NamespaceCon
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterNamespaceGeneratingHandler configures a NamespaceController to execute a NamespaceGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterNamespaceGeneratingHandler(ctx context.Context, controller NamespaceController, apply apply.Apply,
 	condition condition.Cond, name string, handler NamespaceGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &namespaceGeneratingHandler{
@@ -83,6 +89,7 @@ type namespaceStatusHandler struct {
 	handler   NamespaceStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *namespaceStatusHandler) sync(key string, obj *v1.Namespace) (*v1.Namespace, error) {
 	if obj == nil {
 		return obj, nil
@@ -131,6 +138,7 @@ type namespaceGeneratingHandler struct {
 	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *namespaceGeneratingHandler) Remove(key string, obj *v1.Namespace) (*v1.Namespace, error) {
 	if obj != nil {
 		return obj, nil
@@ -150,6 +158,7 @@ func (a *namespaceGeneratingHandler) Remove(key string, obj *v1.Namespace) (*v1.
 		ApplyObjects()
 }
 
+// Handle executes the configured NamespaceGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *namespaceGeneratingHandler) Handle(obj *v1.Namespace, status v1.NamespaceStatus) (v1.NamespaceStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -174,6 +183,8 @@ func (a *namespaceGeneratingHandler) Handle(obj *v1.Namespace, status v1.Namespa
 	return newStatus, nil
 }
 
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *namespaceGeneratingHandler) isNewResourceVersion(obj *v1.Namespace) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
@@ -185,6 +196,8 @@ func (a *namespaceGeneratingHandler) isNewResourceVersion(obj *v1.Namespace) boo
 	return !ok || previous != obj.ResourceVersion
 }
 
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *namespaceGeneratingHandler) storeResourceVersion(obj *v1.Namespace) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return

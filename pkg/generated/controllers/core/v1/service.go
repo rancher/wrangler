@@ -49,10 +49,14 @@ type ServiceCache interface {
 	generic.CacheInterface[*v1.Service]
 }
 
+// ServiceStatusHandler is executed for every added or modified Service. Should return the new status to be updated
 type ServiceStatusHandler func(obj *v1.Service, status v1.ServiceStatus) (v1.ServiceStatus, error)
 
+// ServiceGeneratingHandler is the top-level handler that is executed for every Service event. It extends ServiceStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type ServiceGeneratingHandler func(obj *v1.Service, status v1.ServiceStatus) ([]runtime.Object, v1.ServiceStatus, error)
 
+// RegisterServiceStatusHandler configures a ServiceController to execute a ServiceStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterServiceStatusHandler(ctx context.Context, controller ServiceController, condition condition.Cond, name string, handler ServiceStatusHandler) {
 	statusHandler := &serviceStatusHandler{
 		client:    controller,
@@ -62,6 +66,8 @@ func RegisterServiceStatusHandler(ctx context.Context, controller ServiceControl
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterServiceGeneratingHandler configures a ServiceController to execute a ServiceGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterServiceGeneratingHandler(ctx context.Context, controller ServiceController, apply apply.Apply,
 	condition condition.Cond, name string, handler ServiceGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &serviceGeneratingHandler{
@@ -83,6 +89,7 @@ type serviceStatusHandler struct {
 	handler   ServiceStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *serviceStatusHandler) sync(key string, obj *v1.Service) (*v1.Service, error) {
 	if obj == nil {
 		return obj, nil
@@ -131,6 +138,7 @@ type serviceGeneratingHandler struct {
 	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *serviceGeneratingHandler) Remove(key string, obj *v1.Service) (*v1.Service, error) {
 	if obj != nil {
 		return obj, nil
@@ -150,6 +158,7 @@ func (a *serviceGeneratingHandler) Remove(key string, obj *v1.Service) (*v1.Serv
 		ApplyObjects()
 }
 
+// Handle executes the configured ServiceGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *serviceGeneratingHandler) Handle(obj *v1.Service, status v1.ServiceStatus) (v1.ServiceStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -174,6 +183,8 @@ func (a *serviceGeneratingHandler) Handle(obj *v1.Service, status v1.ServiceStat
 	return newStatus, nil
 }
 
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *serviceGeneratingHandler) isNewResourceVersion(obj *v1.Service) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
@@ -185,6 +196,8 @@ func (a *serviceGeneratingHandler) isNewResourceVersion(obj *v1.Service) bool {
 	return !ok || previous != obj.ResourceVersion
 }
 
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *serviceGeneratingHandler) storeResourceVersion(obj *v1.Service) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return

@@ -49,10 +49,14 @@ type StatefulSetCache interface {
 	generic.CacheInterface[*v1.StatefulSet]
 }
 
+// StatefulSetStatusHandler is executed for every added or modified StatefulSet. Should return the new status to be updated
 type StatefulSetStatusHandler func(obj *v1.StatefulSet, status v1.StatefulSetStatus) (v1.StatefulSetStatus, error)
 
+// StatefulSetGeneratingHandler is the top-level handler that is executed for every StatefulSet event. It extends StatefulSetStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type StatefulSetGeneratingHandler func(obj *v1.StatefulSet, status v1.StatefulSetStatus) ([]runtime.Object, v1.StatefulSetStatus, error)
 
+// RegisterStatefulSetStatusHandler configures a StatefulSetController to execute a StatefulSetStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterStatefulSetStatusHandler(ctx context.Context, controller StatefulSetController, condition condition.Cond, name string, handler StatefulSetStatusHandler) {
 	statusHandler := &statefulSetStatusHandler{
 		client:    controller,
@@ -62,6 +66,8 @@ func RegisterStatefulSetStatusHandler(ctx context.Context, controller StatefulSe
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterStatefulSetGeneratingHandler configures a StatefulSetController to execute a StatefulSetGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterStatefulSetGeneratingHandler(ctx context.Context, controller StatefulSetController, apply apply.Apply,
 	condition condition.Cond, name string, handler StatefulSetGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &statefulSetGeneratingHandler{
@@ -83,6 +89,7 @@ type statefulSetStatusHandler struct {
 	handler   StatefulSetStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *statefulSetStatusHandler) sync(key string, obj *v1.StatefulSet) (*v1.StatefulSet, error) {
 	if obj == nil {
 		return obj, nil
@@ -131,6 +138,7 @@ type statefulSetGeneratingHandler struct {
 	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *statefulSetGeneratingHandler) Remove(key string, obj *v1.StatefulSet) (*v1.StatefulSet, error) {
 	if obj != nil {
 		return obj, nil
@@ -150,6 +158,7 @@ func (a *statefulSetGeneratingHandler) Remove(key string, obj *v1.StatefulSet) (
 		ApplyObjects()
 }
 
+// Handle executes the configured StatefulSetGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *statefulSetGeneratingHandler) Handle(obj *v1.StatefulSet, status v1.StatefulSetStatus) (v1.StatefulSetStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -174,6 +183,8 @@ func (a *statefulSetGeneratingHandler) Handle(obj *v1.StatefulSet, status v1.Sta
 	return newStatus, nil
 }
 
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *statefulSetGeneratingHandler) isNewResourceVersion(obj *v1.StatefulSet) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
@@ -185,6 +196,8 @@ func (a *statefulSetGeneratingHandler) isNewResourceVersion(obj *v1.StatefulSet)
 	return !ok || previous != obj.ResourceVersion
 }
 
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
 func (a *statefulSetGeneratingHandler) storeResourceVersion(obj *v1.StatefulSet) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
