@@ -20,6 +20,7 @@ package v1
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/rancher/wrangler/v2/pkg/apply"
@@ -48,10 +49,14 @@ type PersistentVolumeClaimCache interface {
 	generic.CacheInterface[*v1.PersistentVolumeClaim]
 }
 
+// PersistentVolumeClaimStatusHandler is executed for every added or modified PersistentVolumeClaim. Should return the new status to be updated
 type PersistentVolumeClaimStatusHandler func(obj *v1.PersistentVolumeClaim, status v1.PersistentVolumeClaimStatus) (v1.PersistentVolumeClaimStatus, error)
 
+// PersistentVolumeClaimGeneratingHandler is the top-level handler that is executed for every PersistentVolumeClaim event. It extends PersistentVolumeClaimStatusHandler by a returning a slice of child objects to be passed to apply.Apply
 type PersistentVolumeClaimGeneratingHandler func(obj *v1.PersistentVolumeClaim, status v1.PersistentVolumeClaimStatus) ([]runtime.Object, v1.PersistentVolumeClaimStatus, error)
 
+// RegisterPersistentVolumeClaimStatusHandler configures a PersistentVolumeClaimController to execute a PersistentVolumeClaimStatusHandler for every events observed.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterPersistentVolumeClaimStatusHandler(ctx context.Context, controller PersistentVolumeClaimController, condition condition.Cond, name string, handler PersistentVolumeClaimStatusHandler) {
 	statusHandler := &persistentVolumeClaimStatusHandler{
 		client:    controller,
@@ -61,6 +66,8 @@ func RegisterPersistentVolumeClaimStatusHandler(ctx context.Context, controller 
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
+// RegisterPersistentVolumeClaimGeneratingHandler configures a PersistentVolumeClaimController to execute a PersistentVolumeClaimGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
 func RegisterPersistentVolumeClaimGeneratingHandler(ctx context.Context, controller PersistentVolumeClaimController, apply apply.Apply,
 	condition condition.Cond, name string, handler PersistentVolumeClaimGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
 	statusHandler := &persistentVolumeClaimGeneratingHandler{
@@ -82,6 +89,7 @@ type persistentVolumeClaimStatusHandler struct {
 	handler   PersistentVolumeClaimStatusHandler
 }
 
+// sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
 func (a *persistentVolumeClaimStatusHandler) sync(key string, obj *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	if obj == nil {
 		return obj, nil
@@ -127,8 +135,10 @@ type persistentVolumeClaimGeneratingHandler struct {
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
 	name  string
+	seen  sync.Map
 }
 
+// Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
 func (a *persistentVolumeClaimGeneratingHandler) Remove(key string, obj *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	if obj != nil {
 		return obj, nil
@@ -138,12 +148,17 @@ func (a *persistentVolumeClaimGeneratingHandler) Remove(key string, obj *v1.Pers
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
+	if a.opts.UniqueApplyForResourceVersion {
+		a.seen.Delete(key)
+	}
+
 	return nil, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects()
 }
 
+// Handle executes the configured PersistentVolumeClaimGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
 func (a *persistentVolumeClaimGeneratingHandler) Handle(obj *v1.PersistentVolumeClaim, status v1.PersistentVolumeClaimStatus) (v1.PersistentVolumeClaimStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
@@ -153,9 +168,41 @@ func (a *persistentVolumeClaimGeneratingHandler) Handle(obj *v1.PersistentVolume
 	if err != nil {
 		return newStatus, err
 	}
+	if !a.isNewResourceVersion(obj) {
+		return newStatus, nil
+	}
 
-	return newStatus, generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
+	err = generic.ConfigureApplyForObject(a.apply, obj, &a.opts).
 		WithOwner(obj).
 		WithSetID(a.name).
 		ApplyObjects(objs...)
+	if err != nil {
+		return newStatus, err
+	}
+	a.storeResourceVersion(obj)
+	return newStatus, nil
+}
+
+// isNewResourceVersion detects if a specific resource version was already successfully processed.
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
+func (a *persistentVolumeClaimGeneratingHandler) isNewResourceVersion(obj *v1.PersistentVolumeClaim) bool {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return true
+	}
+
+	// Apply once per resource version
+	key := obj.Namespace + "/" + obj.Name
+	previous, ok := a.seen.Load(key)
+	return !ok || previous != obj.ResourceVersion
+}
+
+// storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
+// Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
+func (a *persistentVolumeClaimGeneratingHandler) storeResourceVersion(obj *v1.PersistentVolumeClaim) {
+	if !a.opts.UniqueApplyForResourceVersion {
+		return
+	}
+
+	key := obj.Namespace + "/" + obj.Name
+	a.seen.Store(key, obj.ResourceVersion)
 }
