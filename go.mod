@@ -21,7 +21,7 @@ require (
 	k8s.io/code-generator v0.28.0
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 	k8s.io/kube-aggregator v0.28.0
-	sigs.k8s.io/cli-utils v0.28.0
+	sigs.k8s.io/cli-utils v0.35.0
 )
 
 require (
