@@ -2,7 +2,6 @@ package generic_test
 
 import (
 	"context"
-	"github.com/rancher/wrangler/v2/pkg/generic"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -10,10 +9,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/rancher/wrangler/v2/pkg/apply"
-	fakeapply "github.com/rancher/wrangler/v2/pkg/apply/fake"
-	v1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/core/v1"
-	fake2 "github.com/rancher/wrangler/v2/pkg/generic/fake"
+	"github.com/rancher/wrangler/pkg/apply"
+	fakeapply "github.com/rancher/wrangler/pkg/apply/fake"
+	v1 "github.com/rancher/wrangler/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/pkg/generic"
 )
 
 func TestUniqueApplyForResourceVersion(t *testing.T) {
@@ -81,7 +80,7 @@ func TestUniqueApplyForResourceVersion(t *testing.T) {
 
 func setupTestHandler(ctrl *gomock.Controller, apply apply.Apply, opts *generic.GeneratingHandlerOptions) (handler generic.Handler) {
 	const handlerName = "test"
-	controller := fake2.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
+	controller := NewMockServiceController(ctrl)
 	controller.EXPECT().GroupVersionKind()
 	controller.EXPECT().OnChange(gomock.Any(), gomock.Any(), gomock.Any())
 	controller.EXPECT().
@@ -89,7 +88,6 @@ func setupTestHandler(ctrl *gomock.Controller, apply apply.Apply, opts *generic.
 		Do(func(_ context.Context, _ string, h generic.Handler) {
 			handler = h
 		}).Times(1)
-
 	v1.RegisterServiceGeneratingHandler(context.Background(), controller, apply, "", handlerName,
 		func(svc *corev1.Service, status corev1.ServiceStatus) (objs []runtime.Object, newstatus corev1.ServiceStatus, err error) {
 			return []runtime.Object{serviceToEndpoint(svc)}, status, nil
