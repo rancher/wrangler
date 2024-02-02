@@ -1,13 +1,13 @@
 package schemas
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"sync"
 
 	"github.com/rancher/wrangler/v2/pkg/data/convert"
-	"github.com/rancher/wrangler/v2/pkg/merr"
 	"github.com/rancher/wrangler/v2/pkg/name"
 )
 
@@ -36,9 +36,7 @@ func EmptySchemas() *Schemas {
 }
 
 func NewSchemas(schemas ...*Schemas) (*Schemas, error) {
-	var (
-		errs []error
-	)
+	var errs error
 
 	s := &Schemas{
 		processingTypes: map[reflect.Type]*Schema{},
@@ -50,11 +48,11 @@ func NewSchemas(schemas ...*Schemas) (*Schemas, error) {
 
 	for _, schemas := range schemas {
 		if _, err := s.AddSchemas(schemas); err != nil {
-			errs = append(errs, err)
+			errs = errors.Join(errs, err)
 		}
 	}
 
-	return s, merr.NewErrors(errs...)
+	return s, errs
 }
 
 func (s *Schemas) Init(initFunc SchemasInitFunc) *Schemas {
@@ -70,13 +68,13 @@ func (s *Schemas) MustAddSchemas(schema *Schemas) *Schemas {
 }
 
 func (s *Schemas) AddSchemas(schema *Schemas) (*Schemas, error) {
-	var errs []error
+	var errs error
 	for _, schema := range schema.Schemas() {
 		if err := s.AddSchema(*schema); err != nil {
-			errs = append(errs, err)
+			errs = errors.Join(errs, err)
 		}
 	}
-	return s, merr.NewErrors(errs...)
+	return s, errs
 }
 
 func (s *Schemas) RemoveSchema(schema Schema) *Schemas {

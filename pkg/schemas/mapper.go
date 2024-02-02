@@ -1,9 +1,10 @@
 package schemas
 
 import (
+	"errors"
+
 	"github.com/rancher/wrangler/v2/pkg/data"
 	"github.com/rancher/wrangler/v2/pkg/data/convert"
-	"github.com/rancher/wrangler/v2/pkg/merr"
 	"github.com/rancher/wrangler/v2/pkg/schemas/definition"
 )
 
@@ -22,11 +23,11 @@ func (m Mappers) FromInternal(data data.Object) {
 }
 
 func (m Mappers) ToInternal(data data.Object) error {
-	var errors []error
+	var returnErrors error
 	for i := len(m) - 1; i >= 0; i-- {
-		errors = append(errors, m[i].ToInternal(data))
+		returnErrors = errors.Join(returnErrors, m[i].ToInternal(data))
 	}
-	return merr.NewErrors(errors...)
+	return returnErrors
 }
 
 func (m Mappers) ModifySchema(schema *Schema, schemas *Schemas) error {
@@ -76,23 +77,16 @@ func (t *typeMapper) FromInternal(data data.Object) {
 	Mappers(t.Mappers).FromInternal(data)
 }
 
-func addError(errors []error, err error) []error {
-	if err == nil {
-		return errors
-	}
-	return append(errors, err)
-}
-
 func (t *typeMapper) ToInternal(data data.Object) error {
-	var errors []error
-	errors = addError(errors, Mappers(t.Mappers).ToInternal(data))
+	var returnErrors error
+	returnErrors = errors.Join(returnErrors, Mappers(t.Mappers).ToInternal(data))
 
 	for fieldName, schema := range t.subArraySchemas {
 		if schema.Mapper == nil {
 			continue
 		}
 		for _, fieldData := range data.Slice(fieldName) {
-			errors = addError(errors, schema.Mapper.ToInternal(fieldData))
+			returnErrors = errors.Join(returnErrors, schema.Mapper.ToInternal(fieldData))
 		}
 	}
 
@@ -101,7 +95,7 @@ func (t *typeMapper) ToInternal(data data.Object) error {
 			continue
 		}
 		for _, fieldData := range data.Map(fieldName) {
-			errors = addError(errors, schema.Mapper.ToInternal(convert.ToMapInterface(fieldData)))
+			returnErrors = errors.Join(returnErrors, schema.Mapper.ToInternal(convert.ToMapInterface(fieldData)))
 		}
 	}
 
@@ -109,10 +103,10 @@ func (t *typeMapper) ToInternal(data data.Object) error {
 		if schema.Mapper == nil {
 			continue
 		}
-		errors = addError(errors, schema.Mapper.ToInternal(data.Map(fieldName)))
+		returnErrors = errors.Join(returnErrors, schema.Mapper.ToInternal(data.Map(fieldName)))
 	}
 
-	return merr.NewErrors(errors...)
+	return returnErrors
 }
 
 func (t *typeMapper) ModifySchema(schema *Schema, schemas *Schemas) error {

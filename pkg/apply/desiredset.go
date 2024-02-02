@@ -7,7 +7,6 @@ import (
 
 	"github.com/rancher/wrangler/v2/pkg/apply/injectors"
 	"github.com/rancher/wrangler/v2/pkg/kv"
-	"github.com/rancher/wrangler/v2/pkg/merr"
 	"github.com/rancher/wrangler/v2/pkg/objectset"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -50,19 +49,19 @@ type desiredSet struct {
 	injectors                []injectors.ConfigInjector
 	ratelimitingQps          float32
 	injectorNames            []string
-	errs                     []error
+	errs                     error
 
 	createPlan bool
 	plan       Plan
 }
 
 func (o *desiredSet) err(err error) error {
-	o.errs = append(o.errs, err)
+	o.errs = errors.Join(o.errs, err)
 	return o.Err()
 }
 
 func (o desiredSet) Err() error {
-	return merr.NewErrors(append(o.errs, o.objs.Err())...)
+	return errors.Join(o.errs, o.objs.Err())
 }
 
 func (o desiredSet) DryRun(objs ...runtime.Object) (Plan, error) {
