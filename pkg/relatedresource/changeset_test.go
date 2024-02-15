@@ -3,7 +3,6 @@ package relatedresource
 import (
 	"context"
 	"fmt"
-	"slices"
 	"testing"
 	"time"
 
@@ -64,15 +63,15 @@ func (informer *fakeInformer) AddEventHandler(handler cache.ResourceEventHandler
 }
 
 func (informer *fakeInformer) RemoveEventHandler(handlerReg cache.ResourceEventHandlerRegistration) error {
-	x := slices.Index(informer.reg, handlerReg)
+	x := slicesIndex(informer.reg, handlerReg)
 	if x < 0 {
 		return fmt.Errorf("handler not found")
 	}
 
 	close(informer.deleteChan[x])
-	informer.reg = slices.Delete(informer.reg, x, x+1)
-	informer.handlers = slices.Delete(informer.handlers, x, x+1)
-	informer.deleteChan = slices.Delete(informer.deleteChan, x, x+1)
+	informer.reg = deleteIndex(informer.reg, x)
+	informer.handlers = deleteIndex(informer.handlers, x)
+	informer.deleteChan = deleteIndex(informer.deleteChan, x)
 	return nil
 }
 
@@ -83,7 +82,7 @@ func (informer *fakeInformer) add(obj runtime.Object) {
 }
 
 func (informer *fakeInformer) waitUntilDeleted(handler cache.ResourceEventHandler, timeout time.Duration) {
-	x := slices.Index(informer.handlers, handler)
+	x := slicesIndex(informer.handlers, handler)
 	if x < 0 {
 		return
 	}
@@ -92,4 +91,17 @@ func (informer *fakeInformer) waitUntilDeleted(handler cache.ResourceEventHandle
 	case <-informer.deleteChan[x]:
 	case <-time.After(timeout):
 	}
+}
+
+func slicesIndex[S ~[]E, E comparable](s S, v E) int {
+	for i := range s {
+		if v == s[i] {
+			return i
+		}
+	}
+	return -1
+}
+
+func deleteIndex[S ~[]E, E any](s S, i int) S {
+	return append(s[:i], s[i+1:]...)
 }
