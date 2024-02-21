@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetValue(t *testing.T) {
+func TestGetValueFromAny(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name        string
@@ -216,7 +216,7 @@ func TestGetValue(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			gotValue, gotSuccess := GetValue(test.data, test.keys...)
+			gotValue, gotSuccess := GetValueFromAny(test.data, test.keys...)
 			assert.Equal(t, test.wantValue, gotValue)
 			assert.Equal(t, test.wantSuccess, gotSuccess)
 		})

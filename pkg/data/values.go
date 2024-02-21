@@ -28,12 +28,25 @@ func GetValueN(data map[string]interface{}, keys ...string) interface{} {
 	return val
 }
 
-// GetValue retrieves a value from the provided collection, which must be a map[string]interface or a []interface.
+// GetValue works similar to GetValueFromAny, but can only process maps. Kept this way to avoid breaking changes with
+// the previous interface, GetValueFromAny should be used in most cases since that can handle slices as well.
+func GetValue(data map[string]interface{}, keys ...string) (interface{}, bool) {
+	for i, key := range keys {
+		if i == len(keys)-1 {
+			val, ok := data[key]
+			return val, ok
+		}
+		data, _ = data[key].(map[string]interface{})
+	}
+	return nil, false
+}
+
+// GetValueFromAny retrieves a value from the provided collection, which must be a map[string]interface or a []interface.
 // Keys are always strings.
 // For a map, a key denotes the key in the map whose value we want to retrieve.
 // For the slice, it denotes the index (starting at 0) of the value we want to retrieve.
 // Returns the retrieved value (if any) and a bool indicating if the value was found.
-func GetValue(data interface{}, keys ...string) (interface{}, bool) {
+func GetValueFromAny(data interface{}, keys ...string) (interface{}, bool) {
 	for i, key := range keys {
 		if i == len(keys)-1 {
 			if dataMap, ok := data.(map[string]interface{}); ok {
