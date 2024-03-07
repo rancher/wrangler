@@ -207,6 +207,9 @@ func (o *desiredSet) filterCrossVersion(gvk schema.GroupVersionKind, keys []obje
 	return result
 }
 
+// process executes the apply by creating, updating, and deleting objects. It
+// compares the desired state to the current state and builds necessary
+// patchers.
 func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.GroupVersionKind, objs objectset.ObjectByKey) {
 	controller, client, err := o.getControllerAndClient(debugID, gvk)
 	if err != nil {
@@ -316,7 +319,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 	}
 
 	updateF := func(k objectset.ObjectKey) {
-		err := o.compareObjects(gvk, reconciler, patcher, client, debugID, existing[k], objs[k], len(toCreate) > 0 || len(toDelete) > 0)
+		err := o.compareObjects(gvk, reconciler, patcher, debugID, existing[k], objs[k])
 		if err == ErrReplace {
 			deleteF(k, true)
 			o.err(fmt.Errorf("DesiredSet - Replace Wait %s %s for %s", gvk, k, debugID))
