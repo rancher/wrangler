@@ -237,7 +237,7 @@ users := mgmt.Management().V3().User("")
 configmaps := core.Management().Core().Configmaps("examplenamespace")
 
 syncHandler := func(id string, obj *v3.User) (*v3.User, error) {
-	if obj != nil {
+	if obj == nil {
 		return obj, nil
 	}
 
