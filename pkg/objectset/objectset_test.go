@@ -10,7 +10,7 @@ import (
 
 func TestObjectSet_Namespaces(t *testing.T) {
 	type fields struct {
-		errs        []error
+		errs        error
 		objects     ObjectByGVK
 		objectsByGK ObjectByGK
 		order       []runtime.Object

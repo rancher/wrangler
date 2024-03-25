@@ -1,6 +1,7 @@
 package objectset
 
 import (
+	e "errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -9,7 +10,6 @@ import (
 	"github.com/rancher/wrangler/v2/pkg/gvk"
 	"github.com/rancher/wrangler/v2/pkg/stringset"
 
-	"github.com/rancher/wrangler/v2/pkg/merr"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,7 +65,7 @@ func (o ObjectByGVK) Add(obj runtime.Object) (schema.GroupVersionKind, error) {
 }
 
 type ObjectSet struct {
-	errs        []error
+	errs        error
 	objects     ObjectByGVK
 	objectsByGK ObjectByGK
 	order       []runtime.Object
@@ -113,13 +113,13 @@ func (o *ObjectSet) add(obj runtime.Object) {
 
 	gvk, err := o.objects.Add(obj)
 	if err != nil {
-		o.err(errors.Wrapf(err, "failed to add %T", obj))
+		o.AddErr(errors.Wrapf(err, "failed to add %T", obj))
 		return
 	}
 
 	_, err = o.objectsByGK.Add(obj)
 	if err != nil {
-		o.err(errors.Wrapf(err, "failed to add %T", obj))
+		o.AddErr(errors.Wrapf(err, "failed to add %T", obj))
 		return
 	}
 
@@ -130,17 +130,12 @@ func (o *ObjectSet) add(obj runtime.Object) {
 	}
 }
 
-func (o *ObjectSet) err(err error) error {
-	o.errs = append(o.errs, err)
-	return o.Err()
-}
-
 func (o *ObjectSet) AddErr(err error) {
-	o.errs = append(o.errs, err)
+	o.errs = e.Join(o.errs, err)
 }
 
 func (o *ObjectSet) Err() error {
-	return merr.NewErrors(o.errs...)
+	return o.errs
 }
 
 func (o *ObjectSet) Len() int {

@@ -2,13 +2,13 @@ package apply
 
 import (
 	"context"
+	e "errors"
 	"fmt"
 	"sort"
 	"sync"
 
 	"github.com/pkg/errors"
 	gvk2 "github.com/rancher/wrangler/v2/pkg/gvk"
-	"github.com/rancher/wrangler/v2/pkg/merr"
 	"github.com/rancher/wrangler/v2/pkg/objectset"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -340,7 +340,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 
 func (o *desiredSet) list(namespaced bool, informer cache.SharedIndexInformer, client dynamic.NamespaceableResourceInterface, selector labels.Selector, desiredObjects objectset.ObjectByKey) (map[objectset.ObjectKey]runtime.Object, error) {
 	var (
-		errs []error
+		errs error
 		objs = objectset.ObjectByKey{}
 	)
 
@@ -361,25 +361,25 @@ func (o *desiredSet) list(namespaced bool, informer cache.SharedIndexInformer, c
 			// owner set and unspecified lister namespace, search all namespaces
 			err := allNamespaceList(o.ctx, client, selector, func(obj unstructured.Unstructured) {
 				if err := addObjectToMap(objs, &obj); err != nil {
-					errs = append(errs, err)
+					errs = e.Join(errs, err)
 				}
 			})
 			if err != nil {
-				errs = append(errs, err)
+				errs = e.Join(errs, err)
 			}
 		} else {
 			// no owner or lister namespace intentionally restricted; only search in specified namespaces
 			err := multiNamespaceList(o.ctx, namespaces, client, selector, func(obj unstructured.Unstructured) {
 				if err := addObjectToMap(objs, &obj); err != nil {
-					errs = append(errs, err)
+					errs = e.Join(errs, err)
 				}
 			})
 			if err != nil {
-				errs = append(errs, err)
+				errs = e.Join(errs, err)
 			}
 		}
 
-		return objs, merr.NewErrors(errs...)
+		return objs, errs
 	}
 
 	var namespace string
@@ -395,13 +395,13 @@ func (o *desiredSet) list(namespaced bool, informer cache.SharedIndexInformer, c
 
 	if err := cache.ListAllByNamespace(indexer, namespace, selector, func(obj interface{}) {
 		if err := addObjectToMap(objs, obj); err != nil {
-			errs = append(errs, err)
+			errs = e.Join(errs, err)
 		}
 	}); err != nil {
-		errs = append(errs, err)
+		errs = e.Join(errs, err)
 	}
 
-	return objs, merr.NewErrors(errs...)
+	return objs, errs
 }
 
 func shouldPrune(obj runtime.Object) bool {
@@ -523,7 +523,7 @@ func inNamespace(namespace string, obj interface{}) bool {
 // listByHash use a pre-configured indexer to list objects of a certain type by their hash label
 func listByHash(indexer cache.Indexer, hash string, namespace string) (map[objectset.ObjectKey]runtime.Object, error) {
 	var (
-		errs []error
+		errs error
 		objs = objectset.ObjectByKey{}
 	)
 	res, err := indexer.ByIndex(byHash, hash)
@@ -535,8 +535,8 @@ func listByHash(indexer cache.Indexer, hash string, namespace string) (map[objec
 			continue
 		}
 		if err := addObjectToMap(objs, obj); err != nil {
-			errs = append(errs, err)
+			errs = e.Join(errs, err)
 		}
 	}
-	return objs, merr.NewErrors(errs...)
+	return objs, errs
 }
