@@ -40,7 +40,10 @@ func NewSummarySharedInformerFactory(client client.Interface, defaultResync time
 // NewFilteredSummarySharedInformerFactory constructs a new instance of summarySharedInformerFactory.
 // Listers obtained via this factory will be subject to the same filters as specified here.
 func NewFilteredSummarySharedInformerFactory(client client.Interface, defaultResync time.Duration, namespace string, tweakListOptions TweakListOptionsFunc) SummarySharedInformerFactory {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &summarySharedInformerFactory{
+		ctx:              ctx,
+		ctxCancel:        cancel,
 		client:           client,
 		defaultResync:    defaultResync,
 		namespace:        namespace,
@@ -54,6 +57,9 @@ type summarySharedInformerFactory struct {
 	client        client.Interface
 	defaultResync time.Duration
 	namespace     string
+
+	ctx       context.Context
+	ctxCancel context.CancelFunc
 
 	lock      sync.Mutex
 	informers map[schema.GroupVersionResource]informers.GenericInformer
@@ -75,7 +81,7 @@ func (f *summarySharedInformerFactory) ForResource(gvr schema.GroupVersionResour
 		return informer
 	}
 
-	informer = NewFilteredSummaryInformer(f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	informer = NewFilteredSummaryInformer(f.ctx, f.client, gvr, f.namespace, f.defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 	f.informers[key] = informer
 
 	return informer
@@ -88,7 +94,10 @@ func (f *summarySharedInformerFactory) Start(stopCh <-chan struct{}) {
 
 	for informerType, informer := range f.informers {
 		if !f.startedInformers[informerType] {
-			go informer.Informer().Run(stopCh)
+			go func(ctxCancel context.CancelFunc) {
+				informer.Informer().Run(stopCh)
+				ctxCancel()
+			}(f.ctxCancel)
 			f.startedInformers[informerType] = true
 		}
 	}
@@ -117,7 +126,7 @@ func (f *summarySharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) 
 }
 
 // NewFilteredSummaryInformer constructs a new informer for a summary type.
-func NewFilteredSummaryInformer(client client.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
+func NewFilteredSummaryInformer(ctx context.Context, client client.Interface, gvr schema.GroupVersionResource, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions TweakListOptionsFunc) informers.GenericInformer {
 	return &summaryInformer{
 		gvr: gvr,
 		informer: cache.NewSharedIndexInformer(
@@ -126,13 +135,13 @@ func NewFilteredSummaryInformer(client client.Interface, gvr schema.GroupVersion
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).List(context.TODO(), options)
+					return client.Resource(gvr).Namespace(namespace).List(ctx, options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 					if tweakListOptions != nil {
 						tweakListOptions(&options)
 					}
-					return client.Resource(gvr).Namespace(namespace).Watch(context.TODO(), options)
+					return client.Resource(gvr).Namespace(namespace).Watch(ctx, options)
 				},
 			},
 			&summary.SummarizedObject{},
