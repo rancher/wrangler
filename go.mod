@@ -9,7 +9,7 @@ require (
 	github.com/moby/locker v1.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.0.0-20240325194215-0064abcb8aee
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.5.0
 	golang.org/x/text v0.14.0
