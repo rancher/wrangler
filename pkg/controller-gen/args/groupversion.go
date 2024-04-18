@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/imports"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/code-generator/cmd/client-gen/path"
 	"k8s.io/gengo/types"
 )
 
@@ -70,7 +70,7 @@ func toVersionType(obj interface{}) (string, *types.Name) {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	pkg := path.Vendorless(t.PkgPath())
+	pkg := imports.VendorlessPath(t.PkgPath())
 	return versionFromPackage(pkg), &types.Name{
 		Package: pkg,
 		Name:    t.Name(),
@@ -118,7 +118,7 @@ func ScanDirectory(pkgPath string) (result []Type, err error) {
 		for i := 0; i < s.NumFields(); i++ {
 			f := s.Field(i)
 			if f.Embedded() && f.Type().String() == "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta" {
-				pkgPath := path.Vendorless(pkgs[0].PkgPath)
+				pkgPath := imports.VendorlessPath(pkgs[0].PkgPath)
 				result = append(result, Type{
 					Package: pkgPath,
 					Version: versionFromPackage(pkgPath),
