@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// GuessPluralName attempts to pluralize a noun
 func GuessPluralName(name string) string {
 	if name == "" {
 		return name
@@ -47,12 +48,15 @@ func Limit(s string, count int) string {
 	return fmt.Sprintf("%s-%s", s[:count-6], Hex(s, 5))
 }
 
-func Hex(s string, length int) string {
+// Hex gets the checksum of s, encodes it to hexadecimal and returns the first n characters of that hexadecimal
+func Hex(s string, n int) string {
 	h := md5.Sum([]byte(s))
 	d := hex.EncodeToString(h[:])
-	return d[:length]
+	return d[:n]
 }
 
+// SafeConcatName concatenates the given strings and ensures the returned name is under 64 characters
+// by cutting the string off at 56 characters and setting the last 5 with an encoded version of the concatenated string.
 func SafeConcatName(name ...string) string {
 	fullPath := strings.Join(name, "-")
 	if len(fullPath) < 64 {
