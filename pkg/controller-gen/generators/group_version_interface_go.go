@@ -5,31 +5,28 @@ import (
 	"io"
 	"strings"
 
-	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
-func GroupVersionInterfaceGo(gv schema.GroupVersion, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
+func GroupVersionInterfaceGo(gv schema.GroupVersion, customArgs *args.CustomArgs) generator.Generator {
 	return &groupInterfaceGo{
 		gv:         gv,
-		args:       args,
 		customArgs: customArgs,
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "interface",
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "interface.go",
 		},
 	}
 }
 
 type groupInterfaceGo struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	gv         schema.GroupVersion
-	args       *args.GeneratorArgs
-	customArgs *args2.CustomArgs
+	customArgs *args.CustomArgs
 }
 
 func (f *groupInterfaceGo) Imports(context *generator.Context) []string {

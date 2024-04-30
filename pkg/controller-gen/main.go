@@ -29,17 +29,8 @@ import (
 )
 
 func Run(opts cgargs.Options) {
-	customArgs := &cgargs.CustomArgs{
-		ImportPackage: opts.ImportPackage,
-		Options:       opts,
-		TypesByGroup:  map[schema.GroupVersion][]*types.Name{},
-		Package:       opts.OutputPackage,
-	}
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	genericArgs.CustomArgs = customArgs
 	genericArgs.GoHeaderFilePath = opts.Boilerplate
-	genericArgs.InputDirs = parseTypes(customArgs)
-
 	if genericArgs.OutputBase == "./" { //go modules
 		tempDir, err := os.MkdirTemp("", "")
 		if err != nil {
@@ -49,14 +40,33 @@ func Run(opts cgargs.Options) {
 		genericArgs.OutputBase = tempDir
 		defer os.RemoveAll(tempDir)
 	}
-	customArgs.OutputBase = genericArgs.OutputBase
+
+	boilerplate, err := genericArgs.LoadGoBoilerplate()
+	if err != nil {
+		logrus.Fatalf("Loading boilerplate: %v", err)
+	}
+
+	customArgs := &cgargs.CustomArgs{
+		ImportPackage:      opts.ImportPackage,
+		Options:            opts,
+		TypesByGroup:       map[schema.GroupVersion][]*types.Name{},
+		Package:            opts.OutputPackage,
+		OutputBase:         genericArgs.OutputBase,
+		BoilerplateContent: boilerplate,
+	}
+	inputDirs := parseTypes(customArgs)
 
 	clientGen := generators.NewClientGenerator()
 
-	if err := genericArgs.Execute(
-		clientgenerators.NameSystems(nil),
-		clientgenerators.DefaultNameSystem(),
-		clientGen.Packages,
+	getTargets := func(context *generator.Context) []generator.Target {
+		return clientGen.GetTargets(context, customArgs)
+	}
+	if err := gengo.Execute(
+		cs.NameSystems(nil),
+		cs.DefaultNameSystem(),
+		getTargets,
+		gengo.StdBuildTag,
+		inputDirs,
 	); err != nil {
 		logrus.Fatalf("Error: %v", err)
 	}

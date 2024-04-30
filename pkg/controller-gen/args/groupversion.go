@@ -10,7 +10,7 @@ import (
 	"golang.org/x/tools/imports"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
 )
 
 const (
