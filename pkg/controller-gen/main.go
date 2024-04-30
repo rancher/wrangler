@@ -180,7 +180,7 @@ func generateDeepcopy(groups map[string]bool, customArgs *cgargs.CustomArgs) err
 		return nil
 	}
 
-	deepCopyCustomArgs := &dpargs.CustomArgs{}
+	deepCopyCustomArgs := &dp.CustomArgs{}
 
 	args := args.Default().WithoutDefaultFlagParsing()
 	args.CustomArgs = deepCopyCustomArgs
