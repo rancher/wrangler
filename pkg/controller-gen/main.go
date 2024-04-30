@@ -8,24 +8,24 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/gengo/generator"
+	"k8s.io/gengo/args"
+	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/types"
 
 	cgargs "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	"github.com/rancher/wrangler/v2/pkg/controller-gen/generators"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	csargs "k8s.io/code-generator/cmd/client-gen/args"
-	clientgenerators "k8s.io/code-generator/cmd/client-gen/generators"
+
 	cs "k8s.io/code-generator/cmd/client-gen/generators"
 	types2 "k8s.io/code-generator/cmd/client-gen/types"
-	dpargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
 	infargs "k8s.io/code-generator/cmd/informer-gen/args"
 	inf "k8s.io/code-generator/cmd/informer-gen/generators"
 	lsargs "k8s.io/code-generator/cmd/lister-gen/args"
 	ls "k8s.io/code-generator/cmd/lister-gen/generators"
-	"k8s.io/gengo/args"
 	dp "k8s.io/gengo/examples/deepcopy-gen/generators"
-	"k8s.io/gengo/types"
 )
 
 func Run(opts cgargs.Options) {
@@ -255,8 +255,12 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 	)
 }
 
-func setGenClient(groups map[string]bool, typesByGroup map[schema.GroupVersion][]*types.Name, f func(*generator.Context, *args.GeneratorArgs) generator.Packages) func(*generator.Context, *args.GeneratorArgs) generator.Packages {
-	return func(context *generator.Context, generatorArgs *args.GeneratorArgs) generator.Packages {
+func setGenClient(
+	groups map[string]bool,
+	typesByGroup map[schema.GroupVersion][]*types.Name,
+	f func(*generator.Context) []generator.Target,
+) func(*generator.Context) []generator.Target {
+	return func(context *generator.Context) []generator.Target {
 		for gv, names := range typesByGroup {
 			if !groups[gv.Group] {
 				continue
@@ -306,7 +310,7 @@ func setGenClient(groups map[string]bool, typesByGroup map[schema.GroupVersion][
 				}
 			}
 		}
-		return f(context, generatorArgs)
+		return f(context)
 	}
 }
 
