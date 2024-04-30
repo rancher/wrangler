@@ -1,0 +1,43 @@
+name: Wrangler CI
+
+on:
+  push:
+  pull_request:
+    tags:
+      - v*
+    branches:
+      - 'release/*'
+      - 'master'
+
+jobs:
+  ci:
+    strategy:
+      matrix:
+        arch:
+        - amd64
+        - arm64
+    runs-on: org-${{ github.repository_owner_id }}-${{ matrix.arch }}-k8s
+    container: registry.suse.com/bci/golang:1.22
+    # rancher/dapper:v0.5.4
+    steps:
+    - name : Checkout repository
+      # https://github.com/actions/checkout/releases/tag/v4.1.1
+      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+    - name: Install Go
+      # https://github.com/actions/setup-go/releases/tag/v5.0.0
+      uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+      with:
+        go-version-file: 'go.mod'
+    - name : Install mockgen
+      run: go install -v -x github.com/golang/mock/mockgen@v1.6.0
+    - name : Debug - WIP
+      run: |
+        env
+        echo $PATH
+        echo "uname -m is $(uname -m)"
+        [ -e /go/bin ] && ls -lr /go/bin
+        #find $HOME/go/bin -print
+        #ls /opt/hostedtoolcache/go/1.22.0
+        #ls /opt/hostedtoolcache/go/1.22.0/*/bin
+    - name : Run CI
+      run: bash scripts/ci
