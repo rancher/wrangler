@@ -206,11 +206,11 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 		return nil
 	}
 
-	args, clientSetArgs := csargs.NewDefaults()
+	clientSetArgs := csargs.New()
 	clientSetArgs.ClientsetName = "versioned"
-	args.OutputBase = customArgs.OutputBase
-	args.OutputPackagePath = filepath.Join(customArgs.Package, "clientset")
-	args.GoHeaderFilePath = customArgs.Options.Boilerplate
+	clientSetArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Package, "clientset")
+	clientSetArgs.OutputPkg = filepath.Join(customArgs.Package, "clientset")
+	clientSetArgs.GoHeaderFile = customArgs.Options.Boilerplate
 
 	var order []schema.GroupVersion
 
@@ -224,13 +224,14 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 		return order[i].Group < order[j].Group
 	})
 
+	inputDirs := []string{}
 	for _, gv := range order {
 		packageName := customArgs.Options.Groups[gv.Group].PackageName
 		if packageName == "" {
 			packageName = gv.Group
 		}
 		names := customArgs.TypesByGroup[gv]
-		args.InputDirs = append(args.InputDirs, names[0].Package)
+		inputDirs = append(inputDirs, names[0].Package)
 		clientSetArgs.Groups = append(clientSetArgs.Groups, types2.GroupVersions{
 			PackageName: packageName,
 			Group:       types2.Group(gv.Group),
@@ -242,10 +243,16 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 			},
 		})
 	}
-
-	return args.Execute(cs.NameSystems(nil),
+	getTargets := setGenClient(groups, customArgs.TypesByGroup, func(context *generator.Context) []generator.Target {
+		return cs.GetTargets(context, clientSetArgs)
+	})
+	return gengo.Execute(
+		cs.NameSystems(nil),
 		cs.DefaultNameSystem(),
-		setGenClient(groups, customArgs.TypesByGroup, cs.Packages))
+		getTargets,
+		gengo.StdBuildTag,
+		inputDirs,
+	)
 }
 
 func setGenClient(groups map[string]bool, typesByGroup map[schema.GroupVersion][]*types.Name, f func(*generator.Context, *args.GeneratorArgs) generator.Packages) func(*generator.Context, *args.GeneratorArgs) generator.Packages {
