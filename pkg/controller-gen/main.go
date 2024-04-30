@@ -339,21 +339,29 @@ func generateListers(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		return nil
 	}
 
-	args, _ := lsargs.NewDefaults()
-	args.OutputBase = customArgs.OutputBase
-	args.OutputPackagePath = filepath.Join(customArgs.Package, "listers")
-	args.GoHeaderFilePath = customArgs.Options.Boilerplate
+	listerArgs := lsargs.New()
+	listerArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Package, "listers")
+	listerArgs.OutputPkg = filepath.Join(customArgs.Package, "listers")
+	listerArgs.GoHeaderFile = customArgs.Options.Boilerplate
 
+	inputDirs := []string{}
 	for gv, names := range customArgs.TypesByGroup {
 		if !groups[gv.Group] {
 			continue
 		}
-		args.InputDirs = append(args.InputDirs, names[0].Package)
+		inputDirs = append(inputDirs, names[0].Package)
 	}
 
-	return args.Execute(ls.NameSystems(nil),
+	getTargets := setGenClient(groups, customArgs.TypesByGroup, func(context *generator.Context) []generator.Target {
+		return ls.GetTargets(context, listerArgs)
+	})
+	return gengo.Execute(
+		ls.NameSystems(nil),
 		ls.DefaultNameSystem(),
-		setGenClient(groups, customArgs.TypesByGroup, ls.Packages))
+		getTargets,
+		gengo.StdBuildTag,
+		inputDirs,
+	)
 }
 
 func parseTypes(customArgs *cgargs.CustomArgs) []string {
