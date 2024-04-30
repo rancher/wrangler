@@ -9,7 +9,7 @@ platform:
 
 steps:
   - name: test
-    image: registry.suse.com/bci/golang:1.20
+    image: registry.suse.com/bci/golang:1.21
     commands:
       - go install github.com/golang/mock/mockgen@v1.6.0
       - ./scripts/ci
@@ -28,7 +28,7 @@ platform:
 
 steps:
   - name: test
-    image: registry.suse.com/bci/golang:1.20
+    image: registry.suse.com/bci/golang:1.21
     commands:
       - go install github.com/golang/mock/mockgen@v1.6.0
       - ./scripts/ci
