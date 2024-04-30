@@ -315,23 +315,32 @@ func generateInformers(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 		return nil
 	}
 
-	args, clientSetArgs := infargs.NewDefaults()
-	clientSetArgs.VersionedClientSetPackage = filepath.Join(customArgs.Package, "clientset/versioned")
-	clientSetArgs.ListersPackage = filepath.Join(customArgs.Package, "listers")
-	args.OutputBase = customArgs.OutputBase
-	args.OutputPackagePath = filepath.Join(customArgs.Package, "informers")
-	args.GoHeaderFilePath = customArgs.Options.Boilerplate
+	informerArgs := infargs.New()
+	informerArgs.VersionedClientSetPackage = filepath.Join(customArgs.Package, "clientset/versioned")
+	informerArgs.ListersPackage = filepath.Join(customArgs.Package, "listers")
+	informerArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Package, "informers")
+	informerArgs.OutputPkg = filepath.Join(customArgs.Package, "informers")
+	informerArgs.GoHeaderFile = customArgs.Options.Boilerplate
 
+	inputDirs := []string{}
 	for gv, names := range customArgs.TypesByGroup {
 		if !groups[gv.Group] {
 			continue
 		}
-		args.InputDirs = append(args.InputDirs, names[0].Package)
+		inputDirs = append(inputDirs, names[0].Package)
 	}
 
-	return args.Execute(inf.NameSystems(nil),
+	getTargets := setGenClient(groups, customArgs.TypesByGroup, func(context *generator.Context) []generator.Target {
+		return inf.GetTargets(context, informerArgs)
+	})
+
+	return gengo.Execute(
+		inf.NameSystems(nil),
 		inf.DefaultNameSystem(),
-		setGenClient(groups, customArgs.TypesByGroup, inf.Packages))
+		getTargets,
+		gengo.StdBuildTag,
+		inputDirs,
+	)
 }
 
 func generateListers(groups map[string]bool, customArgs *cgargs.CustomArgs) error {
