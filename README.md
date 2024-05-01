@@ -222,7 +222,7 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
-	"github.com/rancher/wrangler/v2/pkg/generated/controllers/core"
+	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
 	"k8s.io/client-go/rest"
 )
 

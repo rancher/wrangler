@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/v2/pkg/apply"
-	"github.com/rancher/wrangler/v2/pkg/data/convert"
-	"github.com/rancher/wrangler/v2/pkg/kv"
-	"github.com/rancher/wrangler/v2/pkg/name"
-	"github.com/rancher/wrangler/v2/pkg/schemas/openapi"
+	"github.com/rancher/wrangler/v3/pkg/apply"
+	"github.com/rancher/wrangler/v3/pkg/data/convert"
+	"github.com/rancher/wrangler/v3/pkg/kv"
+	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/schemas/openapi"
 	"github.com/sirupsen/logrus"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	// Ensure the gvks are loaded so that apply works correctly
-	_ "github.com/rancher/wrangler/v2/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	_ "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 )
 
 var (

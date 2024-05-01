@@ -3,7 +3,7 @@ package patch
 import (
 	"sync"
 
-	"github.com/rancher/wrangler/v2/pkg/gvk"
+	"github.com/rancher/wrangler/v3/pkg/gvk"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"

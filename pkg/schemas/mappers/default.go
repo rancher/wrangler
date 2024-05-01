@@ -1,8 +1,8 @@
 package mappers
 
 import (
-	"github.com/rancher/wrangler/v2/pkg/data"
-	types "github.com/rancher/wrangler/v2/pkg/schemas"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	types "github.com/rancher/wrangler/v3/pkg/schemas"
 )
 
 type DefaultMapper struct {

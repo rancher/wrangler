@@ -1,6 +1,6 @@
 package kstatus
 
-import "github.com/rancher/wrangler/v2/pkg/condition"
+import "github.com/rancher/wrangler/v3/pkg/condition"
 
 // Conditions read by the kstatus package
 

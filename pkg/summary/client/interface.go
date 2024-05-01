@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	"github.com/rancher/wrangler/v2/pkg/summary"
+	"github.com/rancher/wrangler/v3/pkg/summary"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"

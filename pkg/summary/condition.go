@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/rancher/wrangler/v2/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/data"
 )
 
 func GetUnstructuredConditions(obj map[string]interface{}) []Condition {

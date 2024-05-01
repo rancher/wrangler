@@ -20,8 +20,8 @@ package v1
 
 import (
 	"github.com/rancher/lasso/pkg/controller"
-	"github.com/rancher/wrangler/v2/pkg/generic"
-	"github.com/rancher/wrangler/v2/pkg/schemes"
+	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/schemes"
 	v1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )

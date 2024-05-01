@@ -19,7 +19,7 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/rancher/wrangler/v2/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	v1 "k8s.io/api/networking/v1"
 )
 
