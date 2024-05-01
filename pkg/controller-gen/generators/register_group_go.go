@@ -2,29 +2,32 @@ package generators
 
 import (
 	"fmt"
+	"strings"
 
-	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"k8s.io/gengo/v2/generator"
 )
 
-func RegisterGroupGo(group string, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
+func RegisterGroupGo(group string, customArgs *args.CustomArgs) generator.Generator {
 	return &registerGroupGo{
 		group:      group,
-		args:       args,
 		customArgs: customArgs,
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "zz_generated_register",
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "zz_generated_register.go",
 		},
 	}
 }
 
 type registerGroupGo struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	group      string
-	args       *args.GeneratorArgs
-	customArgs *args2.CustomArgs
+	customArgs *args.CustomArgs
+}
+
+func (f *registerGroupGo) Name() string {
+	// Keep the old behavior of generating comments without the .go suffix
+	return strings.TrimSuffix(f.Filename(), ".go")
 }
 
 func (f *registerGroupGo) PackageConsts(*generator.Context) []string {

@@ -3,29 +3,26 @@ package generators
 import (
 	"io"
 
-	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
+	"k8s.io/gengo/v2/generator"
 )
 
-func ListTypesGo(gv schema.GroupVersion, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
+func ListTypesGo(gv schema.GroupVersion, customArgs *args.CustomArgs) generator.Generator {
 	return &listTypesGo{
 		gv:         gv,
-		args:       args,
 		customArgs: customArgs,
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "zz_generated_list_types",
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "zz_generated_list_types.go",
 		},
 	}
 }
 
 type listTypesGo struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	gv         schema.GroupVersion
-	args       *args.GeneratorArgs
-	customArgs *args2.CustomArgs
+	customArgs *args.CustomArgs
 }
 
 func (f *listTypesGo) Imports(*generator.Context) []string {
@@ -39,7 +36,7 @@ func (f *listTypesGo) Init(c *generator.Context, w io.Writer) error {
 		m := map[string]interface{}{
 			"type": t.Name,
 		}
-		args2.CheckType(c.Universe.Type(*t))
+		args.CheckType(c.Universe.Type(*t))
 		sw.Do(string(listTypesBody), m)
 	}
 

@@ -5,32 +5,29 @@ import (
 	"io"
 	"strings"
 
-	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	"github.com/rancher/wrangler/v2/pkg/name"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
-func RegisterGroupVersionGo(gv schema.GroupVersion, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
+func RegisterGroupVersionGo(gv schema.GroupVersion, customArgs *args.CustomArgs) generator.Generator {
 	return &registerGroupVersionGo{
 		gv:         gv,
-		args:       args,
 		customArgs: customArgs,
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "zz_generated_register",
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "zz_generated_register.go",
 		},
 	}
 }
 
 type registerGroupVersionGo struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	gv         schema.GroupVersion
-	args       *args.GeneratorArgs
-	customArgs *args2.CustomArgs
+	customArgs *args.CustomArgs
 }
 
 func (f *registerGroupVersionGo) Imports(*generator.Context) []string {

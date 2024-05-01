@@ -5,33 +5,30 @@ import (
 	"io"
 	"strings"
 
-	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
-func TypeGo(gv schema.GroupVersion, name *types.Name, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
+func TypeGo(gv schema.GroupVersion, name *types.Name, customArgs *args.CustomArgs) generator.Generator {
 	return &typeGo{
 		name:       name,
 		gv:         gv,
-		args:       args,
 		customArgs: customArgs,
-		DefaultGen: generator.DefaultGen{
-			OptionalName: strings.ToLower(name.Name),
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: fmt.Sprintf("%s.go", strings.ToLower(name.Name)),
 		},
 	}
 }
 
 type typeGo struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	name       *types.Name
 	gv         schema.GroupVersion
-	args       *args.GeneratorArgs
-	customArgs *args2.CustomArgs
+	customArgs *args.CustomArgs
 }
 
 func (f *typeGo) Imports(context *generator.Context) []string {
@@ -44,7 +41,7 @@ func (f *typeGo) Imports(context *generator.Context) []string {
 func (f *typeGo) Init(c *generator.Context, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "{{", "}}")
 
-	if err := f.DefaultGen.Init(c, w); err != nil {
+	if err := f.GoGenerator.Init(c, w); err != nil {
 		return err
 	}
 

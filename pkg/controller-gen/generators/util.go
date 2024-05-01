@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 )
 
 var (

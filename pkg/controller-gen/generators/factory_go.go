@@ -4,29 +4,26 @@ import (
 	"fmt"
 	"io"
 
-	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"k8s.io/gengo/v2/generator"
 )
 
-func FactoryGo(group string, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
+func FactoryGo(group string, customArgs *args.CustomArgs) generator.Generator {
 	return &factory{
 		group:      group,
-		args:       args,
 		customArgs: customArgs,
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "factory",
-			OptionalBody: []byte(factoryBody),
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "factory.go",
+			OptionalBody:   []byte(factoryBody),
 		},
 	}
 }
 
 type factory struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	group      string
-	args       *args.GeneratorArgs
-	customArgs *args2.CustomArgs
+	customArgs *args.CustomArgs
 }
 
 func (f *factory) Imports(*generator.Context) []string {
@@ -43,7 +40,7 @@ func (f *factory) Imports(*generator.Context) []string {
 }
 
 func (f *factory) Init(c *generator.Context, w io.Writer) error {
-	if err := f.DefaultGen.Init(c, w); err != nil {
+	if err := f.GoGenerator.Init(c, w); err != nil {
 		return err
 	}
 

@@ -4,30 +4,27 @@ import (
 	"fmt"
 	"io"
 
-	args2 "github.com/rancher/wrangler/v2/pkg/controller-gen/args"
-	"k8s.io/gengo/args"
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
+	"github.com/rancher/wrangler/v2/pkg/controller-gen/args"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
 )
 
-func GroupInterfaceGo(group string, args *args.GeneratorArgs, customArgs *args2.CustomArgs) generator.Generator {
+func GroupInterfaceGo(group string, customArgs *args.CustomArgs) generator.Generator {
 	return &interfaceGo{
 		group:      group,
-		args:       args,
 		customArgs: customArgs,
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "interface",
-			OptionalBody: []byte(interfaceBody),
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "interface.go",
+			OptionalBody:   []byte(interfaceBody),
 		},
 	}
 }
 
 type interfaceGo struct {
-	generator.DefaultGen
+	generator.GoGenerator
 
 	group      string
-	args       *args.GeneratorArgs
-	customArgs *args2.CustomArgs
+	customArgs *args.CustomArgs
 }
 
 func (f *interfaceGo) Imports(context *generator.Context) []string {
@@ -63,7 +60,7 @@ func (f *interfaceGo) Init(c *generator.Context, w io.Writer) error {
 	}
 	sw.Do("}\n", nil)
 
-	if err := f.DefaultGen.Init(c, w); err != nil {
+	if err := f.GoGenerator.Init(c, w); err != nil {
 		return err
 	}
 
