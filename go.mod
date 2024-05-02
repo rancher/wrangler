@@ -22,7 +22,7 @@ require (
 	k8s.io/client-go v0.30.0
 	k8s.io/code-generator v0.30.0
 	k8s.io/gengo v0.0.0-20240228010128-51d4e06bde70
-	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70
+	k8s.io/gengo/v2 v2.0.0-20240404160639-a0386bf69313
 	k8s.io/kube-aggregator v0.30.0
 	sigs.k8s.io/cli-utils v0.35.0
 )
