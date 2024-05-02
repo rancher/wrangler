@@ -9,11 +9,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	gvk2 "github.com/rancher/wrangler/v2/pkg/gvk"
+	gvk2 "github.com/rancher/wrangler/v3/pkg/gvk"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/wrangler/v2/pkg/apply/injectors"
-	"github.com/rancher/wrangler/v2/pkg/objectset"
+	"github.com/rancher/wrangler/v3/pkg/apply/injectors"
+	"github.com/rancher/wrangler/v3/pkg/objectset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

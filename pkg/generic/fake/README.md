@@ -26,8 +26,8 @@ import (
 	"testing"
     
 	"github.com/golang/mock/gomock"
-	wranglerv1 "github.com/rancher/wrangler/v2/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v2/pkg/generic/fake"
+	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	v1 "k8s.io/api/apps/v1"
 )
 

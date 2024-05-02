@@ -1,4 +1,4 @@
-module github.com/rancher/wrangler/v2
+module github.com/rancher/wrangler/v3
 
 go 1.22.0
 

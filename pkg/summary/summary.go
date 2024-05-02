@@ -3,8 +3,8 @@ package summary
 import (
 	"strings"
 
-	"github.com/rancher/wrangler/v2/pkg/data"
-	unstructured2 "github.com/rancher/wrangler/v2/pkg/unstructured"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	unstructured2 "github.com/rancher/wrangler/v3/pkg/unstructured"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

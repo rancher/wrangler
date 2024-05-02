@@ -1,7 +1,7 @@
 package data
 
 import (
-	"github.com/rancher/wrangler/v2/pkg/data/convert"
+	"github.com/rancher/wrangler/v3/pkg/data/convert"
 )
 
 type List []map[string]interface{}

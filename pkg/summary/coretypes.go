@@ -1,8 +1,8 @@
 package summary
 
 import (
-	"github.com/rancher/wrangler/v2/pkg/data"
-	"github.com/rancher/wrangler/v2/pkg/data/convert"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
