@@ -30,14 +30,5 @@ jobs:
         go-version-file: 'go.mod'
     - name : Install mockgen
       run: go install -v -x github.com/golang/mock/mockgen@v1.6.0
-    - name : Debug - WIP
-      run: |
-        env
-        echo $PATH
-        echo "uname -m is $(uname -m)"
-        [ -e /go/bin ] && ls -lr /go/bin
-        #find $HOME/go/bin -print
-        #ls /opt/hostedtoolcache/go/1.22.0
-        #ls /opt/hostedtoolcache/go/1.22.0/*/bin
     - name : Run CI
       run: bash scripts/ci
