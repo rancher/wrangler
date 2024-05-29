@@ -18,7 +18,6 @@ jobs:
         - arm64
     runs-on: org-${{ github.repository_owner_id }}-${{ matrix.arch }}-k8s
     container: registry.suse.com/bci/golang:1.22
-    # rancher/dapper:v0.5.4
     steps:
     - name : Checkout repository
       # https://github.com/actions/checkout/releases/tag/v4.1.1
