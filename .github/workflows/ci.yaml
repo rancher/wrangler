@@ -21,7 +21,7 @@ jobs:
     steps:
     - name : Checkout repository
       # https://github.com/actions/checkout/releases/tag/v4.1.1
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
     - name : Install mockgen
       run: go install -v -x github.com/golang/mock/mockgen@v1.6.0
     - name : Run CI
