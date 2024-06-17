@@ -1,8 +1,5 @@
 name: golangci-lint
 
-env:
-  SETUP_GO_VERSION: '^1.21'
-
 on:
   push:
   pull_request:
@@ -25,7 +22,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.SETUP_GO_VERSION }}
+          go-version-file: go.mod
 
       - name: Generate Golang
         run: |
