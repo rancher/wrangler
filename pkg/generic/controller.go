@@ -54,7 +54,7 @@ type ControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
 
 	// OnRemove runs the given object handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T], opts ...OnRemoveOption)
 
 	// Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
 	Enqueue(namespace, name string)
@@ -75,7 +75,7 @@ type NonNamespacedControllerInterface[T RuntimeMetaObject, TList runtime.Object]
 	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
 
 	// OnRemove runs the given object handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T], opts ...OnRemoveOption)
 
 	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
@@ -244,8 +244,8 @@ func (c *Controller[T, TList]) OnChange(ctx context.Context, name string, sync O
 }
 
 // OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *Controller[T, TList]) OnRemove(ctx context.Context, name string, sync ObjectHandler[T]) {
-	c.AddGenericHandler(ctx, name, NewRemoveHandler(name, c.Updater(), FromObjectHandlerToHandler(sync)))
+func (c *Controller[T, TList]) OnRemove(ctx context.Context, name string, sync ObjectHandler[T], opts ...OnRemoveOption) {
+	c.AddGenericHandler(ctx, name, NewRemoveHandler(name, c.Updater(), FromObjectHandlerToHandler(sync), opts...))
 }
 
 // Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.

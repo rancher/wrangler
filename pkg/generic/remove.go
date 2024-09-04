@@ -11,17 +11,23 @@ var (
 
 type Updater func(runtime.Object) (runtime.Object, error)
 
+// objectLifecycleAdapter adds a finalizer to the resources to block resources deletion until the configured handler could be executed
 type objectLifecycleAdapter struct {
-	name    string
-	handler Handler
-	updater Updater
+	name      string
+	handler   Handler
+	updater   Updater
+	condition func(runtime.Object) bool
 }
 
-func NewRemoveHandler(name string, updater Updater, handler Handler) Handler {
+func NewRemoveHandler(name string, updater Updater, handler Handler, opts ...OnRemoveOption) Handler {
 	o := objectLifecycleAdapter{
-		name:    name,
-		handler: handler,
-		updater: updater,
+		name:      name,
+		handler:   handler,
+		updater:   updater,
+		condition: includeAll,
+	}
+	for _, opt := range opts {
+		opt(&o)
 	}
 	return o.sync
 }
@@ -104,7 +110,7 @@ func (o *objectLifecycleAdapter) removeFinalizer(obj runtime.Object) (runtime.Ob
 }
 
 func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {
-	if o.hasFinalizer(obj) {
+	if o.hasFinalizer(obj) || !o.condition(obj) {
 		return obj, nil
 	}
 
