@@ -17,12 +17,12 @@ require (
 	golang.org/x/text v0.14.0
 	golang.org/x/tools v0.18.0
 	k8s.io/api v0.30.0
-	k8s.io/apiextensions-apiserver v0.27.4
+	k8s.io/apiextensions-apiserver v0.27.16
 	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v0.30.0
-	k8s.io/code-generator v0.27.4
+	k8s.io/code-generator v0.27.16
 	k8s.io/gengo v0.0.0-20240826214909-a7b603a56eb7
-	k8s.io/kube-aggregator v0.27.4
+	k8s.io/kube-aggregator v0.27.16
 	sigs.k8s.io/cli-utils v0.27.0
 )
 
