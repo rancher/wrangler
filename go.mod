@@ -7,12 +7,12 @@ toolchain go1.22.6
 require (
 	github.com/evanphx/json-patch v5.9.0+incompatible
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang/mock v1.6.0
 	github.com/moby/locker v1.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/rancher/lasso v0.0.0-20240705194423-b2a060d103c1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
+	go.uber.org/mock v0.4.0
 	golang.org/x/sync v0.8.0
 	golang.org/x/text v0.17.0
 	golang.org/x/tools v0.24.0
