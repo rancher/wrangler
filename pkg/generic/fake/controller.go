@@ -740,15 +740,20 @@ func (mr *MockControllerInterfaceMockRecorder[T, TList]) OnChange(ctx, name, syn
 }
 
 // OnRemove mocks base method.
-func (m *MockControllerInterface[T, TList]) OnRemove(ctx context.Context, name string, sync generic.ObjectHandler[T]) {
+func (m *MockControllerInterface[T, TList]) OnRemove(ctx context.Context, name string, sync generic.ObjectHandler[T], opts ...generic.OnRemoveOption) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnRemove", ctx, name, sync)
+	varargs := []any{ctx, name, sync}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "OnRemove", varargs...)
 }
 
 // OnRemove indicates an expected call of OnRemove.
-func (mr *MockControllerInterfaceMockRecorder[T, TList]) OnRemove(ctx, name, sync any) *gomock.Call {
+func (mr *MockControllerInterfaceMockRecorder[T, TList]) OnRemove(ctx, name, sync any, opts ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnRemove", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).OnRemove), ctx, name, sync)
+	varargs := append([]any{ctx, name, sync}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnRemove", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).OnRemove), varargs...)
 }
 
 // Patch mocks base method.
@@ -1030,15 +1035,20 @@ func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) OnChange(c
 }
 
 // OnRemove mocks base method.
-func (m *MockNonNamespacedControllerInterface[T, TList]) OnRemove(ctx context.Context, name string, sync generic.ObjectHandler[T]) {
+func (m *MockNonNamespacedControllerInterface[T, TList]) OnRemove(ctx context.Context, name string, sync generic.ObjectHandler[T], opts ...generic.OnRemoveOption) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "OnRemove", ctx, name, sync)
+	varargs := []any{ctx, name, sync}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	m.ctrl.Call(m, "OnRemove", varargs...)
 }
 
 // OnRemove indicates an expected call of OnRemove.
-func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) OnRemove(ctx, name, sync any) *gomock.Call {
+func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) OnRemove(ctx, name, sync any, opts ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnRemove", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).OnRemove), ctx, name, sync)
+	varargs := append([]any{ctx, name, sync}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "OnRemove", reflect.TypeOf((*MockNonNamespacedControllerInterface[T, TList])(nil).OnRemove), varargs...)
 }
 
 // Patch mocks base method.
