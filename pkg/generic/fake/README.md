@@ -65,7 +65,13 @@ mock.EXPECT().List(gomock.Any()).Return(nil, nil)
 ```
 
 ## Fake Generation
-This package was generated with `mockgen`, see [`generate.go`](./generate.go).
+This package was generated with `mockgen` (see [`generate.go`](./generate.go)), just run:
+```shell
+go generate ./...
+```
+to recreate them.
+
+#### Caveats
 
 Due to incomplete support for generics, some modifications over the original file need to be applied for the generation
 to succeeed.
