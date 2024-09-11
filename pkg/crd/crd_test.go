@@ -1,7 +1,6 @@
 package crd
 
-// Mocks generated with
-// mockgen --build_flags=--mod=mod -package crd -destination ./mockCRDClient_test.go "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1" CustomResourceDefinitionInterface
+//go:generate mockgen --build_flags=--mod=mod -package crd -destination ./mockCRDClient_test.go "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1" CustomResourceDefinitionInterface
 
 import (
 	"context"
@@ -10,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"

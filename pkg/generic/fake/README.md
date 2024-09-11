@@ -65,16 +65,15 @@ mock.EXPECT().List(gomock.Any()).Return(nil, nil)
 ```
 
 ## Fake Generation
-This package was generated with `mockgen -package fake -destination ./controller.go -source ../controller.go` and `mockgen -package fake -destination ./cache.go -source ../cache.go`
+This package was generated with `mockgen` (see [`generate.go`](./generate.go)), just run:
+```shell
+go generate ./...
+```
+to recreate them.
 
-Due to an open issue with mockgen https://github.com/golang/mock/issues/649
-`controller.go` must be modified for the generation to succeed.
+#### Caveats
+
+Due to incomplete support for generics, some modifications over the original file need to be applied for the generation
+to succeeed.
+#### `controller.go`
 1. Comment out the `comparable` in RuntimeMetaObject
-2. Remove `[T, TList]` on `ClientInterface` embedded into ControllerInterface and NonNamespacedControllerInterface. This will cause the file to no longer build but the generation will succeed.
-   
-    ``` golang
-        type ControllerInterface[T RuntimeMetaObject, TList runtime.Object interface {
-            ControllerMeta
-            ClientInterface //[T, TList]
-
-    ```
