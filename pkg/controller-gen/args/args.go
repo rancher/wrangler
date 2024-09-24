@@ -47,6 +47,8 @@ type Group struct {
 	GenerateListers bool
 	// Generate informers
 	GenerateInformers bool
+	// Generate openapi
+	GenerateOpenAPI bool
 	// The package name of the API types
 	PackageName string
 }
