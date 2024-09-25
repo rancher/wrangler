@@ -8,7 +8,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/moby/locker v1.0.1
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/lasso v0.0.0-20240123150939-7055397d6dfa
+	github.com/rancher/lasso 8f384efc8813
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.8.0
