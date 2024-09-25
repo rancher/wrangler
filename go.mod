@@ -10,7 +10,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/moby/locker v1.0.1
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/lasso v0.0.0-20240809125800-8da6f11865d5
+	github.com/rancher/lasso 8f384efc8813
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.6.0
