@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
@@ -285,30 +286,43 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 	openAPIArgs.OutputFile = "zz_generated_openapi.go"
 	openAPIArgs.OutputPkg = customArgs.Options.OutputPackage
 	openAPIArgs.GoHeaderFile = customArgs.Options.Boilerplate
-	openAPIArgs.ReportFilename = "-"
 
 	if err := openAPIArgs.Validate(); err != nil {
 		return err
 	}
 
-	getTargets := setGenClient(groups, customArgs.TypesByGroup, func(context *generator.Context) []generator.Target {
+	getTargets := func(context *generator.Context) []generator.Target {
 		return oa.GetTargets(context, openAPIArgs)
-	})
+	}
 
-	inputDirs := []string{}
+	inputDirs := map[string]bool{}
 	for gv, names := range customArgs.TypesByGroup {
 		if !groups[gv.Group] {
 			continue
 		}
-		inputDirs = append(inputDirs, names[0].Package)
+
+		if _, found := inputDirs[names[0].Package]; !found {
+			inputDirs[names[0].Package] = true
+		}
+
+		group := customArgs.Options.Groups[gv.Group]
+		if len(group.OpenAPIDependencies) > 0 {
+			for _, dep := range group.OpenAPIDependencies {
+				if _, found := inputDirs[dep]; !found {
+					inputDirs[dep] = true
+				}
+			}
+		}
 	}
+
+	logrus.Info(inputDirs)
 
 	return gengo.Execute(
 		oa.NameSystems(),
 		oa.DefaultNameSystem(),
 		getTargets,
 		gengo.StdBuildTag,
-		inputDirs,
+		maps.Keys(inputDirs),
 	)
 }
 
