@@ -2,13 +2,13 @@ package controllergen
 
 import (
 	"fmt"
+	"golang.org/x/exp/maps"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
@@ -284,7 +284,7 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 	openAPIArgs := oaargs.New()
 	openAPIArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Options.OutputPackage, "openapi")
 	openAPIArgs.OutputFile = "zz_generated_openapi.go"
-	openAPIArgs.OutputPkg = customArgs.Options.OutputPackage
+	openAPIArgs.OutputPkg = customArgs.Options.OutputPackage + "/openapi"
 	openAPIArgs.GoHeaderFile = customArgs.Options.Boilerplate
 
 	if err := openAPIArgs.Validate(); err != nil {
@@ -314,8 +314,6 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 			}
 		}
 	}
-
-	logrus.Info(inputDirs)
 
 	return gengo.Execute(
 		oa.NameSystems(),
