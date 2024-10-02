@@ -2,7 +2,6 @@ package controllergen
 
 import (
 	"fmt"
-	"golang.org/x/exp/maps"
 	"io"
 	"os"
 	"path/filepath"
@@ -291,28 +290,29 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		return err
 	}
 
-	getTargets := func(context *generator.Context) []generator.Target {
-		return oa.GetTargets(context, openAPIArgs)
-	}
-
-	inputDirs := map[string]bool{}
+	inputDirsMap := map[string]bool{}
+	inputDirs := []string{}
 	for gv, names := range customArgs.TypesByGroup {
 		if !groups[gv.Group] {
 			continue
 		}
 
-		if _, found := inputDirs[names[0].Package]; !found {
-			inputDirs[names[0].Package] = true
+		if _, found := inputDirsMap[names[0].Package]; !found {
+			inputDirsMap[names[0].Package] = true
+			inputDirs = append(inputDirs, names[0].Package)
 		}
 
 		group := customArgs.Options.Groups[gv.Group]
-		if len(group.OpenAPIDependencies) > 0 {
-			for _, dep := range group.OpenAPIDependencies {
-				if _, found := inputDirs[dep]; !found {
-					inputDirs[dep] = true
-				}
+		for _, dep := range group.OpenAPIDependencies {
+			if _, found := inputDirsMap[dep]; !found {
+				inputDirsMap[dep] = true
+				inputDirs = append(inputDirs, dep)
 			}
 		}
+	}
+
+	getTargets := func(context *generator.Context) []generator.Target {
+		return oa.GetTargets(context, openAPIArgs)
 	}
 
 	return gengo.Execute(
@@ -320,7 +320,7 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		oa.DefaultNameSystem(),
 		getTargets,
 		gengo.StdBuildTag,
-		maps.Keys(inputDirs),
+		inputDirs,
 	)
 }
 
