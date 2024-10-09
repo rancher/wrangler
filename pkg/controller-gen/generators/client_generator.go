@@ -92,19 +92,17 @@ func (cg *ClientGenerator) typesGroupVersionDocPackage(name *types.Name, gv sche
 		}
 	})
 
-	var headerComment string
-
-	headerComment += string(customArgs.BoilerplateContent)
-	headerComment += fmt.Sprintln()
-	headerComment += fmt.Sprintln(`// +k8s:deepcopy-gen=package`)
-
+	openAPIDirective := ""
 	if customArgs.Options.Groups[gv.Group].GenerateOpenAPI {
-		headerComment += fmt.Sprintln(`// +k8s:openapi-gen=true`)
+		openAPIDirective = fmt.Sprintf("\n// +k8s:openapi-gen=true")
 	}
 
-	headerComment += fmt.Sprintln(`// +groupName=`, gv.Group)
-
-	p.HeaderComment = []byte(headerComment)
+	p.HeaderComment = []byte(fmt.Sprintf(`
+%s
+%s
+// +k8s:deepcopy-gen=package
+// +groupName=%s
+`, string(customArgs.BoilerplateContent), openAPIDirective, gv.Group))
 
 	return p
 }
