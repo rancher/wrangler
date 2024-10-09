@@ -124,7 +124,7 @@ func Run(opts cgargs.Options) {
 	}
 
 	if err := generateOpenAPI(openAPIGroups, customArgs); err != nil {
-		logrus.Fatalf("openapi failed: %w", err)
+		logrus.Fatalf("openapi failed: %v", err)
 	}
 
 	if err := copyGoPathToModules(customArgs); err != nil {
