@@ -45,7 +45,7 @@ var (
 )
 
 // prepareObjectForCreate returns a copy of the object with the "applied"
-// annotation set. The 'applied' annotation contains a serialized, pruned
+// annotation set. The "applied" annotation contains a serialized and pruned
 // representation of obj, e.g. Strings are shortened to 64 characters and bytes
 // are skipped.
 func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (runtime.Object, error) {
@@ -80,7 +80,7 @@ func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (ru
 }
 
 // originalAndModified returns the original bytes from the oldObject's
-// "applied" annotation and the 'modified' bytes for the newObject
+// "applied" annotation and the modified bytes for the newObject.
 func originalAndModified(gvk schema.GroupVersionKind, oldMetadata v1.Object, newObject runtime.Object) ([]byte, []byte, error) {
 	original, err := getOriginalBytes(gvk, oldMetadata)
 	if err != nil {
@@ -174,7 +174,7 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-// applyPatch applies the patch to the object and returns true if the object was changed
+// applyPatch applies the patch to the object and returns true if the object was changed.
 func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal bool, oldObject, newObject runtime.Object, diffPatches [][]byte) (bool, error) {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
