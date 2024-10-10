@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/jsonmergepatch"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	"k8s.io/client-go/dynamic"
 )
 
 const (
@@ -45,6 +44,10 @@ var (
 	}
 )
 
+// prepareObjectForCreate returns a copy of the object with the "applied"
+// annotation set. The "applied" annotation contains a serialized and pruned
+// representation of obj, e.g. Strings are shortened to 64 characters and bytes
+// are skipped.
 func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (runtime.Object, error) {
 	serialized, err := serializeApplied(obj)
 	if err != nil {
@@ -76,6 +79,8 @@ func prepareObjectForCreate(gvk schema.GroupVersionKind, obj runtime.Object) (ru
 	return obj, nil
 }
 
+// originalAndModified returns the original bytes from the oldObject's
+// "applied" annotation and the modified bytes for the newObject.
 func originalAndModified(gvk schema.GroupVersionKind, oldMetadata v1.Object, newObject runtime.Object) ([]byte, []byte, error) {
 	original, err := getOriginalBytes(gvk, oldMetadata)
 	if err != nil {
@@ -169,6 +174,7 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
+// applyPatch applies the patch to the object and returns true if the object was changed.
 func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal bool, oldObject, newObject runtime.Object, diffPatches [][]byte) (bool, error) {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
@@ -235,7 +241,8 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 	return true, err
 }
 
-func (o *desiredSet) compareObjects(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, client dynamic.NamespaceableResourceInterface, debugID string, oldObject, newObject runtime.Object, force bool) error {
+// compareObjects updates the resource with the passed in patcher. It considers WithDiffPatch and WithReconciler.
+func (o *desiredSet) compareObjects(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, oldObject, newObject runtime.Object) error {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
 		return err
