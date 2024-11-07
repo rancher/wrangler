@@ -157,14 +157,18 @@ func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
 			continue
 		}
 
-		return filepath.Walk(pkg, func(path string, info os.FileInfo, err error) error {
+		if err := filepath.Walk(pkg, func(path string, info os.FileInfo, err error) error {
 			newPath := strings.Replace(path, pkg, ".", 1)
 			if info.IsDir() {
 				return os.MkdirAll(newPath, info.Mode())
 			}
 
 			return copyFile(path, newPath)
-		})
+		}); err != nil {
+			return err
+		}
+
+		return deleteFile(pkg)
 	}
 
 	return nil
@@ -193,6 +197,10 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.Chmod(dst, srcinfo.Mode())
+}
+
+func deleteFile(path string) error {
+	return os.RemoveAll(path)
 }
 
 func generateDeepcopy(groups map[string]bool, customArgs *cgargs.CustomArgs) error {
