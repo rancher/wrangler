@@ -149,7 +149,7 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 		newStatus = *origStatus.DeepCopy()
 	}
 
-	if a.condition != "" {
+	if a.condition != "" && err != nil {
 		if errors.IsConflict(err) {
 			a.condition.SetError(&newStatus, "", nil)
 		} else {
