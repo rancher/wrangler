@@ -13,7 +13,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/mock v0.4.0
-	golang.org/x/sync v0.8.0
+	golang.org/x/sync v0.10.0
 	golang.org/x/text v0.17.0
 	golang.org/x/tools v0.24.0
 	k8s.io/api v0.31.1
