@@ -108,11 +108,11 @@ func Test_objectLifecycleAdapter_sync(t *testing.T) {
 					t.Errorf("sync() unexpected value = %v, err: %v", got, err)
 				}
 			}
-			if got, want := handlerCount, tt.wantHandlerCount; got != want {
-				t.Errorf("handlerCount = %v, want %v", got, want)
+			if handlerCount != tt.wantHandlerCount {
+				t.Errorf("handlerCount = %v, want %v", handlerCount, tt.wantHandlerCount)
 			}
-			if got, want := updaterCount, tt.wantUpdaterCount; got != want {
-				t.Errorf("updaterCount = %v, want %v", got, want)
+			if updaterCount != tt.wantUpdaterCount {
+				t.Errorf("updaterCount = %v, want %v", updaterCount, tt.wantUpdaterCount)
 			}
 		})
 	}
