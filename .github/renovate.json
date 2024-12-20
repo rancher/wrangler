@@ -3,7 +3,7 @@
     "github>rancher/renovate-config#release"
   ],
   "baseBranches": [
-    "master",
+    "main",
     "release-2.1",
     "release-2.0-untagged"
   ],

@@ -6,8 +6,8 @@ on:
     tags:
       - v*
     branches:
-      - 'release-*'
-      - 'master'
+      - 'release/*'
+      - 'main'
 
 jobs:
   ci:
