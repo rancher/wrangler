@@ -21,11 +21,12 @@ import (
 
 	cs "k8s.io/code-generator/cmd/client-gen/generators"
 	types2 "k8s.io/code-generator/cmd/client-gen/types"
+	dpargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
+	dp "k8s.io/code-generator/cmd/deepcopy-gen/generators"
 	infargs "k8s.io/code-generator/cmd/informer-gen/args"
 	inf "k8s.io/code-generator/cmd/informer-gen/generators"
 	lsargs "k8s.io/code-generator/cmd/lister-gen/args"
 	ls "k8s.io/code-generator/cmd/lister-gen/generators"
-	dp "k8s.io/gengo/examples/deepcopy-gen/generators"
 	oaargs "k8s.io/kube-openapi/cmd/openapi-gen/args"
 	oa "k8s.io/kube-openapi/pkg/generators"
 )
@@ -200,25 +201,30 @@ func generateDeepcopy(groups map[string]bool, customArgs *cgargs.CustomArgs) err
 		return nil
 	}
 
-	deepCopyCustomArgs := &dp.CustomArgs{}
+	deepCopyArgs := dpargs.New()
+	deepCopyArgs.OutputFile = "zz_generated_deepcopy.go"
+	deepCopyArgs.GoHeaderFile = customArgs.Options.Boilerplate
 
-	args := args.Default().WithoutDefaultFlagParsing()
-	args.CustomArgs = deepCopyCustomArgs
-	args.OutputBase = customArgs.OutputBase
-	args.OutputFileBaseName = "zz_generated_deepcopy"
-	args.GoHeaderFilePath = customArgs.Options.Boilerplate
-
+	inputDirs := []string{}
 	for gv, names := range customArgs.TypesByGroup {
 		if !groups[gv.Group] {
 			continue
 		}
-		args.InputDirs = append(args.InputDirs, names[0].Package)
-		deepCopyCustomArgs.BoundingDirs = append(deepCopyCustomArgs.BoundingDirs, names[0].Package)
+		inputDirs = append(inputDirs, names[0].Package)
+		deepCopyArgs.BoundingDirs = append(deepCopyArgs.BoundingDirs, names[0].Package)
 	}
 
-	return args.Execute(dp.NameSystems(),
+	getTargets := func(context *generator.Context) []generator.Target {
+		return dp.GetTargets(context, deepCopyArgs)
+	}
+
+	return gengo.Execute(
+		dp.NameSystems(),
 		dp.DefaultNameSystem(),
-		dp.Packages)
+		getTargets,
+		gengo.StdBuildTag,
+		inputDirs,
+	)
 }
 
 func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) error {
