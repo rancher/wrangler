@@ -16,6 +16,7 @@ import (
 	cgargs "github.com/rancher/wrangler/v3/pkg/controller-gen/args"
 	"github.com/rancher/wrangler/v3/pkg/controller-gen/generators"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/tools/imports"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	csargs "k8s.io/code-generator/cmd/client-gen/args"
 
@@ -62,6 +63,13 @@ func Run(opts cgargs.Options) {
 	clientGen := generators.NewClientGenerator()
 
 	getTargets := func(context *generator.Context) []generator.Target {
+		// replace the default formatter options to ensure unused imports are pruned.
+		// ref: https://github.com/kubernetes/gengo/pull/277#issuecomment-2557462569
+		goGenerator := generator.NewGoFile()
+		goGenerator.Format = func(src []byte) ([]byte, error) {
+			return imports.Process("", src, nil)
+		}
+		context.FileTypes[generator.GoFileType] = goGenerator
 		return clientGen.GetTargets(context, customArgs)
 	}
 	if err := gengo.Execute(
