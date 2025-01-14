@@ -12,20 +12,26 @@
     },
     "linters-settings": {
         "govet": {
-            "check-shadowing": false
+            "disable": [
+                "shadow"
+            ]
         },
         "revive": {
-            "rules": {
-                "name": "confusing-naming",
-                "disabled": true
-            }
+            "rules": [
+                {
+                    "name": "confusing-naming",
+                    "disabled": true
+                }
+            ]
         }
     },
     "run": {
-        "skip-dirs": [
-            "pkg/generated"
-        ],
         "tests": false,
         "timeout": "10m"
+    },
+    "issues": {
+        "exclude-dirs": [
+            "pkg/generated"
+        ]
     }
 }
