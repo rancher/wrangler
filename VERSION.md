@@ -17,5 +17,5 @@ The current supported release lines are:
 
 | Wrangler Branch | Wrangler Major version | Supported Kubernetes Versions |
 |--------------------------|------------------------------------|------------------------------------------------|
-| main | v3 | v1.26 - v1.30 |
+| main | v3 | v1.26 - v1.32 |
 | release/v2 | v2 | v1.23 - v1.26 |
