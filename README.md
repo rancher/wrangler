@@ -361,3 +361,7 @@ type FooCache interface {
 type FooIndexer func(obj *v1alpha1.Foo) ([]string, error)
 
 ```
+
+# Versioning
+
+See [VERSION.md](VERSION.md).
