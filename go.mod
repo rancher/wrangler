@@ -21,7 +21,7 @@ require (
 	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v0.30.0
 	k8s.io/code-generator v0.27.4
-	k8s.io/gengo v0.0.0-20240826214909-a7b603a56eb7
+	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511
 	k8s.io/kube-aggregator v0.27.4
 	sigs.k8s.io/cli-utils v0.27.0
 )
