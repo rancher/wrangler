@@ -13,7 +13,7 @@ require (
 	github.com/rancher/lasso v0.0.0-20240809125800-8da6f11865d5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/sync v0.6.0
+	golang.org/x/sync v0.11.0
 	golang.org/x/text v0.14.0
 	golang.org/x/tools v0.18.0
 	k8s.io/api v0.30.0
