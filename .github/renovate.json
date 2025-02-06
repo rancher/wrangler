@@ -4,8 +4,7 @@
   ],
   "baseBranches": [
     "main",
-    "release-2.1",
-    "release-2.0-untagged"
+    "release/v2",
   ],
   "prHourlyLimit": 2
 }
