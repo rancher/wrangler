@@ -2,7 +2,7 @@ module github.com/rancher/wrangler/v3
 
 go 1.23.0
 
-toolchain go1.23.4
+toolchain go1.23.6
 
 require (
 	github.com/evanphx/json-patch v5.9.0+incompatible
