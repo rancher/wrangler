@@ -16,13 +16,13 @@ require (
 	golang.org/x/sync v0.11.0
 	golang.org/x/text v0.22.0
 	golang.org/x/tools v0.30.0
-	k8s.io/api v0.29.3
-	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/apimachinery v0.29.3
-	k8s.io/client-go v0.29.3
-	k8s.io/code-generator v0.29.3
+	k8s.io/api v0.31.6
+	k8s.io/apiextensions-apiserver v0.31.6
+	k8s.io/apimachinery v0.31.6
+	k8s.io/client-go v0.31.6
+	k8s.io/code-generator v0.31.6
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01
-	k8s.io/kube-aggregator v0.29.3
+	k8s.io/kube-aggregator v0.31.6
 	sigs.k8s.io/cli-utils v0.35.0
 )
 
