@@ -6,5 +6,23 @@
     "main",
     "release/v2"
   ],
-  "prHourlyLimit": 2
+  "prHourlyLimit": 2,
+  "packageRules": [
+    {
+      "matchPackagePatterns": [
+        "k8s.io/*",
+        "sigs.k8s.io/*",
+        "go.opentelemetry.io/*",
+        "github.com/prometheus/*"
+      ],
+      "enabled": false
+    },
+    {
+      "matchPackagePatterns": [
+        "github.com/rancher/lasso/*"
+      ],
+      "matchUpdateTypes": ["major", "minor"],
+      "enabled": false
+    }
+  ] 
 }
