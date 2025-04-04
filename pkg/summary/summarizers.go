@@ -1,20 +1,33 @@
 package summary
 
 import (
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
+	"github.com/rancher/wrangler/v3/pkg/gvk"
 	"github.com/rancher/wrangler/v3/pkg/kv"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kstatus "sigs.k8s.io/cli-utils/pkg/kstatus/status"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
 	kindSep = ", Kind="
 	reason  = "%REASON%"
 )
+
+type ConditionTypeStatus struct {
+	Type   string
+	Status metav1.ConditionStatus
+}
+
+type ConditionTypeStatusErrorMapping map[ConditionTypeStatus]bool
 
 var (
 	// True ==
@@ -80,6 +93,17 @@ var (
 	// Unknown ==
 	ErrorFalse = map[string]bool{
 		"Failed": true,
+	}
+
+	// For given GVK, This condition Type and this Status, indicates an error or not
+	// e.g.: GVK: helm.cattle.io/v1, HelmChart
+	//            --> Type: JobCreated, Status: True, IsError: false
+	//            --> Type: Failed, Status: True, IsError: false
+	GVKConditionErrorMapping = map[schema.GroupVersionKind]ConditionTypeStatusErrorMapping{
+		{Group: "helm.cattle.io", Version: "v1", Kind: "HelmChart"}: {
+			{"JobCreated", metav1.ConditionTrue}: false,
+			{"Failed", metav1.ConditionFalse}:    false,
+		},
 	}
 
 	// True ==
@@ -218,7 +242,55 @@ func checkStandard(obj data.Object, _ []Condition, summary Summary) Summary {
 	return summary
 }
 
-func checkErrors(_ data.Object, conditions []Condition, summary Summary) Summary {
+func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (Summary, bool) {
+	obj, err := json.Marshal(data)
+	if err != nil {
+		logrus.Errorln("checkGVKErrors: failed to marshal object: ", err.Error())
+		return summary, false
+	}
+
+	gvk, detected, err := gvk.Detect(obj)
+	if err != nil {
+		logrus.Errorln("checkGVKErrors: failed to detect GVK: ", err.Error())
+		return summary, false
+	}
+
+	if !detected {
+		return summary, false
+	}
+
+	errorMapping, found := GVKConditionErrorMapping[gvk]
+	if !found {
+		return summary, false
+	}
+
+	for _, c := range conditions {
+		isError, found := errorMapping[ConditionTypeStatus{c.Type(), metav1.ConditionStatus(c.Status())}]
+		if !found {
+			continue
+		}
+
+		if !isError {
+			continue
+		}
+
+		summary.Error = true
+		summary.Message = append(summary.Message, c.Message())
+		if summary.State == "active" || summary.State == "" {
+			summary.State = "error"
+		}
+		break
+	}
+
+	return summary, true
+}
+
+func checkErrors(data data.Object, conditions []Condition, summary Summary) Summary {
+	summary, handled := checkGVKErrors(data, conditions, summary)
+	if summary.Error || handled {
+		return summary
+	}
+
 	for _, c := range conditions {
 		if (ErrorFalse[c.Type()] && c.Status() == "False") || c.Reason() == "Error" {
 			summary.Error = true
