@@ -4,8 +4,8 @@ import (
 	"errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/rancher/wrangler/v3/pkg/generic"
 )
@@ -17,7 +17,7 @@ type MetaV1ConditionHandler struct {
 // getConditionsSlice attempts to retrieve and validate the slice of conditions
 // from the given object. It returns the slice of metav1.Condition if successful,
 // and nil otherwise.
-func getConditionsSlice(obj interface{}) ([]metav1.Condition, bool) {
+func getConditionsSlice(obj client.Object) ([]metav1.Condition, bool) {
 	condSliceValue := getValue(obj, "Status", "Conditions")
 
 	if !condSliceValue.IsValid() || condSliceValue.Kind() != reflect.Slice {
@@ -29,7 +29,7 @@ func getConditionsSlice(obj interface{}) ([]metav1.Condition, bool) {
 	return conditions, ok
 }
 
-func findCondition(obj interface{}, name string) *metav1.Condition {
+func findCondition(obj client.Object, name string) *metav1.Condition {
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
 		return nil
@@ -37,7 +37,7 @@ func findCondition(obj interface{}, name string) *metav1.Condition {
 	return meta.FindStatusCondition(conditionsSlice, name)
 }
 
-func (ch *MetaV1ConditionHandler) HasCondition(obj interface{}) bool {
+func (ch *MetaV1ConditionHandler) HasCondition(obj client.Object) bool {
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok || len(conditionsSlice) == 0 {
 		return false
@@ -52,7 +52,7 @@ func (ch *MetaV1ConditionHandler) HasCondition(obj interface{}) bool {
 	return false
 }
 
-func (ch *MetaV1ConditionHandler) GetStatus(obj interface{}) string {
+func (ch *MetaV1ConditionHandler) GetStatus(obj client.Object) string {
 	foundCondition := findCondition(obj, ch.RootCondition.Name())
 	if foundCondition == nil {
 		return ""
@@ -61,11 +61,11 @@ func (ch *MetaV1ConditionHandler) GetStatus(obj interface{}) string {
 	return string(foundCondition.Status)
 }
 
-func (ch *MetaV1ConditionHandler) SetStatus(obj interface{}, status string) {
+func (ch *MetaV1ConditionHandler) SetStatus(obj client.Object, status string) {
 	ch.setStatus(obj, status)
 }
 
-func (ch *MetaV1ConditionHandler) SetStatusBool(obj interface{}, val bool) {
+func (ch *MetaV1ConditionHandler) SetStatusBool(obj client.Object, val bool) {
 	if val {
 		ch.setStatus(obj, "True")
 	} else {
@@ -73,10 +73,10 @@ func (ch *MetaV1ConditionHandler) SetStatusBool(obj interface{}, val bool) {
 	}
 }
 
-func (ch *MetaV1ConditionHandler) False(obj interface{}) {
+func (ch *MetaV1ConditionHandler) False(obj client.Object) {
 	ch.setStatus(obj, "False")
 }
-func (ch *MetaV1ConditionHandler) IsFalse(obj interface{}) bool {
+func (ch *MetaV1ConditionHandler) IsFalse(obj client.Object) bool {
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
 		return false
@@ -85,11 +85,11 @@ func (ch *MetaV1ConditionHandler) IsFalse(obj interface{}) bool {
 	return meta.IsStatusConditionFalse(conditionsSlice, ch.RootCondition.Name())
 }
 
-func (ch *MetaV1ConditionHandler) True(obj interface{}) {
+func (ch *MetaV1ConditionHandler) True(obj client.Object) {
 	ch.setStatus(obj, "True")
 }
 
-func (ch *MetaV1ConditionHandler) IsTrue(obj interface{}) bool {
+func (ch *MetaV1ConditionHandler) IsTrue(obj client.Object) bool {
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
 		return false
@@ -97,10 +97,10 @@ func (ch *MetaV1ConditionHandler) IsTrue(obj interface{}) bool {
 
 	return meta.IsStatusConditionTrue(conditionsSlice, ch.RootCondition.Name())
 }
-func (ch *MetaV1ConditionHandler) Unknown(obj interface{}) {
+func (ch *MetaV1ConditionHandler) Unknown(obj client.Object) {
 	ch.setStatus(obj, "Unknown")
 }
-func (ch *MetaV1ConditionHandler) IsUnknown(obj interface{}) bool {
+func (ch *MetaV1ConditionHandler) IsUnknown(obj client.Object) bool {
 	foundCondition := findCondition(obj, ch.RootCondition.Name())
 	if foundCondition == nil {
 		return false
@@ -109,7 +109,7 @@ func (ch *MetaV1ConditionHandler) IsUnknown(obj interface{}) bool {
 	return foundCondition.Status == metav1.ConditionUnknown
 }
 
-func (ch *MetaV1ConditionHandler) SetError(obj interface{}, reason string, err error) {
+func (ch *MetaV1ConditionHandler) SetError(obj client.Object, reason string, err error) {
 	cond := ch.findOrCreateCondition(obj)
 
 	if err == nil || errors.Is(err, generic.ErrSkip) {
@@ -130,7 +130,7 @@ func (ch *MetaV1ConditionHandler) SetError(obj interface{}, reason string, err e
 	cond.ObservedGeneration = getResourceGeneration(obj)
 }
 
-func (ch *MetaV1ConditionHandler) MatchesError(obj interface{}, reason string, err error) bool {
+func (ch *MetaV1ConditionHandler) MatchesError(obj client.Object, reason string, err error) bool {
 	if err == nil {
 		return ch.IsTrue(obj) &&
 			ch.GetMessage(obj) == "" &&
@@ -144,7 +144,7 @@ func (ch *MetaV1ConditionHandler) MatchesError(obj interface{}, reason string, e
 		ch.GetReason(obj) == reason
 }
 
-func (ch *MetaV1ConditionHandler) GetReason(obj interface{}) string {
+func (ch *MetaV1ConditionHandler) GetReason(obj client.Object) string {
 	foundCondition := findCondition(obj, ch.RootCondition.Name())
 	if foundCondition == nil {
 		return ""
@@ -153,7 +153,7 @@ func (ch *MetaV1ConditionHandler) GetReason(obj interface{}) string {
 	return foundCondition.Reason
 }
 
-func (ch *MetaV1ConditionHandler) SetReason(obj interface{}, reason string) {
+func (ch *MetaV1ConditionHandler) SetReason(obj client.Object, reason string) {
 	cond := ch.findOrCreateCondition(obj)
 	updatedCond := cond.DeepCopy()
 	updatedCond.Reason = reason
@@ -167,7 +167,7 @@ func (ch *MetaV1ConditionHandler) SetReason(obj interface{}, reason string) {
 	_ = meta.SetStatusCondition(&conditionsSlice, *updatedCond)
 }
 
-func (ch *MetaV1ConditionHandler) GetMessage(obj interface{}) string {
+func (ch *MetaV1ConditionHandler) GetMessage(obj client.Object) string {
 	foundCondition := findCondition(obj, ch.RootCondition.Name())
 	if foundCondition == nil {
 		return ""
@@ -176,7 +176,7 @@ func (ch *MetaV1ConditionHandler) GetMessage(obj interface{}) string {
 	return foundCondition.Message
 }
 
-func (ch *MetaV1ConditionHandler) SetMessage(obj interface{}, msg string) {
+func (ch *MetaV1ConditionHandler) SetMessage(obj client.Object, msg string) {
 	cond := ch.findOrCreateCondition(obj)
 	updatedCond := cond.DeepCopy()
 	updatedCond.Message = msg
@@ -190,7 +190,7 @@ func (ch *MetaV1ConditionHandler) SetMessage(obj interface{}, msg string) {
 	_ = meta.SetStatusCondition(&conditionsSlice, *updatedCond)
 }
 
-func (ch *MetaV1ConditionHandler) SetMessageIfBlank(obj interface{}, msg string) {
+func (ch *MetaV1ConditionHandler) SetMessageIfBlank(obj client.Object, msg string) {
 	cond := ch.findOrCreateCondition(obj)
 	updatedCond := cond.DeepCopy()
 	if cond.Message == "" {
@@ -210,7 +210,7 @@ func (ch *MetaV1ConditionHandler) SetMessageIfBlank(obj interface{}, msg string)
 	_ = meta.SetStatusCondition(&conditionsSlice, *updatedCond)
 }
 
-func (ch *MetaV1ConditionHandler) setStatus(obj interface{}, status string) {
+func (ch *MetaV1ConditionHandler) setStatus(obj client.Object, status string) {
 	if reflect.TypeOf(obj).Kind() != reflect.Ptr {
 		panic("obj passed must be a pointer")
 	}
@@ -228,7 +228,7 @@ func (ch *MetaV1ConditionHandler) setStatus(obj interface{}, status string) {
 	cond.ObservedGeneration = getResourceGeneration(obj)
 }
 
-func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1.Condition {
+func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj client.Object) *metav1.Condition {
 	foundCondition := findCondition(obj, ch.RootCondition.Name())
 	if foundCondition != nil {
 		return foundCondition
@@ -258,16 +258,11 @@ func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1
 // getResourceGeneration attempts to retrieve and validate the slice of conditions
 // from the given object. It returns the slice of metav1.Condition if successful,
 // and nil otherwise.
-func getResourceGeneration(obj interface{}) int64 {
-	unstructuredObj, ok := obj.(*unstructured.Unstructured)
-	if !ok {
-		return 0
-	}
-
-	return unstructuredObj.GetGeneration()
+func getResourceGeneration(obj client.Object) int64 {
+	return obj.GetGeneration()
 }
 
-func setConditionsSlice(obj interface{}, conditions []metav1.Condition) {
+func setConditionsSlice(obj client.Object, conditions []metav1.Condition) {
 	statusValue := getValue(obj, "Status")
 	if !statusValue.IsValid() {
 		panic("object does not have a Status field")

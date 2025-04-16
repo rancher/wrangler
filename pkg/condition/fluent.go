@@ -7,6 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type MetaV1ConditionFluentBuilder struct {
@@ -15,7 +16,7 @@ type MetaV1ConditionFluentBuilder struct {
 	workingCondition metav1.Condition
 }
 
-func (m *MetaV1ConditionFluentBuilder) Target(obj interface{}) types.FluentCondition {
+func (m *MetaV1ConditionFluentBuilder) Target(obj client.Object) types.FluentCondition {
 	cond := m.findOrInitCond(obj)
 	m.workingCondition = *cond.DeepCopy()
 	m.initedTarget = true
@@ -23,7 +24,7 @@ func (m *MetaV1ConditionFluentBuilder) Target(obj interface{}) types.FluentCondi
 	return m
 }
 
-func (m *MetaV1ConditionFluentBuilder) findOrInitCond(obj interface{}) metav1.Condition {
+func (m *MetaV1ConditionFluentBuilder) findOrInitCond(obj client.Object) metav1.Condition {
 	foundCondition := findCondition(obj, m.RootCondition.Name())
 	if foundCondition != nil {
 		return *foundCondition
@@ -138,7 +139,7 @@ func (m *MetaV1ConditionFluentBuilder) SetMessageIfBlank(message string) types.F
 	return m
 }
 
-func (m *MetaV1ConditionFluentBuilder) Apply(obj interface{}) bool {
+func (m *MetaV1ConditionFluentBuilder) Apply(obj client.Object) bool {
 	if !m.initedTarget {
 		logrus.Warnf("fluent condition handler not initialized")
 		return false

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"testing"
 )
 
@@ -12,7 +14,14 @@ type testObjStatusStd struct {
 }
 
 type testResourceObjStd struct {
-	Status testObjStatusStd `json:"status"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Status            testObjStatusStd `json:"status"`
+}
+
+func (t testResourceObjStd) DeepCopyObject() runtime.Object {
+	//TODO implement me
+	panic("implement me")
 }
 
 func newKatesCondition(condition Cond, message string) metav1.Condition {
@@ -23,7 +32,7 @@ func newKatesCondition(condition Cond, message string) metav1.Condition {
 	}
 }
 
-func newTestObjStd(conditions ...Cond) testResourceObjStd {
+func newTestObjStd(conditions ...Cond) client.Object {
 	newObj := testResourceObjStd{
 		Status: testObjStatusStd{
 			Conditions: []metav1.Condition{},
@@ -40,7 +49,7 @@ func newTestObjStd(conditions ...Cond) testResourceObjStd {
 	}
 	newObj.Status.Conditions = newConditions
 
-	return newObj
+	return &newObj
 }
 
 func TestConditionToKatesCondition(t *testing.T) {
@@ -53,83 +62,83 @@ func TestConditionToKatesCondition(t *testing.T) {
 
 func TestStandardConditionHasCondition(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, true, TestCondtion.ToK8sCondition().HasCondition(&testObj))
+	assert.Equal(t, true, TestCondtion.ToK8sCondition().HasCondition(testObj))
 
-	assert.Equal(t, false, AnotherTestCondtion.ToK8sCondition().HasCondition(&testObj))
+	assert.Equal(t, false, AnotherTestCondtion.ToK8sCondition().HasCondition(testObj))
 }
 
 func TestStandardConditionGetStatus(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
 }
 
 func TestStandardConditionSetStatus(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	TestCondtion.ToK8sCondition().SetStatus(&testObj, "False")
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	TestCondtion.ToK8sCondition().SetStatus(testObj, "False")
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.GetStatus(&testObj))
-	AnotherTestCondtion.SetStatus(&testObj, "Unknown")
-	assert.Equal(t, "Unknown", AnotherTestCondtion.GetStatus(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.GetStatus(testObj))
+	AnotherTestCondtion.SetStatus(testObj, "Unknown")
+	assert.Equal(t, "Unknown", AnotherTestCondtion.GetStatus(testObj))
 }
 
 func TestStandardBoolHelpers(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	TestCondtion.ToK8sCondition().False(&testObj)
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	TestCondtion.ToK8sCondition().False(testObj)
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	AnotherTestCondtion.ToK8sCondition().True(&testObj)
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	AnotherTestCondtion.ToK8sCondition().False(&testObj)
-	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
+	AnotherTestCondtion.ToK8sCondition().True(testObj)
+	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
+	AnotherTestCondtion.ToK8sCondition().False(testObj)
+	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
 }
 
 func TestStandardConditionSetStatusBool(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	TestCondtion.ToK8sCondition().SetStatusBool(&testObj, false)
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	TestCondtion.ToK8sCondition().SetStatusBool(testObj, false)
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	AnotherTestCondtion.ToK8sCondition().SetStatusBool(&testObj, true)
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
+	AnotherTestCondtion.ToK8sCondition().SetStatusBool(testObj, true)
+	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
 }
 
 func TestStandardConditionSetReasonMethods(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	TestCondtion.ToK8sCondition().SetReason(&testObj, "Because I Said So")
-	assert.Equal(t, "Because I Said So", TestCondtion.ToK8sCondition().GetReason(&testObj))
+	TestCondtion.ToK8sCondition().SetReason(testObj, "Because I Said So")
+	assert.Equal(t, "Because I Said So", TestCondtion.ToK8sCondition().GetReason(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetReason(&testObj))
-	AnotherTestCondtion.ToK8sCondition().SetReason(&testObj, "Because Tom Said So")
-	assert.Equal(t, "Because Tom Said So", AnotherTestCondtion.ToK8sCondition().GetReason(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetReason(testObj))
+	AnotherTestCondtion.ToK8sCondition().SetReason(testObj, "Because Tom Said So")
+	assert.Equal(t, "Because Tom Said So", AnotherTestCondtion.ToK8sCondition().GetReason(testObj))
 }
 
 func TestStandardConditionSetMessageIfBlank(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	TestCondtion.ToK8sCondition().SetMessageIfBlank(&testObj, "This will be ignored")
-	assert.NotEqual(t, "This will be ignored", TestCondtion.GetMessage(&testObj))
+	TestCondtion.ToK8sCondition().SetMessageIfBlank(testObj, "This will be ignored")
+	assert.NotEqual(t, "This will be ignored", TestCondtion.GetMessage(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.GetMessage(&testObj))
-	AnotherTestCondtion.ToK8sCondition().SetMessageIfBlank(&testObj, "This will be updated")
-	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(&testObj))
-	AnotherTestCondtion.ToK8sCondition().SetMessageIfBlank(&testObj, "This will NOT be updated")
-	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.GetMessage(testObj))
+	AnotherTestCondtion.ToK8sCondition().SetMessageIfBlank(testObj, "This will be updated")
+	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(testObj))
+	AnotherTestCondtion.ToK8sCondition().SetMessageIfBlank(testObj, "This will NOT be updated")
+	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(testObj))
 }
 
 func TestStandardConditionMessageMethods(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, "Hello World", TestCondtion.ToK8sCondition().GetMessage(&testObj))
-	TestCondtion.ToK8sCondition().SetMessage(&testObj, "")
-	assert.Equal(t, "", TestCondtion.ToK8sCondition().GetMessage(&testObj))
+	assert.Equal(t, "Hello World", TestCondtion.ToK8sCondition().GetMessage(testObj))
+	TestCondtion.ToK8sCondition().SetMessage(testObj, "")
+	assert.Equal(t, "", TestCondtion.ToK8sCondition().GetMessage(testObj))
 
-	AnotherTestCondtion.ToK8sCondition().SetMessage(&testObj, "This will be updated")
-	assert.Equal(t, "This will be updated", AnotherTestCondtion.ToK8sCondition().GetMessage(&testObj))
+	AnotherTestCondtion.ToK8sCondition().SetMessage(testObj, "This will be updated")
+	assert.Equal(t, "This will be updated", AnotherTestCondtion.ToK8sCondition().GetMessage(testObj))
 }
 
 func TestStandardConditionErrorMethods(t *testing.T) {
@@ -138,22 +147,22 @@ func TestStandardConditionErrorMethods(t *testing.T) {
 	testError := errors.New("some test error")
 
 	testObj := newTestObjStd(TestCondtion)
-	TestCondtion.ToK8sCondition().False(&testObj)
-	SubStatusCondition.ToK8sCondition().False(&testObj)
-	SubStatusCondition.ToK8sCondition().SetError(&testObj, "", testError)
+	TestCondtion.ToK8sCondition().False(testObj)
+	SubStatusCondition.ToK8sCondition().False(testObj)
+	SubStatusCondition.ToK8sCondition().SetError(testObj, "", testError)
 
-	assert.Equal(t, "Error", SubStatusCondition.ToK8sCondition().GetReason(&testObj))
-	assert.Equal(t, "some test error", SubStatusCondition.ToK8sCondition().GetMessage(&testObj))
-	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(&testObj, "Error", testError))
-	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(&testObj, "", testError))
+	assert.Equal(t, "Error", SubStatusCondition.ToK8sCondition().GetReason(testObj))
+	assert.Equal(t, "some test error", SubStatusCondition.ToK8sCondition().GetMessage(testObj))
+	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(testObj, "Error", testError))
+	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(testObj, "", testError))
 
-	SubStatusCondition.ToK8sCondition().SetError(&testObj, "Because it Broke", testError)
-	assert.False(t, SubStatusCondition.ToK8sCondition().MatchesError(&testObj, "", testError))
-	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(&testObj, "Because it Broke", testError))
-	assert.False(t, SubStatusCondition.ToK8sCondition().MatchesError(&testObj, "Because something else Broke", testError))
+	SubStatusCondition.ToK8sCondition().SetError(testObj, "Because it Broke", testError)
+	assert.False(t, SubStatusCondition.ToK8sCondition().MatchesError(testObj, "", testError))
+	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(testObj, "Because it Broke", testError))
+	assert.False(t, SubStatusCondition.ToK8sCondition().MatchesError(testObj, "Because something else Broke", testError))
 
-	SubStatusCondition.ToK8sCondition().SetError(&testObj, "Because something else Broke", nil)
-	assert.False(t, SubStatusCondition.ToK8sCondition().MatchesError(&testObj, "Because something else Broke", testError))
-	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(&testObj, "Because something else Broke", nil))
+	SubStatusCondition.ToK8sCondition().SetError(testObj, "Because something else Broke", nil)
+	assert.False(t, SubStatusCondition.ToK8sCondition().MatchesError(testObj, "Because something else Broke", testError))
+	assert.True(t, SubStatusCondition.ToK8sCondition().MatchesError(testObj, "Because something else Broke", nil))
 
 }

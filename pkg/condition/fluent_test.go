@@ -13,96 +13,94 @@ import (
 
 func TestFluentConditionSetStatus(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	TestCondtion.ToFluentBuilder(&testObj).SetStatus("False").Apply(&testObj)
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetStatus("False").Apply(testObj)
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.GetStatus(&testObj))
-	assert.Equal(t, "", AnotherTestCondtion.GetStatus(&testObj.Status))
-	AnotherTestCondtion.ToFluentBuilder(&testObj).SetStatus("Unknown").Apply(&testObj)
-	assert.Equal(t, "Unknown", AnotherTestCondtion.GetStatus(&testObj))
-	assert.Equal(t, "Unknown", AnotherTestCondtion.GetStatus(&testObj.Status))
+	assert.Equal(t, "", AnotherTestCondtion.GetStatus(testObj))
+	AnotherTestCondtion.ToFluentBuilder(testObj).SetStatus("Unknown").Apply(testObj)
+	assert.Equal(t, "Unknown", AnotherTestCondtion.GetStatus(testObj))
 }
 
 func TestFluentBoolHelpers(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	TestCondtion.ToFluentBuilder(&testObj).False().Apply(&testObj)
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	TestCondtion.ToFluentBuilder(testObj).False().Apply(testObj)
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	AnotherTestCondtion.ToFluentBuilder(&testObj).True().Apply(&testObj)
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	AnotherTestCondtion.ToFluentBuilder(nil).Target(&testObj).False().Apply(&testObj)
-	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
+	AnotherTestCondtion.ToFluentBuilder(testObj).True().Apply(testObj)
+	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
+	AnotherTestCondtion.ToFluentBuilder(nil).Target(testObj).False().Apply(testObj)
+	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	TestCondtion.ToFluentBuilder(&testObj).Unknown().Apply(&testObj)
-	assert.Equal(t, "Unknown", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	TestCondtion.ToFluentBuilder(testObj).Unknown().Apply(testObj)
+	assert.Equal(t, "Unknown", TestCondtion.ToK8sCondition().GetStatus(testObj))
 }
 
 func TestFluentConditionSetStatusBool(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	TestCondtion.ToFluentBuilder(&testObj).SetStatusBool(false).Apply(&testObj)
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetStatusBool(false).Apply(testObj)
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	AnotherTestCondtion.ToFluentBuilder(&testObj).SetStatusBool(true).Apply(&testObj)
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
+	AnotherTestCondtion.ToFluentBuilder(testObj).SetStatusBool(true).Apply(testObj)
+	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(testObj))
 }
 
 func TestSetError(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	testErr := errors.New("test error")
 
-	TestCondtion.ToFluentBuilder(&testObj).SetError("it all broke", testErr).Apply(&testObj)
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "it all broke", TestCondtion.ToK8sCondition().GetReason(&testObj))
-	assert.Equal(t, "test error", TestCondtion.ToK8sCondition().GetMessage(&testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetError("it all broke", testErr).Apply(testObj)
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	assert.Equal(t, "it all broke", TestCondtion.ToK8sCondition().GetReason(testObj))
+	assert.Equal(t, "test error", TestCondtion.ToK8sCondition().GetMessage(testObj))
 
 	testErr = errors.New("another test error")
-	TestCondtion.ToFluentBuilder(&testObj).SetError("", testErr).Apply(&testObj)
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "Error", TestCondtion.ToK8sCondition().GetReason(&testObj))
-	assert.Equal(t, "another test error", TestCondtion.ToK8sCondition().GetMessage(&testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetError("", testErr).Apply(testObj)
+	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	assert.Equal(t, "Error", TestCondtion.ToK8sCondition().GetReason(testObj))
+	assert.Equal(t, "another test error", TestCondtion.ToK8sCondition().GetMessage(testObj))
 
-	TestCondtion.ToFluentBuilder(&testObj).SetError("Skip-itty Skip", generic.ErrSkip).Apply(&testObj)
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "Skip-itty Skip", TestCondtion.ToK8sCondition().GetReason(&testObj))
-	assert.Equal(t, "", TestCondtion.ToK8sCondition().GetMessage(&testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetError("Skip-itty Skip", generic.ErrSkip).Apply(testObj)
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
+	assert.Equal(t, "Skip-itty Skip", TestCondtion.ToK8sCondition().GetReason(testObj))
+	assert.Equal(t, "", TestCondtion.ToK8sCondition().GetMessage(testObj))
 }
 
 func TestFluentConditionSetReasonMethods(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	TestCondtion.ToFluentBuilder(&testObj).SetReason("Because I Said So").Apply(&testObj)
-	assert.Equal(t, "Because I Said So", TestCondtion.ToK8sCondition().GetReason(&testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetReason("Because I Said So").Apply(testObj)
+	assert.Equal(t, "Because I Said So", TestCondtion.ToK8sCondition().GetReason(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetReason(&testObj))
-	AnotherTestCondtion.ToFluentBuilder(&testObj).SetReason("Because Tom Said So").Apply(&testObj)
-	assert.Equal(t, "Because Tom Said So", AnotherTestCondtion.ToK8sCondition().GetReason(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetReason(testObj))
+	AnotherTestCondtion.ToFluentBuilder(testObj).SetReason("Because Tom Said So").Apply(testObj)
+	assert.Equal(t, "Because Tom Said So", AnotherTestCondtion.ToK8sCondition().GetReason(testObj))
 }
 
 func TestFluentConditionSetMessage(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	TestCondtion.ToFluentBuilder(&testObj).SetMessage("This will NOT be ignored").Apply(&testObj)
-	assert.Equal(t, "This will NOT be ignored", TestCondtion.GetMessage(&testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetMessage("This will NOT be ignored").Apply(testObj)
+	assert.Equal(t, "This will NOT be ignored", TestCondtion.GetMessage(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.GetMessage(&testObj))
-	AnotherTestCondtion.ToFluentBuilder(&testObj).SetMessage("This will be updated").Apply(&testObj)
-	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.GetMessage(testObj))
+	AnotherTestCondtion.ToFluentBuilder(testObj).SetMessage("This will be updated").Apply(testObj)
+	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(testObj))
 }
 
 func TestFluentConditionSetMessageIfBlank(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
-	TestCondtion.ToFluentBuilder(&testObj).SetMessageIfBlank("This will be ignored").Apply(&testObj)
-	assert.NotEqual(t, "This will be ignored", TestCondtion.GetMessage(&testObj))
+	TestCondtion.ToFluentBuilder(testObj).SetMessageIfBlank("This will be ignored").Apply(testObj)
+	assert.NotEqual(t, "This will be ignored", TestCondtion.GetMessage(testObj))
 
-	assert.Equal(t, "", AnotherTestCondtion.GetMessage(&testObj))
-	AnotherTestCondtion.ToFluentBuilder(&testObj).SetMessageIfBlank("This will be updated").Apply(&testObj)
-	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(&testObj))
-	AnotherTestCondtion.ToFluentBuilder(&testObj).SetMessageIfBlank("This will NOT be updated").Apply(&testObj)
-	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(&testObj))
+	assert.Equal(t, "", AnotherTestCondtion.GetMessage(testObj))
+	AnotherTestCondtion.ToFluentBuilder(testObj).SetMessageIfBlank("This will be updated").Apply(testObj)
+	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(testObj))
+	AnotherTestCondtion.ToFluentBuilder(testObj).SetMessageIfBlank("This will NOT be updated").Apply(testObj)
+	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(testObj))
 }
 
 func TestIncorrectBuilder(t *testing.T) {
@@ -112,7 +110,7 @@ func TestIncorrectBuilder(t *testing.T) {
 	}
 
 	// Base control expectations
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(testObj))
 	assert.False(t, fluentBuilder.initedTarget)
 	assert.Equal(t, metav1.Condition{}, fluentBuilder.workingCondition)
 
@@ -123,7 +121,7 @@ func TestIncorrectBuilder(t *testing.T) {
 
 	// Verify SetStatus
 	fluentBuilder.SetStatus("Unknown")
-	assert.NotEqual(t, "Unknown", TestCondtion.ToK8sCondition().GetStatus(&testObj))
+	assert.NotEqual(t, "Unknown", TestCondtion.ToK8sCondition().GetStatus(testObj))
 	assert.Contains(t, logBuf.String(), "fluent condition handler not initialized")
 
 	// Verify SetError
@@ -137,26 +135,26 @@ func TestIncorrectBuilder(t *testing.T) {
 	logBuf = bytes.Buffer{}
 	assert.Empty(t, logBuf.String())
 	fluentBuilder.SetReason("for fun")
-	assert.NotEqual(t, "for fun", TestCondtion.ToK8sCondition().GetReason(&testObj))
+	assert.NotEqual(t, "for fun", TestCondtion.ToK8sCondition().GetReason(testObj))
 	assert.Contains(t, logBuf.String(), "fluent condition handler not initialized")
 
 	// Verify SetMessage
 	logBuf = bytes.Buffer{}
 	assert.Empty(t, logBuf.String())
 	fluentBuilder.SetMessage("some message")
-	assert.NotEqual(t, "some message", TestCondtion.ToK8sCondition().GetReason(&testObj))
+	assert.NotEqual(t, "some message", TestCondtion.ToK8sCondition().GetReason(testObj))
 	assert.Contains(t, logBuf.String(), "fluent condition handler not initialized")
 
 	logBuf = bytes.Buffer{}
 	assert.Empty(t, logBuf.String())
 	fluentBuilder.SetMessageIfBlank("some message")
-	assert.NotEqual(t, "some message", TestCondtion.ToK8sCondition().GetReason(&testObj))
+	assert.NotEqual(t, "some message", TestCondtion.ToK8sCondition().GetReason(testObj))
 	assert.Contains(t, logBuf.String(), "fluent condition handler not initialized")
 
 	// Verify Apply
 	logBuf = bytes.Buffer{}
 	assert.Empty(t, logBuf.String())
-	res := fluentBuilder.Apply(&testObj)
+	res := fluentBuilder.Apply(testObj)
 	assert.False(t, res)
 	assert.Contains(t, logBuf.String(), "fluent condition handler not initialized")
 }

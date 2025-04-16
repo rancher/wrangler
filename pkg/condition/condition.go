@@ -3,6 +3,7 @@ package condition
 import (
 	"github.com/rancher/wrangler/v3/pkg/condition/types"
 	"reflect"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -166,7 +167,7 @@ func (c Cond) ToK8sCondition() types.Condition {
 	}
 }
 
-func (c Cond) ToFluentBuilder(obj interface{}) types.FluentCondition {
+func (c Cond) ToFluentBuilder(obj client.Object) types.FluentCondition {
 	if obj != nil {
 		handler := MetaV1ConditionFluentBuilder{
 			RootCondition: c,
