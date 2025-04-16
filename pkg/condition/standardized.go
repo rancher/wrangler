@@ -209,8 +209,11 @@ func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1
 	}
 
 	newCond := metav1.Condition{
-		Type:   ch.RootCondition.Name(),
-		Status: metav1.ConditionUnknown,
+		Type:               ch.RootCondition.Name(),
+		Status:             metav1.ConditionUnknown,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+		Reason:             "Created",
+		Message:            "",
 	}
 
 	conditionsSlice, ok := getConditionSlice(obj)
