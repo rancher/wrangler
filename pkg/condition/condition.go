@@ -166,6 +166,18 @@ func (c Cond) ToK8sCondition() types.Condition {
 	}
 }
 
+func (c Cond) ToFluentBuilder(obj interface{}) types.FluentCondition {
+	if obj != nil {
+		handler := MetaV1ConditionFluentBuilder{
+			RootCondition: c,
+		}
+		return handler.Target(obj)
+	}
+	return &MetaV1ConditionFluentBuilder{
+		RootCondition: c,
+	}
+}
+
 func touchTS(value reflect.Value) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	getFieldValue(value, "LastUpdateTime").SetString(now)

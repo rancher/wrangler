@@ -42,3 +42,17 @@ type Condition interface {
 	SetMessage(obj interface{}, msg string)
 	SetMessageIfBlank(obj interface{}, message string)
 }
+
+type FluentCondition interface {
+	Target(obj interface{}) FluentCondition
+	SetStatus(status string) FluentCondition
+	True() FluentCondition
+	False() FluentCondition
+	Unknown() FluentCondition
+	SetStatusBool(val bool) FluentCondition
+	SetError(reason string, err error) FluentCondition
+	SetReason(reason string) FluentCondition
+	SetMessage(message string) FluentCondition
+	SetMessageIfBlank(message string) FluentCondition
+	Apply(obj interface{}) bool
+}

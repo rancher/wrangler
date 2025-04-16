@@ -117,7 +117,7 @@ func TestStandardConditionSetStatusBool(t *testing.T) {
 	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 }
 
-func TestStandardConditionReasonMethods(t *testing.T) {
+func TestStandardConditionSetReasonMethods(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	TestCondtion.ToK8sCondition().SetReason(&testObj, "Because I Said So")
 	assert.Equal(t, "Because I Said So", TestCondtion.ToK8sCondition().GetReason(&testObj))
