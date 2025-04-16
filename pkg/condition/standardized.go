@@ -109,10 +109,13 @@ func (ch *MetaV1ConditionHandler) IsUnknown(obj interface{}) bool {
 }
 
 func (ch *MetaV1ConditionHandler) SetError(obj interface{}, reason string, err error) {
+	cond := ch.findOrCreateCondition(obj)
+
 	if err == nil || errors.Is(err, generic.ErrSkip) {
-		ch.True(obj)
-		ch.SetMessage(obj, "")
-		ch.SetReason(obj, reason)
+		cond.Status = metav1.ConditionTrue
+		cond.Message = ""
+		cond.Reason = reason
+		cond.ObservedGeneration = getResourceGeneration(obj)
 		return
 	}
 
@@ -120,10 +123,12 @@ func (ch *MetaV1ConditionHandler) SetError(obj interface{}, reason string, err e
 		reason = "Error"
 	}
 
-	ch.False(obj)
-	ch.SetMessage(obj, err.Error())
-	ch.SetReason(obj, reason)
+	cond.Status = metav1.ConditionFalse
+	cond.Message = err.Error()
+	cond.Reason = reason
+	cond.ObservedGeneration = getResourceGeneration(obj)
 }
+
 func (ch *MetaV1ConditionHandler) MatchesError(obj interface{}, reason string, err error) bool {
 	if err == nil {
 		return ch.IsTrue(obj) &&
