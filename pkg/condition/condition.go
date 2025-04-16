@@ -4,11 +4,26 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+
+	"github.com/rancher/wrangler/v3/pkg/generic"
 )
 
 type Cond string
+
+func (c Cond) HasCondition(obj interface{}) bool {
+	condSlice := getValue(obj, "Status", "Conditions")
+	if !condSlice.IsValid() {
+		condSlice = getValue(obj, "Conditions")
+	}
+
+	foundCond := findCond(obj, condSlice, string(c))
+	if foundCond != nil {
+		return true
+	}
+
+	return false
+}
 
 func (c Cond) GetStatus(obj interface{}) string {
 	return getStatus(obj, string(c))
