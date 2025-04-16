@@ -54,67 +54,50 @@ func TestConditionToKatesCondition(t *testing.T) {
 func TestStandardConditionHasCondition(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	assert.Equal(t, true, TestCondtion.ToK8sCondition().HasCondition(&testObj))
-	assert.Equal(t, true, TestCondtion.ToK8sCondition().HasCondition(&testObj.Status))
 
 	assert.Equal(t, false, AnotherTestCondtion.ToK8sCondition().HasCondition(&testObj))
-	assert.Equal(t, false, AnotherTestCondtion.ToK8sCondition().HasCondition(&testObj.Status))
 }
 
 func TestStandardConditionGetStatus(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 }
 
 func TestStandardConditionSetStatus(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	TestCondtion.ToK8sCondition().SetStatus(&testObj, "False")
 	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	assert.Equal(t, "", AnotherTestCondtion.GetStatus(&testObj))
-	assert.Equal(t, "", AnotherTestCondtion.GetStatus(&testObj.Status))
 	AnotherTestCondtion.SetStatus(&testObj, "Unknown")
 	assert.Equal(t, "Unknown", AnotherTestCondtion.GetStatus(&testObj))
-	assert.Equal(t, "Unknown", AnotherTestCondtion.GetStatus(&testObj.Status))
 }
 
 func TestStandardBoolHelpers(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	TestCondtion.ToK8sCondition().False(&testObj)
 	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	AnotherTestCondtion.ToK8sCondition().True(&testObj)
 	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	AnotherTestCondtion.ToK8sCondition().False(&testObj)
 	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 }
 
 func TestStandardConditionSetStatusBool(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	TestCondtion.ToK8sCondition().SetStatusBool(&testObj, false)
 	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	AnotherTestCondtion.ToK8sCondition().SetStatusBool(&testObj, true)
 	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 }
 
 func TestStandardConditionSetReasonMethods(t *testing.T) {
