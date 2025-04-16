@@ -14,10 +14,8 @@ import (
 func TestFluentConditionSetStatus(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	TestCondtion.ToFluentBuilder(&testObj).SetStatus("False").Apply(&testObj)
 	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	assert.Equal(t, "", AnotherTestCondtion.GetStatus(&testObj))
 	assert.Equal(t, "", AnotherTestCondtion.GetStatus(&testObj.Status))
@@ -30,38 +28,28 @@ func TestFluentBoolHelpers(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 
 	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	TestCondtion.ToFluentBuilder(&testObj).False().Apply(&testObj)
 	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	AnotherTestCondtion.ToFluentBuilder(&testObj).True().Apply(&testObj)
 	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	AnotherTestCondtion.ToFluentBuilder(nil).Target(&testObj).False().Apply(&testObj)
 	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	TestCondtion.ToFluentBuilder(&testObj).Unknown().Apply(&testObj)
 	assert.Equal(t, "Unknown", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "Unknown", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 }
 
 func TestFluentConditionSetStatusBool(t *testing.T) {
 	testObj := newTestObjStd(TestCondtion)
 	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	TestCondtion.ToFluentBuilder(&testObj).SetStatusBool(false).Apply(&testObj)
 	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "False", TestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 
 	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 	AnotherTestCondtion.ToFluentBuilder(&testObj).SetStatusBool(true).Apply(&testObj)
 	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj))
-	assert.Equal(t, "True", AnotherTestCondtion.ToK8sCondition().GetStatus(&testObj.Status))
 }
 
 func TestSetError(t *testing.T) {

@@ -18,9 +18,6 @@ type MetaV1ConditionHandler struct {
 // and nil otherwise.
 func getConditionsSlice(obj interface{}) ([]metav1.Condition, bool) {
 	condSliceValue := getValue(obj, "Status", "Conditions")
-	if !condSliceValue.IsValid() {
-		condSliceValue = getValue(obj, "Conditions")
-	}
 
 	if !condSliceValue.IsValid() || condSliceValue.Kind() != reflect.Slice {
 		return nil, false
@@ -248,12 +245,18 @@ func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1
 }
 
 func setConditionsSlice(obj interface{}, conditions []metav1.Condition) {
+	statusValue := getValue(obj, "Status")
+	if !statusValue.IsValid() {
+		panic("object does not have a Status field")
+	}
+
 	condSliceValue := getValue(obj, "Status", "Conditions")
 	if !condSliceValue.IsValid() {
-		condSliceValue = getValue(obj, "Conditions")
-		if !condSliceValue.IsValid() {
-			panic("obj doesn't have conditions")
-		}
+		panic("Status does not have a Conditions field")
+	}
+
+	if condSliceValue.Kind() != reflect.Slice {
+		panic("Conditions field must be a slice")
 	}
 
 	condSliceValue.Set(reflect.ValueOf(conditions))
