@@ -4,6 +4,7 @@ import (
 	"errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"reflect"
 
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -156,6 +157,7 @@ func (ch *MetaV1ConditionHandler) SetReason(obj interface{}, reason string) {
 	cond := ch.findOrCreateCondition(obj)
 	updatedCond := cond.DeepCopy()
 	updatedCond.Reason = reason
+	updatedCond.ObservedGeneration = getResourceGeneration(obj)
 
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
@@ -178,6 +180,7 @@ func (ch *MetaV1ConditionHandler) SetMessage(obj interface{}, msg string) {
 	cond := ch.findOrCreateCondition(obj)
 	updatedCond := cond.DeepCopy()
 	updatedCond.Message = msg
+	updatedCond.ObservedGeneration = getResourceGeneration(obj)
 
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
@@ -197,6 +200,7 @@ func (ch *MetaV1ConditionHandler) SetMessageIfBlank(obj interface{}, msg string)
 	if updatedCond.Message == cond.Message {
 		return
 	}
+	updatedCond.ObservedGeneration = getResourceGeneration(obj)
 
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
@@ -221,6 +225,7 @@ func (ch *MetaV1ConditionHandler) setStatus(obj interface{}, status string) {
 	cond := ch.findOrCreateCondition(obj)
 
 	cond.Status = statusParsed
+	cond.ObservedGeneration = getResourceGeneration(obj)
 }
 
 func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1.Condition {
@@ -230,10 +235,11 @@ func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1
 	}
 
 	newCond := metav1.Condition{
-		Type:    ch.RootCondition.Name(),
-		Status:  metav1.ConditionUnknown,
-		Reason:  "Created",
-		Message: "",
+		Type:               ch.RootCondition.Name(),
+		Status:             metav1.ConditionUnknown,
+		ObservedGeneration: getResourceGeneration(obj),
+		Reason:             "Created",
+		Message:            "",
 	}
 
 	conditionsSlice, ok := getConditionsSlice(obj)
@@ -247,6 +253,18 @@ func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1
 	}
 
 	return findCondition(obj, ch.RootCondition.Name())
+}
+
+// getResourceGeneration attempts to retrieve and validate the slice of conditions
+// from the given object. It returns the slice of metav1.Condition if successful,
+// and nil otherwise.
+func getResourceGeneration(obj interface{}) int64 {
+	unstructuredObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return 0
+	}
+
+	return unstructuredObj.GetGeneration()
 }
 
 func setConditionsSlice(obj interface{}, conditions []metav1.Condition) {

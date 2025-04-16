@@ -146,6 +146,7 @@ func (m *MetaV1ConditionFluentBuilder) Apply(obj interface{}) bool {
 
 	conditionsSlice, ok := getConditionsSlice(obj)
 	if ok {
+		m.workingCondition.ObservedGeneration = getResourceGeneration(obj)
 		changed := meta.SetStatusCondition(&conditionsSlice, m.workingCondition)
 		m.initedTarget = false
 		m.workingCondition = metav1.Condition{}
