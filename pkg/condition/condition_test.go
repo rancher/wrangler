@@ -1,8 +1,10 @@
 package condition
 
 import (
+	"errors"
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	"testing"
 )
 
@@ -14,18 +16,30 @@ type testResourceObj struct {
 	Status testObjStatus `json:"status"`
 }
 
+func newGenericCondition(condition Cond, message string) genericcondition.GenericCondition {
+	return genericcondition.GenericCondition{
+		Type:    string(condition),
+		Status:  v1.ConditionTrue,
+		Message: message,
+	}
+}
+
 func newTestObj(conditions ...Cond) testResourceObj {
 	newObj := testResourceObj{
 		Status: testObjStatus{
 			Conditions: []genericcondition.GenericCondition{},
 		},
 	}
+	newConditions := make([]genericcondition.GenericCondition, 0, len(conditions))
 	if len(conditions) > 0 {
 		for _, condition := range conditions {
-			condition.SetStatusBool(&newObj, true)
-			condition.Message(&newObj, "Hello World")
+			newConditions = append(
+				newConditions,
+				newGenericCondition(condition, "Hello World"),
+			)
 		}
 	}
+	newObj.Status.Conditions = newConditions
 
 	return newObj
 }
@@ -123,7 +137,7 @@ func TestUnknownHelpers(t *testing.T) {
 	testObj := newTestObj(TestCondtion)
 	assert.False(t, TestCondtion.IsUnknown(&testObj))
 	assert.False(t, AnotherTestCondtion.IsUnknown(&testObj))
-	AnotherTestCondtion.Message(&testObj, "Test Message, will default status to unknown")
+	AnotherTestCondtion.SetMessage(&testObj, "Test Message, will default status to unknown")
 	assert.True(t, AnotherTestCondtion.IsUnknown(&testObj))
 
 	TestCondtion.Unknown(&testObj)
@@ -142,7 +156,7 @@ func TestCreateUnknownIfNotExists(t *testing.T) {
 
 func TestReasonMethods(t *testing.T) {
 	testObj := newTestObj(TestCondtion)
-	TestCondtion.Reason(&testObj, "Because I Said So")
+	TestCondtion.SetReason(&testObj, "Because I Said So")
 	assert.Equal(t, "Because I Said So", TestCondtion.GetReason(&testObj))
 
 	assert.Equal(t, "", AnotherTestCondtion.GetReason(&testObj))
@@ -165,9 +179,35 @@ func TestSetMessageIfBlank(t *testing.T) {
 func TestMessageMethods(t *testing.T) {
 	testObj := newTestObj(TestCondtion)
 	assert.Equal(t, "Hello World", TestCondtion.GetMessage(&testObj))
-	TestCondtion.Message(&testObj, "")
+	TestCondtion.SetMessage(&testObj, "")
 	assert.Equal(t, "", TestCondtion.GetMessage(&testObj))
 
-	AnotherTestCondtion.Message(&testObj, "This will be updated")
+	AnotherTestCondtion.SetMessage(&testObj, "This will be updated")
 	assert.Equal(t, "This will be updated", AnotherTestCondtion.GetMessage(&testObj))
+}
+
+func TestErrorMethods(t *testing.T) {
+	const SubStatusCondition Cond = "SomeStepSpecificState"
+
+	testError := errors.New("some test error")
+
+	testObj := newTestObj(TestCondtion)
+	TestCondtion.False(&testObj)
+	SubStatusCondition.False(&testObj)
+	SubStatusCondition.SetError(&testObj, "", testError)
+
+	assert.Equal(t, "Error", SubStatusCondition.GetReason(&testObj))
+	assert.Equal(t, "some test error", SubStatusCondition.GetMessage(&testObj))
+	assert.True(t, SubStatusCondition.MatchesError(&testObj, "Error", testError))
+	assert.True(t, SubStatusCondition.MatchesError(&testObj, "", testError))
+
+	SubStatusCondition.SetError(&testObj, "Because it Broke", testError)
+	assert.False(t, SubStatusCondition.MatchesError(&testObj, "", testError))
+	assert.True(t, SubStatusCondition.MatchesError(&testObj, "Because it Broke", testError))
+	assert.False(t, SubStatusCondition.MatchesError(&testObj, "Because something else Broke", testError))
+
+	SubStatusCondition.SetError(&testObj, "Because something else Broke", nil)
+	assert.False(t, SubStatusCondition.MatchesError(&testObj, "Because something else Broke", testError))
+	assert.True(t, SubStatusCondition.MatchesError(&testObj, "Because something else Broke", nil))
+
 }
