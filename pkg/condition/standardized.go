@@ -2,11 +2,9 @@ package condition
 
 import (
 	"errors"
-	"reflect"
-	"time"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 
 	"github.com/rancher/wrangler/v3/pkg/generic"
 )
@@ -15,10 +13,10 @@ type MetaV1ConditionHandler struct {
 	RootCondition Cond
 }
 
-// getConditionSlice attempts to retrieve and validate the slice of conditions
+// getConditionsSlice attempts to retrieve and validate the slice of conditions
 // from the given object. It returns the slice of metav1.Condition if successful,
 // and nil otherwise.
-func getConditionSlice(obj interface{}) ([]metav1.Condition, bool) {
+func getConditionsSlice(obj interface{}) ([]metav1.Condition, bool) {
 	condSliceValue := getValue(obj, "Status", "Conditions")
 	if !condSliceValue.IsValid() {
 		condSliceValue = getValue(obj, "Conditions")
@@ -33,20 +31,8 @@ func getConditionSlice(obj interface{}) ([]metav1.Condition, bool) {
 	return conditions, ok
 }
 
-func setConditionSlice(obj interface{}, conditions []metav1.Condition) {
-	condSliceValue := getValue(obj, "Status", "Conditions")
-	if !condSliceValue.IsValid() {
-		condSliceValue = getValue(obj, "Conditions")
-		if !condSliceValue.IsValid() {
-			panic("obj doesn't have conditions")
-		}
-	}
-
-	condSliceValue.Set(reflect.ValueOf(conditions))
-}
-
 func findCondition(obj interface{}, name string) *metav1.Condition {
-	conditionsSlice, ok := getConditionSlice(obj)
+	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
 		return nil
 	}
@@ -54,8 +40,18 @@ func findCondition(obj interface{}, name string) *metav1.Condition {
 }
 
 func (ch *MetaV1ConditionHandler) HasCondition(obj interface{}) bool {
-	foundCondition := findCondition(obj, ch.RootCondition.Name())
-	return foundCondition != nil
+	conditionsSlice, ok := getConditionsSlice(obj)
+	if !ok || len(conditionsSlice) == 0 {
+		return false
+	}
+
+	for i := range conditionsSlice {
+		if conditionsSlice[i].Type == ch.RootCondition.Name() {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (ch *MetaV1ConditionHandler) GetStatus(obj interface{}) string {
@@ -83,23 +79,25 @@ func (ch *MetaV1ConditionHandler) False(obj interface{}) {
 	ch.setStatus(obj, "False")
 }
 func (ch *MetaV1ConditionHandler) IsFalse(obj interface{}) bool {
-	foundCondition := findCondition(obj, ch.RootCondition.Name())
-	if foundCondition == nil {
+	conditionsSlice, ok := getConditionsSlice(obj)
+	if !ok {
 		return false
 	}
 
-	return foundCondition.Status == metav1.ConditionFalse
+	return meta.IsStatusConditionFalse(conditionsSlice, ch.RootCondition.Name())
 }
+
 func (ch *MetaV1ConditionHandler) True(obj interface{}) {
 	ch.setStatus(obj, "True")
 }
+
 func (ch *MetaV1ConditionHandler) IsTrue(obj interface{}) bool {
-	foundCondition := findCondition(obj, ch.RootCondition.Name())
-	if foundCondition == nil {
+	conditionsSlice, ok := getConditionsSlice(obj)
+	if !ok {
 		return false
 	}
 
-	return foundCondition.Status == metav1.ConditionTrue
+	return meta.IsStatusConditionTrue(conditionsSlice, ch.RootCondition.Name())
 }
 func (ch *MetaV1ConditionHandler) Unknown(obj interface{}) {
 	ch.setStatus(obj, "Unknown")
@@ -154,7 +152,15 @@ func (ch *MetaV1ConditionHandler) GetReason(obj interface{}) string {
 
 func (ch *MetaV1ConditionHandler) SetReason(obj interface{}, reason string) {
 	cond := ch.findOrCreateCondition(obj)
-	cond.Reason = reason
+	updatedCond := cond.DeepCopy()
+	updatedCond.Reason = reason
+
+	conditionsSlice, ok := getConditionsSlice(obj)
+	if !ok {
+		panic("conditions slice does not exist")
+	}
+
+	_ = meta.SetStatusCondition(&conditionsSlice, *updatedCond)
 }
 
 func (ch *MetaV1ConditionHandler) GetMessage(obj interface{}) string {
@@ -168,19 +174,34 @@ func (ch *MetaV1ConditionHandler) GetMessage(obj interface{}) string {
 
 func (ch *MetaV1ConditionHandler) SetMessage(obj interface{}, msg string) {
 	cond := ch.findOrCreateCondition(obj)
-	cond.Message = msg
+	updatedCond := cond.DeepCopy()
+	updatedCond.Message = msg
+
+	conditionsSlice, ok := getConditionsSlice(obj)
+	if !ok {
+		panic("conditions slice does not exist")
+	}
+
+	_ = meta.SetStatusCondition(&conditionsSlice, *updatedCond)
 }
 
 func (ch *MetaV1ConditionHandler) SetMessageIfBlank(obj interface{}, msg string) {
 	cond := ch.findOrCreateCondition(obj)
+	updatedCond := cond.DeepCopy()
 	if cond.Message == "" {
-		cond.Message = msg
+		updatedCond.Message = msg
 	}
-}
 
-func (ch *MetaV1ConditionHandler) touchTransitionTS(condition *metav1.Condition) {
-	now := metav1.NewTime(time.Now())
-	condition.LastTransitionTime = now
+	if updatedCond.Message == cond.Message {
+		return
+	}
+
+	conditionsSlice, ok := getConditionsSlice(obj)
+	if !ok {
+		panic("conditions slice does not exist")
+	}
+
+	_ = meta.SetStatusCondition(&conditionsSlice, *updatedCond)
 }
 
 func (ch *MetaV1ConditionHandler) setStatus(obj interface{}, status string) {
@@ -196,9 +217,7 @@ func (ch *MetaV1ConditionHandler) setStatus(obj interface{}, status string) {
 
 	statusParsed := metav1.ConditionStatus(status)
 	cond := ch.findOrCreateCondition(obj)
-	if cond.Status != statusParsed {
-		ch.touchTransitionTS(cond)
-	}
+
 	cond.Status = statusParsed
 }
 
@@ -209,19 +228,33 @@ func (ch *MetaV1ConditionHandler) findOrCreateCondition(obj interface{}) *metav1
 	}
 
 	newCond := metav1.Condition{
-		Type:               ch.RootCondition.Name(),
-		Status:             metav1.ConditionUnknown,
-		LastTransitionTime: metav1.NewTime(time.Now()),
-		Reason:             "Created",
-		Message:            "",
+		Type:    ch.RootCondition.Name(),
+		Status:  metav1.ConditionUnknown,
+		Reason:  "Created",
+		Message: "",
 	}
 
-	conditionsSlice, ok := getConditionSlice(obj)
+	conditionsSlice, ok := getConditionsSlice(obj)
 	if !ok {
 		panic("conditions slice does not exist")
 	}
 
-	conditionsSlice = append(conditionsSlice, newCond)
-	setConditionSlice(obj, conditionsSlice)
+	changed := meta.SetStatusCondition(&conditionsSlice, newCond)
+	if changed {
+		setConditionsSlice(obj, conditionsSlice)
+	}
+
 	return findCondition(obj, ch.RootCondition.Name())
+}
+
+func setConditionsSlice(obj interface{}, conditions []metav1.Condition) {
+	condSliceValue := getValue(obj, "Status", "Conditions")
+	if !condSliceValue.IsValid() {
+		condSliceValue = getValue(obj, "Conditions")
+		if !condSliceValue.IsValid() {
+			panic("obj doesn't have conditions")
+		}
+	}
+
+	condSliceValue.Set(reflect.ValueOf(conditions))
 }
