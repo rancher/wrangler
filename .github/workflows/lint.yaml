@@ -1,7 +1,7 @@
 name: golangci-lint
 
 env:
-  SETUP_GO_VERSION: '^1.23'
+  SETUP_GO_VERSION: '^1.24'
 
 on:
   push:
