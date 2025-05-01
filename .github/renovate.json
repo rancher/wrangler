@@ -9,20 +9,23 @@
   "prHourlyLimit": 2,
   "packageRules": [
     {
-      "matchPackagePatterns": [
-        "k8s.io/*",
-        "sigs.k8s.io/*",
-        "go.opentelemetry.io/*",
-        "github.com/prometheus/*"
-      ],
-      "enabled": false
+      "enabled": false,
+      "matchPackageNames": [
+        "/k8s.io/*/",
+        "/sigs.k8s.io/*/",
+        "/go.opentelemetry.io/*/",
+        "/github.com/prometheus/*/"
+      ]
     },
     {
-      "matchPackagePatterns": [
-        "github.com/rancher/lasso/*"
+      "matchUpdateTypes": [
+        "major",
+        "minor"
       ],
-      "matchUpdateTypes": ["major", "minor"],
-      "enabled": false
+      "enabled": false,
+      "matchPackageNames": [
+        "/github.com/rancher/lasso/*/"
+      ]
     }
-  ] 
+  ]
 }
