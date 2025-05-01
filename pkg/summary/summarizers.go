@@ -2,6 +2,7 @@ package summary
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/kv"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	kstatus "sigs.k8s.io/cli-utils/pkg/kstatus/status"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,13 +21,6 @@ const (
 	kindSep = ", Kind="
 	reason  = "%REASON%"
 )
-
-type ConditionTypeStatus struct {
-	Type   string
-	Status metav1.ConditionStatus
-}
-
-type ConditionTypeStatusErrorMapping map[ConditionTypeStatus]bool
 
 var (
 	// True ==
@@ -99,10 +92,11 @@ var (
 	// e.g.: GVK: helm.cattle.io/v1, HelmChart
 	//            --> Type: JobCreated, Status: True, IsError: false
 	//            --> Type: Failed, Status: True, IsError: false
-	GVKConditionErrorMapping = map[schema.GroupVersionKind]ConditionTypeStatusErrorMapping{
+	GVKConditionErrorMapping = ConditionTypeStatusErrorMapping{
 		{Group: "helm.cattle.io", Version: "v1", Kind: "HelmChart"}: {
 			{"JobCreated", metav1.ConditionTrue}: false,
 			{"Failed", metav1.ConditionFalse}:    false,
+			{"Failed", metav1.ConditionTrue}:     true,
 		},
 	}
 
@@ -156,6 +150,24 @@ func init() {
 		checkApplyOwned,
 		checkCattleTypes,
 	}
+
+	initializeCheckGVKError()
+}
+
+func initializeCheckGVKError() {
+	gvkConfig := os.Getenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING")
+	if gvkConfig != "" {
+		logrus.Debugf("GVK Error Mapping Provided")
+		gvkErrorMapping := ConditionTypeStatusErrorMapping{}
+		if err := json.Unmarshal([]byte(gvkConfig), &gvkErrorMapping); err != nil {
+			logrus.Errorln("Unable to parse GVK config: ", err.Error())
+			return
+		}
+		logrus.Debugf("GVK Error Mapping Set")
+		GVKConditionErrorMapping = gvkErrorMapping
+		return
+	}
+	logrus.Debugf("GVK Error Mapping not provided, using predefined values")
 }
 
 func checkOwner(obj data.Object, conditions []Condition, summary Summary) Summary {
@@ -245,13 +257,11 @@ func checkStandard(obj data.Object, _ []Condition, summary Summary) Summary {
 func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (Summary, bool) {
 	obj, err := json.Marshal(data)
 	if err != nil {
-		logrus.Errorln("checkGVKErrors: failed to marshal object: ", err.Error())
 		return summary, false
 	}
-
+	logrus.Infof(string(obj))
 	gvk, detected, err := gvk.Detect(obj)
 	if err != nil {
-		logrus.Errorln("checkGVKErrors: failed to detect GVK: ", err.Error())
 		return summary, false
 	}
 
@@ -264,11 +274,17 @@ func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (
 		return summary, false
 	}
 
+	if len(conditions) == 0 {
+		return summary, false
+	}
+
+	handled := false
 	for _, c := range conditions {
 		isError, found := errorMapping[ConditionTypeStatus{c.Type(), metav1.ConditionStatus(c.Status())}]
 		if !found {
 			continue
 		}
+		handled = true
 
 		if !isError {
 			continue
@@ -280,6 +296,10 @@ func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (
 			summary.State = "error"
 		}
 		break
+	}
+
+	if !handled {
+		return summary, false
 	}
 
 	return summary, true
