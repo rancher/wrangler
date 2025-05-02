@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -20,22 +21,14 @@ const (
 // Is is expected to be something like:
 //
 //	{
-//			"gvk": 				"helm.cattle.io/v1/HelmChart",
+//			"gvk": 			"helm.cattle.io/v1/HelmChart",
 //			"conditionMapping": [
 //				{
-//					"type": "JobCreated"
-//					"status": "True",
-//					"error": false,
+//					"type": "JobCreated"	// This means JobCreated is mostly informational and True or False doesn't mean error
 //				},
 //				{
-//					"type": "Failed"
-//					"status": "True",
-//					"error": true,
-//				},
-//				{
-//					"type": "Failed"
-//					"status": "False",
-//					"error": false,
+//					"type": "Failed",	// This means Failed is considered error if it's status is True
+//					"status": ["True"]
 //				},
 //			}
 //	}
@@ -47,17 +40,11 @@ type conditionTypeStatusJSON struct {
 }
 
 type conditionStatusErrorJSON struct {
-	Type    string `json:"type"`
-	Status  string `json:"status"`
-	IsError bool   `json:"error"`
+	Type   string   `json:"type"`
+	Status []string `json:"status"`
 }
 
-type ConditionTypeStatus struct {
-	Type   string
-	Status metav1.ConditionStatus
-}
-
-type ConditionTypeStatusErrorMapping map[schema.GroupVersionKind]map[ConditionTypeStatus]bool
+type ConditionTypeStatusErrorMapping map[schema.GroupVersionKind]map[string]sets.Set[string]
 
 func (m ConditionTypeStatusErrorMapping) MarshalJSON() ([]byte, error) {
 	output := []conditionTypeStatusJSON{}
@@ -66,11 +53,16 @@ func (m ConditionTypeStatusErrorMapping) MarshalJSON() ([]byte, error) {
 			GVK: fmt.Sprintf(gvkFormat, gvk.Group, gvk.Version, gvk.Kind),
 			ConditionMapping: func() []conditionStatusErrorJSON {
 				conditions := make([]conditionStatusErrorJSON, 0)
-				for condition, isErr := range mapping {
+				for condition, statuses := range mapping {
 					conditions = append(conditions, conditionStatusErrorJSON{
-						Type:    condition.Type,
-						Status:  string(condition.Status),
-						IsError: isErr,
+						Type: condition,
+						Status: func() []string {
+							output := []string{}
+							for status := range statuses {
+								output = append(output, status)
+							}
+							return output
+						}(),
 					})
 				}
 				return conditions
@@ -86,6 +78,7 @@ func (m ConditionTypeStatusErrorMapping) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	for _, mapping := range GVKConditionMapping {
 		// parsing Group, Version and Kind in a format of group/version/kind
 		// eg: helm.cattle.io/v1/HelmChart
@@ -93,16 +86,15 @@ func (m ConditionTypeStatusErrorMapping) UnmarshalJSON(data []byte) error {
 		if len(gvk) != 3 {
 			return errors.New("gvk parsing failed: wrong GVK format")
 		}
-		conditionMapping := map[ConditionTypeStatus]bool{}
+		conditionMapping := map[string]sets.Set[string]{}
 		for _, condition := range mapping.ConditionMapping {
-			if condition.Status != string(metav1.ConditionFalse) &&
-				condition.Status != string(metav1.ConditionTrue) {
-				return errors.New("gvk parsing failed: conditions status should be only True or False")
+			// checking if statuses are "True" or "False"
+			for _, status := range condition.Status {
+				if status != string(metav1.ConditionFalse) && status != string(metav1.ConditionTrue) {
+					return errors.New("gvk parsing failed: conditions status should be only True or False")
+				}
 			}
-			conditionMapping[ConditionTypeStatus{
-				Type:   condition.Type,
-				Status: metav1.ConditionStatus(condition.Status),
-			}] = condition.IsError
+			conditionMapping[condition.Type] = sets.New[string](condition.Status...)
 		}
 
 		m[schema.GroupVersionKind{

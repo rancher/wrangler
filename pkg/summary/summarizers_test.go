@@ -182,8 +182,45 @@ func TestCheckGVKErrors(t *testing.T) {
 							"conditionMapping": [
 								{
 									"type": "Failed",
-									"status": "True",
-									"error": true
+									"status": ["True"]
+								}
+							]
+						}
+					]
+				`)
+			},
+		},
+		{
+			name: "load conditions - gvk found - condition is only informational",
+			input: input{
+				data: data.Object{
+					"APIVersion": "sample.cattle.io/v1",
+					"Kind":       "Sample",
+				},
+				conditions: []Condition{
+					NewCondition("Created", "True", "", ""),
+				},
+				summary: Summary{
+					State: "testing",
+					Error: false,
+				},
+			},
+			expected: output{
+				summary: Summary{
+					State: "testing",
+					Error: false,
+				},
+				handled: true,
+			},
+			loadConditions: func() {
+				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
+					[
+						{
+							"gvk": "sample.cattle.io/v1/Sample",
+							"conditionMapping": [
+								{
+									"type": "Created",
+									"status": []
 								}
 							]
 						}
@@ -221,8 +258,7 @@ func TestCheckGVKErrors(t *testing.T) {
 							"conditionMapping": [
 								{
 									"type": "Failed",
-									"status": "False",
-									"error": false
+									"status": ["True"]
 								}
 							]
 						}
@@ -260,8 +296,7 @@ func TestCheckGVKErrors(t *testing.T) {
 							"conditionMapping": [
 								{
 									"type": "Failed",
-									"status": "True",
-									"error": true
+									"status": ["True"]
 								}
 							]
 						}

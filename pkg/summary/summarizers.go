@@ -15,6 +15,7 @@ import (
 	kstatus "sigs.k8s.io/cli-utils/pkg/kstatus/status"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -90,13 +91,14 @@ var (
 
 	// For given GVK, This condition Type and this Status, indicates an error or not
 	// e.g.: GVK: helm.cattle.io/v1, HelmChart
-	//            --> Type: JobCreated, Status: True, IsError: false
-	//            --> Type: Failed, Status: True, IsError: false
+	//            --> Type: JobCreated: [], indicates True or False are not errors
+	//            --> Type: Failed: ["True"], indicates "True" status is considered error
+	// 	      --> Type: Worked: ["False"], indicates "False" status is considered error
+	// 	      --> Type: Unknown: ["True", "False"] indicated "True" or "False" are considered errors
 	GVKConditionErrorMapping = ConditionTypeStatusErrorMapping{
 		{Group: "helm.cattle.io", Version: "v1", Kind: "HelmChart"}: {
-			{"JobCreated", metav1.ConditionTrue}: false,
-			{"Failed", metav1.ConditionFalse}:    false,
-			{"Failed", metav1.ConditionTrue}:     true,
+			"JobCreated": sets.New[string](),
+			"Failed":     sets.New[string](string(metav1.ConditionTrue)),
 		},
 	}
 
@@ -255,11 +257,15 @@ func checkStandard(obj data.Object, _ []Condition, summary Summary) Summary {
 }
 
 func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (Summary, bool) {
+	if len(conditions) == 0 {
+		return summary, false
+	}
+
 	obj, err := json.Marshal(data)
 	if err != nil {
 		return summary, false
 	}
-	logrus.Infof(string(obj))
+
 	gvk, detected, err := gvk.Detect(obj)
 	if err != nil {
 		return summary, false
@@ -269,33 +275,26 @@ func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (
 		return summary, false
 	}
 
-	errorMapping, found := GVKConditionErrorMapping[gvk]
+	conditionMapping, found := GVKConditionErrorMapping[gvk]
 	if !found {
-		return summary, false
-	}
-
-	if len(conditions) == 0 {
 		return summary, false
 	}
 
 	handled := false
 	for _, c := range conditions {
-		isError, found := errorMapping[ConditionTypeStatus{c.Type(), metav1.ConditionStatus(c.Status())}]
+		status, found := conditionMapping[c.Type()]
 		if !found {
 			continue
 		}
+
 		handled = true
-
-		if !isError {
-			continue
+		if status.Has(c.Status()) {
+			summary.Error = true
+			summary.Message = append(summary.Message, c.Message())
+			if summary.State == "active" || summary.State == "" {
+				summary.State = "error"
+			}
 		}
-
-		summary.Error = true
-		summary.Message = append(summary.Message, c.Message())
-		if summary.State == "active" || summary.State == "" {
-			summary.State = "error"
-		}
-		break
 	}
 
 	if !handled {
