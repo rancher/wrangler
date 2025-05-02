@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -88,12 +87,6 @@ func (m ConditionTypeStatusErrorMapping) UnmarshalJSON(data []byte) error {
 		}
 		conditionMapping := map[string]sets.Set[string]{}
 		for _, condition := range mapping.ConditionMapping {
-			// checking if statuses are "True" or "False"
-			for _, status := range condition.Status {
-				if status != string(metav1.ConditionFalse) && status != string(metav1.ConditionTrue) {
-					return errors.New("gvk parsing failed: conditions status should be only True or False")
-				}
-			}
 			conditionMapping[condition.Type] = sets.New[string](condition.Status...)
 		}
 
