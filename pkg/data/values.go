@@ -74,7 +74,11 @@ func GetValueFromAny(data interface{}, keys ...string) (interface{}, bool) {
 			if keyInt >= len(node) {
 				return nil, false
 			}
-			return node[keyInt], true
+			data = node[keyInt]
+			// If we're at the end of the keys, we'll return the value at the end of this function
+			// Otherwise we'll try to index into the string and hit the default case,
+			// and return <nil, false>
+			// See the "keys nested too far on a string array" test.
 		default:
 			return nil, false
 		}

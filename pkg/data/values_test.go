@@ -186,6 +186,24 @@ func TestGetValueFromAny(t *testing.T) {
 			wantSuccess: false,
 		},
 		{
+			name: "keys nested too far on a string array",
+			data: map[string]interface{}{
+				"block1": []string{
+					"ink",
+					"wink",
+					"blink",
+				},
+				"block2": []string{
+					"ball",
+					"bell",
+					"bill",
+				},
+			},
+			keys:        []string{"block1", "2", "3"},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
 			name: "map blank key with value",
 			data: map[string]interface{}{
 				"": "bob",
