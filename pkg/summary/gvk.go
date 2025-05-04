@@ -16,8 +16,8 @@ const (
 )
 
 // conditionTypeStatusJSON is a custom JSON to map a complex object into a standard JSON object. It maps Groups, Versions and Kinds to
-// Conditions Types and Status, indicating with a flag if a certain condition with specific status represents an error or not.
-// Is is expected to be something like:
+// Conditions, Types, and Status, indicating with a flag if a certain condition with specific status represents an error or not.
+// It is expected to be something like:
 //
 //	{
 //			"gvk": 			"helm.cattle.io/v1/HelmChart",
@@ -32,7 +32,7 @@ const (
 //			}
 //	}
 //
-// IMPORTANT: Please pay attention to the the conditionStatusSep char, in this case it is a '/'. It separates Groups, Versions and Kinds.
+// IMPORTANT: Please pay attention to the conditionStatusSep char, in this case it is a '/'. It separates Groups, Versions and Kinds.
 type conditionTypeStatusJSON struct {
 	GVK              string                     `json:"gvk"`
 	ConditionMapping []conditionStatusErrorJSON `json:"conditionMapping"`
