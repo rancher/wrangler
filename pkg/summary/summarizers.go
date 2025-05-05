@@ -21,8 +21,8 @@ import (
 const (
 	kindSep = ", Kind="
 	reason  = "%REASON%"
+	checkGVKErrorMappingEnvVar = "CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING"
 )
-
 var (
 	// True ==
 	// False == error
@@ -81,8 +81,7 @@ var (
 		"ReplicaFailure":      true,
 		"Stalled":             true,
 	}
-
-	// True ==
+// True ==
 	// False == error
 	// Unknown ==
 	ErrorFalse = map[string]bool{
@@ -157,7 +156,7 @@ func init() {
 }
 
 func initializeCheckGVKError() {
-	gvkConfig := os.Getenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING")
+	gvkConfig := os.Getenv(checkGVKErrorMappingEnvVar)
 	if gvkConfig != "" {
 		logrus.Debugf("GVK Error Mapping Provided")
 		gvkErrorMapping := ConditionTypeStatusErrorMapping{}

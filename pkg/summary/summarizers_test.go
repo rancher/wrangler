@@ -175,7 +175,7 @@ func TestCheckGVKErrors(t *testing.T) {
 				handled: false,
 			},
 			loadConditions: func() {
-				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
+				os.Setenv(checkGVKErrorMappingEnvVar, `
 					[
 						{
 							"gvk": "sample.cattle.io/v1, Kind=Sample",
@@ -213,7 +213,7 @@ func TestCheckGVKErrors(t *testing.T) {
 				handled: true,
 			},
 			loadConditions: func() {
-				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
+				os.Setenv(checkGVKErrorMappingEnvVar, `
 					[
 						{
 							"gvk": "sample.cattle.io/v1, Kind=Sample",
@@ -251,7 +251,7 @@ func TestCheckGVKErrors(t *testing.T) {
 				handled: true,
 			},
 			loadConditions: func() {
-				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
+				os.Setenv(checkGVKErrorMappingEnvVar, `
 					[
 						{
 							"gvk": "sample.cattle.io/v1, Kind=Sample",
@@ -289,7 +289,7 @@ func TestCheckGVKErrors(t *testing.T) {
 				handled: true,
 			},
 			loadConditions: func() {
-				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
+				os.Setenv(checkGVKErrorMappingEnvVar, `
 					[
 						{
 							"gvk": "sample.cattle.io/v1, Kind=Sample",
