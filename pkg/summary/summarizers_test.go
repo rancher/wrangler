@@ -178,8 +178,8 @@ func TestCheckGVKErrors(t *testing.T) {
 				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
 					[
 						{
-							"gvk": "sample.cattle.io/v1/Sample",
-							"conditionMapping": [
+							"gvk": "sample.cattle.io/v1, Kind=Sample",
+							"conditionMappings": [
 								{
 									"type": "Failed",
 									"status": ["True"]
@@ -216,8 +216,8 @@ func TestCheckGVKErrors(t *testing.T) {
 				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
 					[
 						{
-							"gvk": "sample.cattle.io/v1/Sample",
-							"conditionMapping": [
+							"gvk": "sample.cattle.io/v1, Kind=Sample",
+							"conditionMappings": [
 								{
 									"type": "Created",
 									"status": []
@@ -254,8 +254,8 @@ func TestCheckGVKErrors(t *testing.T) {
 				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
 					[
 						{
-							"gvk": "sample.cattle.io/v1/Sample",
-							"conditionMapping": [
+							"gvk": "sample.cattle.io/v1, Kind=Sample",
+							"conditionMappings": [
 								{
 									"type": "Failed",
 									"status": ["True"]
@@ -292,8 +292,8 @@ func TestCheckGVKErrors(t *testing.T) {
 				os.Setenv("CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING", `
 					[
 						{
-							"gvk": "sample.cattle.io/v1/Sample",
-							"conditionMapping": [
+							"gvk": "sample.cattle.io/v1, Kind=Sample",
+							"conditionMappings": [
 								{
 									"type": "Failed",
 									"status": ["True"]

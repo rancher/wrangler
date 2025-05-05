@@ -97,8 +97,8 @@ var (
 	// 	      --> Type: Unknown: ["True", "False"] indicated "True" or "False" are considered errors
 	GVKConditionErrorMapping = ConditionTypeStatusErrorMapping{
 		{Group: "helm.cattle.io", Version: "v1", Kind: "HelmChart"}: {
-			"JobCreated": sets.New[string](),
-			"Failed":     sets.New[string](string(metav1.ConditionTrue)),
+			"JobCreated": sets.New[metav1.ConditionStatus](),
+			"Failed":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
 	}
 
@@ -288,7 +288,7 @@ func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (
 		}
 
 		handled = true
-		if status.Has(c.Status()) {
+		if status.Has(metav1.ConditionStatus(c.Status())) {
 			summary.Error = true
 			summary.Message = append(summary.Message, c.Message())
 			if summary.State == "active" || summary.State == "" {
