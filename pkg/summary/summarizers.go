@@ -19,10 +19,11 @@ import (
 )
 
 const (
-	kindSep = ", Kind="
-	reason  = "%REASON%"
+	kindSep                    = ", Kind="
+	reason                     = "%REASON%"
 	checkGVKErrorMappingEnvVar = "CATTLE_WRANGLER_CHECK_GVK_ERROR_MAPPING"
 )
+
 var (
 	// True ==
 	// False == error
@@ -72,16 +73,15 @@ var (
 	// False ==
 	// Unknown ==
 	ErrorTrue = map[string]bool{
-		"OutOfDisk":           true,
-		"MemoryPressure":      true,
-		"DiskPressure":        true,
-		"NetworkUnavailable":  true,
-		"KernelHasNoDeadlock": true,
-		"Unschedulable":       true,
-		"ReplicaFailure":      true,
-		"Stalled":             true,
+		"OutOfDisk":          true,
+		"MemoryPressure":     true,
+		"DiskPressure":       true,
+		"NetworkUnavailable": true,
+		"Unschedulable":      true,
+		"ReplicaFailure":     true,
+		"Stalled":            true,
 	}
-// True ==
+	// True ==
 	// False == error
 	// Unknown ==
 	ErrorFalse = map[string]bool{
@@ -98,6 +98,11 @@ var (
 		{Group: "helm.cattle.io", Version: "v1", Kind: "HelmChart"}: {
 			"JobCreated": sets.New[metav1.ConditionStatus](),
 			"Failed":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		},
+		{Group: "apps", Version: "v1", Kind: "Deployment"}: {
+			"ReplicaFailure": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+			"Stalled":        sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+			"Progressing":    sets.New[metav1.ConditionStatus](metav1.ConditionFalse),
 		},
 	}
 
