@@ -10,22 +10,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// conditionTypeStatusJSON is a custom JSON to map a complex object into a standard JSON object. It maps Groups, Versions and Kinds to
-// Conditions, Types, and Status, indicating with a flag if a certain condition with specific status represents an error or not.
-// It is expected to be something like:
+// conditionTypeStatusJSON is a custom JSON to map a complex object into a standard JSON object. It maps Groups, 
+// Versions and Kinds to Conditions, Types, and Status, indicating with a flag if a certain condition with specific 
+// status represents an error or not. It is expected to be something like:
 //
-//	{
-//			"gvk": 			"helm.cattle.io/v1, Kind=HelmChart",
-//			"conditionMappings": [
-//				{
-//					"type": "JobCreated"	// This means JobCreated is mostly informational and True or False doesn't mean error
-//				},
-//				{
-//					"type": "Failed",	// This means Failed is considered error if it's status is True
-//					"status": ["True"]
-//				},
-//			}
+//{
+//	"gvk": 			"helm.cattle.io/v1, Kind=HelmChart",
+//	"conditionMappings": [
+//		{
+//			"type": "JobCreated"	// This means JobCreated is mostly informational and True or False 
+//		},				// doesn't mean error
+//		{
+//			"type": "Failed",	// This means Failed is considered error if it's status is True
+//			"status": ["True"]
+//		},
 //	}
+//}
 type conditionTypeStatusJSON struct {
 	GVK               string                     `json:"gvk"`
 	ConditionMappings []conditionStatusErrorJSON `json:"conditionMappings"`

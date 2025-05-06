@@ -311,8 +311,8 @@ func TestCheckGVKErrors(t *testing.T) {
 			if tc.loadConditions != nil {
 				tc.loadConditions()
 			}
-			initializeCheckGVKError()
-			summary, handled := checkGVKErrors(tc.input.data, tc.input.conditions, tc.input.summary)
+			initializeCheckErrors()
+			summary, handled := checkErrors(tc.input.data, tc.input.conditions, tc.input.summary)
 
 			assert.Equal(t, tc.expected.summary.Error, summary.Error)
 			assert.Equal(t, tc.expected.handled, handled)

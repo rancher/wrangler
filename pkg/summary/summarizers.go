@@ -69,25 +69,6 @@ var (
 		"Processed":                   "processed",
 	}
 
-	// True == error
-	// False ==
-	// Unknown ==
-	ErrorTrue = map[string]bool{
-		"OutOfDisk":          true,
-		"MemoryPressure":     true,
-		"DiskPressure":       true,
-		"NetworkUnavailable": true,
-		"Unschedulable":      true,
-		"ReplicaFailure":     true,
-		"Stalled":            true,
-	}
-	// True ==
-	// False == error
-	// Unknown ==
-	ErrorFalse = map[string]bool{
-		"Failed": true,
-	}
-
 	// For given GVK, This condition Type and this Status, indicates an error or not
 	// e.g.: GVK: helm.cattle.io/v1, HelmChart
 	//            --> Type: JobCreated: [], indicates True or False are not errors
@@ -99,11 +80,29 @@ var (
 			"JobCreated": sets.New[metav1.ConditionStatus](),
 			"Failed":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
+		{Group: "", Version: "v1", Kind: "Node"}: {
+			"MemoryPressure":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+			"DiskPressure":       sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+			"NetworkUnavailable": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		},
 		{Group: "apps", Version: "v1", Kind: "Deployment"}: {
 			"ReplicaFailure": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"Stalled":        sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"Progressing":    sets.New[metav1.ConditionStatus](metav1.ConditionFalse),
 		},
+	}
+
+	// In case we cannot match any Groups, Versions and Kinds in GVKConditionErrorMapping then we fallback to this
+	// mapping.
+	FallbackConditionErrorMapping = map[string]sets.Set[metav1.ConditionStatus]{
+		"OutOfDisk":          sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		"MemoryPressure":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		"DiskPressure":       sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		"NetworkUnavailable": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		"Unschedulable":      sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		"ReplicaFailure":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		"Stalled":            sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		"Failed":             sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 	}
 
 	// True ==
@@ -157,10 +156,10 @@ func init() {
 		checkCattleTypes,
 	}
 
-	initializeCheckGVKError()
+	initializeCheckErrors()
 }
 
-func initializeCheckGVKError() {
+func initializeCheckErrors() {
 	gvkConfig := os.Getenv(checkGVKErrorMappingEnvVar)
 	if gvkConfig != "" {
 		logrus.Debugf("GVK Error Mapping Provided")
@@ -169,8 +168,41 @@ func initializeCheckGVKError() {
 			logrus.Errorln("Unable to parse GVK config: ", err.Error())
 			return
 		}
+
+		// Merging GVK + Conditions
+		//
+		// IMPORTANT: In case you add a condition that exists already, we replace the set that holds the Status
+		// completely of that condition by yours, this makes it possible to deactivate certain statuses for
+		// debugging reasons.
+		//
+		// eg.:
+		//
+		// Existing one:
+		//
+		// helm.cattle.io, Kind=HelmChart
+		// JobCreated => []
+		// Failed => ["True"]
+		//
+		// In case you set Failed = ["False"] and add Ready = ["False"]:
+		//
+		// helm.cattle.io, Kind=HelmChart
+		// JobCreated => []		<<<= not changed
+		// Failed => ["False"]		<<<= replaced completely the set.
+		// Ready => ["False"] 		<<<= merged to existing conditions.
+		//
+		// So, we've merged the conditions, but not the status set values.
+		for gvk, newConditionsMap := range gvkErrorMapping {
+			if _, exists := GVKConditionErrorMapping[gvk]; !exists {
+				GVKConditionErrorMapping[gvk] = map[string]sets.Set[metav1.ConditionStatus]{}
+			}
+
+			existingConditionsMap := GVKConditionErrorMapping[gvk]
+			for condition, errorMapping := range newConditionsMap {
+				existingConditionsMap[condition] := errorMapping
+			}
+			GVKConditionErrorMapping[gvk] := existingConditionsMap
+		}
 		logrus.Debugf("GVK Error Mapping Set")
-		GVKConditionErrorMapping = gvkErrorMapping
 		return
 	}
 	logrus.Debugf("GVK Error Mapping not provided, using predefined values")
@@ -260,7 +292,9 @@ func checkStandard(obj data.Object, _ []Condition, summary Summary) Summary {
 	return summary
 }
 
-func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (Summary, bool) {
+func checkErrors(data data.Object, conditions []Condition, summary Summary) Summary {
+	conditionMapping := FallbackConditionErrorMapping
+
 	if len(conditions) == 0 {
 		return summary, false
 	}
@@ -272,26 +306,22 @@ func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (
 
 	gvk, detected, err := gvk.Detect(obj)
 	if err != nil {
-		return summary, false
+		logrus.Debugln("checkErrors: failed to detect GVK: ", err.Error())
 	}
 
-	if !detected {
-		return summary, false
+	if detected {
+		gvkConditionMapping, found := GVKConditionErrorMapping[gvk]
+		if found {
+			conditionMapping = gvkConditionMapping
+		}
 	}
 
-	conditionMapping, found := GVKConditionErrorMapping[gvk]
-	if !found {
-		return summary, false
-	}
-
-	handled := false
 	for _, c := range conditions {
 		status, found := conditionMapping[c.Type()]
 		if !found {
 			continue
 		}
 
-		handled = true
 		if status.Has(metav1.ConditionStatus(c.Status())) {
 			summary.Error = true
 			summary.Message = append(summary.Message, c.Message())
@@ -299,42 +329,9 @@ func checkGVKErrors(data data.Object, conditions []Condition, summary Summary) (
 				summary.State = "error"
 			}
 		}
+
 	}
 
-	if !handled {
-		return summary, false
-	}
-
-	return summary, true
-}
-
-func checkErrors(data data.Object, conditions []Condition, summary Summary) Summary {
-	summary, handled := checkGVKErrors(data, conditions, summary)
-	if summary.Error || handled {
-		return summary
-	}
-
-	for _, c := range conditions {
-		if (ErrorFalse[c.Type()] && c.Status() == "False") || c.Reason() == "Error" {
-			summary.Error = true
-			summary.Message = append(summary.Message, c.Message())
-			if summary.State == "active" || summary.State == "" {
-				summary.State = "error"
-			}
-			break
-		}
-	}
-
-	if summary.Error {
-		return summary
-	}
-
-	for _, c := range conditions {
-		if ErrorTrue[c.Type()] && c.Status() == "True" {
-			summary.Error = true
-			summary.Message = append(summary.Message, c.Message())
-		}
-	}
 	return summary
 }
 
