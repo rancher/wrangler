@@ -71,10 +71,10 @@ var (
 
 	// For given GVK, This condition Type and this Status, indicates an error or not
 	// e.g.: GVK: helm.cattle.io/v1, HelmChart
-	//            --> Type: JobCreated: [], indicates True or False are not errors
-	//            --> Type: Failed: ["True"], indicates "True" status is considered error
-	// 	      --> Type: Worked: ["False"], indicates "False" status is considered error
-	// 	      --> Type: Unknown: ["True", "False"] indicated "True" or "False" are considered errors
+	//		--> JobCreated: [], indicates True or False are not errors
+	//		--> Failed: ["True"], indicates "True" status is considered error
+	//		--> Worked: ["False"], indicates "False" status is considered error
+	//		--> Unknown: ["True", "False"] indicated "True" or "False" are considered errors
 	GVKConditionErrorMapping = ConditionTypeStatusErrorMapping{
 		{Group: "helm.cattle.io", Version: "v1", Kind: "HelmChart"}: {
 			"JobCreated": sets.New[metav1.ConditionStatus](),
@@ -186,7 +186,7 @@ func initializeCheckErrors() {
 		// In case you set Failed = ["False"] and add Ready = ["False"]:
 		//
 		// helm.cattle.io, Kind=HelmChart
-		// JobCreated => []		<<<= not changed
+		// JobCreated => []			<<<= not changed
 		// Failed => ["False"]		<<<= replaced completely the set.
 		// Ready => ["False"] 		<<<= merged to existing conditions.
 		//
@@ -198,9 +198,9 @@ func initializeCheckErrors() {
 
 			existingConditionsMap := GVKConditionErrorMapping[gvk]
 			for condition, errorMapping := range newConditionsMap {
-				existingConditionsMap[condition] := errorMapping
+				existingConditionsMap[condition] = errorMapping
 			}
-			GVKConditionErrorMapping[gvk] := existingConditionsMap
+			GVKConditionErrorMapping[gvk] = existingConditionsMap
 		}
 		logrus.Debugf("GVK Error Mapping Set")
 		return
@@ -296,12 +296,12 @@ func checkErrors(data data.Object, conditions []Condition, summary Summary) Summ
 	conditionMapping := FallbackConditionErrorMapping
 
 	if len(conditions) == 0 {
-		return summary, false
+		return summary
 	}
 
 	obj, err := json.Marshal(data)
 	if err != nil {
-		return summary, false
+		return summary
 	}
 
 	gvk, detected, err := gvk.Detect(obj)

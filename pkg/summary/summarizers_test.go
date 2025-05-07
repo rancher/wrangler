@@ -273,7 +273,7 @@ func TestCheckGVKErrors(t *testing.T) {
 					"APIVersion": "sample.cattle.io/v1",
 					"Kind":       "Sample",
 				},
-				conditions: []Condition{
+			conditions: []Condition{
 					NewCondition("Failed", "True", "", ""),
 				},
 				summary: Summary{
@@ -312,10 +312,9 @@ func TestCheckGVKErrors(t *testing.T) {
 				tc.loadConditions()
 			}
 			initializeCheckErrors()
-			summary, handled := checkErrors(tc.input.data, tc.input.conditions, tc.input.summary)
+			summary := checkErrors(tc.input.data, tc.input.conditions, tc.input.summary)
 
 			assert.Equal(t, tc.expected.summary.Error, summary.Error)
-			assert.Equal(t, tc.expected.handled, handled)
 		})
 	}
 

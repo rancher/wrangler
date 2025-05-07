@@ -2,7 +2,8 @@ package summary
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
+	"regexp"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10,22 +11,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// conditionTypeStatusJSON is a custom JSON to map a complex object into a standard JSON object. It maps Groups, 
-// Versions and Kinds to Conditions, Types, and Status, indicating with a flag if a certain condition with specific 
+var (
+	gvkRegExp = regexp.MustCompile(`^(.*?)/(.*),\s*Kind=(.+)$`)
+)
+
+// conditionTypeStatusJSON is a custom JSON to map a complex object into a standard JSON object. It maps Groups,
+// Versions and Kinds to Conditions, Types, and Status, indicating with a flag if a certain condition with specific
 // status represents an error or not. It is expected to be something like:
 //
-//{
-//	"gvk": 			"helm.cattle.io/v1, Kind=HelmChart",
-//	"conditionMappings": [
-//		{
-//			"type": "JobCreated"	// This means JobCreated is mostly informational and True or False 
-//		},				// doesn't mean error
-//		{
-//			"type": "Failed",	// This means Failed is considered error if it's status is True
-//			"status": ["True"]
-//		},
+//	{
+//		"gvk": 			"helm.cattle.io/v1, Kind=HelmChart",
+//		"conditionMappings": [
+//			{
+//				"type": "JobCreated"	// This means JobCreated is mostly informational and True or False
+//			},				// doesn't mean error
+//			{
+//				"type": "Failed",	// This means Failed is considered error if it's status is True
+//				"status": ["True"]
+//			},
+//		}
 //	}
-//}
 type conditionTypeStatusJSON struct {
 	GVK               string                     `json:"gvk"`
 	ConditionMappings []conditionStatusErrorJSON `json:"conditionMappings"`
@@ -61,23 +66,23 @@ func (m ConditionTypeStatusErrorMapping) UnmarshalJSON(data []byte) error {
 	}
 
 	for _, mapping := range conditionMappingsJSON {
+		// checking if mapping.GVK is in the right format: <group>/[version], Kind=[kind]
+		mx := gvkRegExp.FindStringSubmatch(mapping.GVK)
+		if len(mx) == 0 {
+			return fmt.Errorf("gvk parsing failed: wrong GVK format: <%s>\n", mapping.GVK)
+		}
+
 		// parsing Group, Version and Kind in a format of group/version, Kind=kind
 		// eg: helm.cattle.io/v1, Kind=HelmChart, becomes:
 		// parts[0] = helm.cattle.io/v1
 		// parts[1] = HelmChart
 		parts := strings.Split(mapping.GVK, ", Kind=")
-		if len(parts) != 2 {
-			return errors.New("gvk parsing failed: wrong GVK format")
-		}
 
 		// parsing group/version
 		// eg: helm.cattle.io/v1, becomes:
 		// gv[0] = helm.cattle.io
 		// gv[1] = v1
 		gv := strings.Split(parts[0], "/")
-		if len(gv) != 2 {
-			return errors.New("gvk parsing failed: wrong group/version format")
-		}
 
 		conditionMappings := map[string]sets.Set[metav1.ConditionStatus]{}
 		for _, condition := range mapping.ConditionMappings {
