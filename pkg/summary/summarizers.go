@@ -85,7 +85,6 @@ var (
 			"MemoryPressure":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"DiskPressure":       sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"NetworkUnavailable": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
-			"Unschedulable":      sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
 		{Group: "apps", Version: "v1", Kind: "Deployment"}: {
 			"ReplicaFailure": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
@@ -99,12 +98,7 @@ var (
 	// In case we cannot match any Groups, Versions and Kinds in GVKConditionErrorMapping then we fallback to this
 	// mapping.
 	FallbackConditionErrorMapping = map[string]sets.Set[metav1.ConditionStatus]{
-		"OutOfDisk":          sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
-		"MemoryPressure":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
-		"DiskPressure":       sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
-		"NetworkUnavailable": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		"Unschedulable":      sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
-		"ReplicaFailure":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		"Stalled":            sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		"Failed":             sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 	}
