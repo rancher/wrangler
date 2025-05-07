@@ -9,7 +9,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/moby/locker v1.0.1
 	github.com/pkg/errors v0.9.1
-	github.com/rancher/lasso v0.2.1
+	github.com/rancher/lasso v0.2.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/mock v0.5.0
