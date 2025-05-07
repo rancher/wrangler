@@ -81,14 +81,18 @@ var (
 			"Failed":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
 		{Group: "", Version: "v1", Kind: "Node"}: {
+			"OutOfDisk":          sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"MemoryPressure":     sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"DiskPressure":       sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"NetworkUnavailable": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+			"Unschedulable":      sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
 		{Group: "apps", Version: "v1", Kind: "Deployment"}: {
 			"ReplicaFailure": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
-			"Stalled":        sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"Progressing":    sets.New[metav1.ConditionStatus](metav1.ConditionFalse),
+		},
+		{Group: "apps", Version: "v1", Kind: "ReplicaSet"}: {
+			"ReplicaFailure": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
 	}
 
@@ -301,6 +305,7 @@ func checkErrors(data data.Object, conditions []Condition, summary Summary) Summ
 
 	obj, err := json.Marshal(data)
 	if err != nil {
+		logrus.Debugln("Failed to parse the object: ", err.Error())
 		return summary
 	}
 

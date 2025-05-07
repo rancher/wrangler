@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -72,27 +71,15 @@ func (m ConditionTypeStatusErrorMapping) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("gvk parsing failed: wrong GVK format: <%s>\n", mapping.GVK)
 		}
 
-		// parsing Group, Version and Kind in a format of group/version, Kind=kind
-		// eg: helm.cattle.io/v1, Kind=HelmChart, becomes:
-		// parts[0] = helm.cattle.io/v1
-		// parts[1] = HelmChart
-		parts := strings.Split(mapping.GVK, ", Kind=")
-
-		// parsing group/version
-		// eg: helm.cattle.io/v1, becomes:
-		// gv[0] = helm.cattle.io
-		// gv[1] = v1
-		gv := strings.Split(parts[0], "/")
-
 		conditionMappings := map[string]sets.Set[metav1.ConditionStatus]{}
 		for _, condition := range mapping.ConditionMappings {
 			conditionMappings[condition.Type] = sets.New[metav1.ConditionStatus](condition.Status...)
 		}
 
 		m[schema.GroupVersionKind{
-			Group:   gv[0],
-			Version: gv[1],
-			Kind:    parts[1],
+			Group:   mx[1],
+			Version: mx[2],
+			Kind:    mx[3],
 		}] = conditionMappings
 	}
 	return nil

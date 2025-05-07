@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCheckGVKErrors(t *testing.T) {
+func TestCheckErrors(t *testing.T) {
 	type input struct {
 		data       data.Object
 		conditions []Condition
