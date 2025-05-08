@@ -98,7 +98,6 @@ var (
 	// In case we cannot match any Groups, Versions and Kinds in GVKConditionErrorMapping then we fallback to this
 	// mapping.
 	FallbackConditionErrorMapping = map[string]sets.Set[metav1.ConditionStatus]{
-		"Unschedulable":      sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		"Stalled":            sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		"Failed":             sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 	}
