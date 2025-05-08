@@ -2,6 +2,7 @@ package summary
 
 import (
 	"encoding/json"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,6 +59,33 @@ func TestConditionalTypeStatusErrorMapping_MarshalJSON(t *testing.T) {
 			expected := []conditionTypeStatusJSON{}
 			assert.NoError(t, json.Unmarshal(output, &actual))
 			assert.NoError(t, json.Unmarshal(tc.expected, &expected))
+
+			sort.Slice(actual, func(i, j int) bool { return actual[i].GVK < actual[j].GVK })
+			sort.Slice(expected, func(i, j int) bool { return expected[i].GVK < expected[j].GVK })
+
+			for _, act := range actual {
+				sort.Slice(act.ConditionMappings, func(i, j int) bool {
+					return act.ConditionMappings[i].Type < act.ConditionMappings[j].Type
+				})
+
+				for _, mappings := range act.ConditionMappings {
+					sort.Slice(mappings.Status, func(i, j int) bool {
+						return mappings.Status[i] < mappings.Status[j]
+					})
+				}
+			}
+
+			for _, exp := range expected {
+				sort.Slice(exp.ConditionMappings, func(i, j int) bool {
+					return exp.ConditionMappings[i].Type < exp.ConditionMappings[j].Type
+				})
+
+				for _, mappings := range exp.ConditionMappings {
+					sort.Slice(mappings.Status, func(i, j int) bool {
+						return mappings.Status[i] < mappings.Status[j]
+					})
+				}
+			}
 
 			assert.Equal(t, expected, actual)
 		})
