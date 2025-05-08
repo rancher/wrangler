@@ -114,7 +114,7 @@ func TestCheckErrors(t *testing.T) {
 					"Kind":       "HelmChart",
 				},
 				conditions: []Condition{
-					NewCondition("Failed", "True", "", ""),
+					NewCondition("Failed", "True", "", "Helm Install Error"),
 				},
 				summary: Summary{
 					State: "testing",
@@ -125,6 +125,9 @@ func TestCheckErrors(t *testing.T) {
 				summary: Summary{
 					State: "testing",
 					Error: true,
+					Message: []string{
+						"Helm Install Error",
+					},
 				},
 				handled: true,
 			},
@@ -273,8 +276,8 @@ func TestCheckErrors(t *testing.T) {
 					"APIVersion": "sample.cattle.io/v1",
 					"Kind":       "Sample",
 				},
-			conditions: []Condition{
-					NewCondition("Failed", "True", "", ""),
+				conditions: []Condition{
+					NewCondition("Failed", "True", "", "Sample Failure"),
 				},
 				summary: Summary{
 					State: "testing",
@@ -285,6 +288,9 @@ func TestCheckErrors(t *testing.T) {
 				summary: Summary{
 					State: "testing",
 					Error: true,
+					Message: []string{
+						"Sample Failure",
+					},
 				},
 				handled: true,
 			},
@@ -304,6 +310,32 @@ func TestCheckErrors(t *testing.T) {
 				`)
 			},
 		},
+		{
+			name: "fallback conditions",
+			input: input{
+				data: data.Object{
+					"APIVersion": "fallback.cattle.io/v1",
+					"Kind":       "Fallback",
+				},
+				conditions: []Condition{
+					NewCondition("Failed", "True", "", "Sample Failure"),
+				},
+				summary: Summary{
+					State: "testing",
+					Error: false,
+				},
+			},
+			expected: output{
+				summary: Summary{
+					State: "testing",
+					Error: true,
+					Message: []string{
+						"Sample Failure",
+					},
+				},
+				handled: true,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -314,7 +346,7 @@ func TestCheckErrors(t *testing.T) {
 			initializeCheckErrors()
 			summary := checkErrors(tc.input.data, tc.input.conditions, tc.input.summary)
 
-			assert.Equal(t, tc.expected.summary.Error, summary.Error)
+			assert.Equal(t, tc.expected.summary, summary)
 		})
 	}
 
