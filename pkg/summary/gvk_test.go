@@ -54,8 +54,8 @@ func TestConditionalTypeStatusErrorMapping_MarshalJSON(t *testing.T) {
 				assert.Error(t, err)
 			}
 
-			actual := []map[string]interface{}{}
-			expected := []map[string]interface{}{}
+			actual := []conditionTypeStatusJSON{}
+			expected := []conditionTypeStatusJSON{}
 			assert.NoError(t, json.Unmarshal(output, &actual))
 			assert.NoError(t, json.Unmarshal(tc.expected, &expected))
 

@@ -8,10 +8,10 @@ import (
 
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
-	"github.com/rancher/wrangler/v3/pkg/gvk"
 	"github.com/rancher/wrangler/v3/pkg/kv"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kstatus "sigs.k8s.io/cli-utils/pkg/kstatus/status"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,13 +93,12 @@ var (
 		{Group: "apps", Version: "v1", Kind: "ReplicaSet"}: {
 			"ReplicaFailure": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
-	}
-
-	// In case we cannot match any Groups, Versions and Kinds in GVKConditionErrorMapping then we fallback to this
-	// mapping.
-	FallbackConditionErrorMapping = map[string]sets.Set[metav1.ConditionStatus]{
-		"Stalled":            sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
-		"Failed":             sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		
+		// FALLBACK: In case we cannot match any Groups, Versions and Kinds then we fallback to this mapping.
+		{Group: "", Version: "", Kind: ""}: {
+			"Stalled": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+			"Failed":  sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
+		},
 	}
 
 	// True ==
@@ -290,28 +289,17 @@ func checkStandard(obj data.Object, _ []Condition, summary Summary) Summary {
 }
 
 func checkErrors(data data.Object, conditions []Condition, summary Summary) Summary {
-	conditionMapping := FallbackConditionErrorMapping
-
 	if len(conditions) == 0 {
 		return summary
 	}
 
-	obj, err := json.Marshal(data)
-	if err != nil {
-		logrus.Debugln("Failed to parse the object: ", err.Error())
-		return summary
+	ustr := &unstructured.Unstructured{
+		Object: data,
 	}
 
-	gvk, detected, err := gvk.Detect(obj)
-	if err != nil {
-		logrus.Debugln("checkErrors: failed to detect GVK: ", err.Error())
-	}
-
-	if detected {
-		gvkConditionMapping, found := GVKConditionErrorMapping[gvk]
-		if found {
-			conditionMapping = gvkConditionMapping
-		}
+	conditionMapping, found := GVKConditionErrorMapping[ustr.GroupVersionKind()]
+	if !found {
+		conditionMapping = GVKConditionErrorMapping[schema.GroupVersionKind{}]
 	}
 
 	for _, c := range conditions {
