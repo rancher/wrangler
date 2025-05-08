@@ -17,7 +17,6 @@ func TestCheckErrors(t *testing.T) {
 
 	type output struct {
 		summary Summary
-		handled bool
 	}
 
 	testCases := []struct {
@@ -40,7 +39,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: false,
 			},
 		},
 		{
@@ -60,7 +58,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: false,
 			},
 		},
 		{
@@ -80,7 +77,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: false,
 			},
 		},
 		{
@@ -103,7 +99,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: false,
 			},
 		},
 		{
@@ -129,7 +124,6 @@ func TestCheckErrors(t *testing.T) {
 						"Helm Install Error",
 					},
 				},
-				handled: true,
 			},
 		},
 		{
@@ -152,7 +146,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: true,
 			},
 		},
 		{
@@ -175,7 +168,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: false,
 			},
 			loadConditions: func() {
 				os.Setenv(checkGVKErrorMappingEnvVar, `
@@ -213,7 +205,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: true,
 			},
 			loadConditions: func() {
 				os.Setenv(checkGVKErrorMappingEnvVar, `
@@ -251,7 +242,6 @@ func TestCheckErrors(t *testing.T) {
 					State: "testing",
 					Error: false,
 				},
-				handled: true,
 			},
 			loadConditions: func() {
 				os.Setenv(checkGVKErrorMappingEnvVar, `
@@ -292,7 +282,6 @@ func TestCheckErrors(t *testing.T) {
 						"Sample Failure",
 					},
 				},
-				handled: true,
 			},
 			loadConditions: func() {
 				os.Setenv(checkGVKErrorMappingEnvVar, `
@@ -333,7 +322,6 @@ func TestCheckErrors(t *testing.T) {
 						"Sample Failure",
 					},
 				},
-				handled: true,
 			},
 		},
 	}
