@@ -2,18 +2,12 @@ package summary
 
 import (
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-func removeSpacesAndTabs(s string) string {
-	fields := strings.Fields(s)
-	return strings.Join(fields, "")
-}
 
 func TestConditionalTypeStatusErrorMapping_MarshalJSON(t *testing.T) {
 	testCases := []struct {
@@ -60,9 +54,12 @@ func TestConditionalTypeStatusErrorMapping_MarshalJSON(t *testing.T) {
 				assert.Error(t, err)
 			}
 
-			assert.Equal(t,
-				removeSpacesAndTabs(string(tc.expected)),
-				removeSpacesAndTabs(string(output)))
+			actual := []map[string]interface{}{}
+			expected := []map[string]interface{}{}
+			assert.NoError(t, json.Unmarshal(output, &actual))
+			assert.NoError(t, json.Unmarshal(tc.expected, &expected))
+
+			assert.Equal(t, expected, actual)
 		})
 	}
 }
