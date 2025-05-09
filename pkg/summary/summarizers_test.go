@@ -324,6 +324,31 @@ func TestCheckErrors(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "condition has error at reason field",
+			input: input{
+				data: data.Object{
+					"APIVersion": "sample.cattle.io/v1",
+					"Kind":       "Sample",
+				},
+				conditions: []Condition{
+					NewCondition("Failed", "True", "Error", "Error in Reason"),
+				},
+				summary: Summary{
+					State: "testing",
+					Error: false,
+				},
+			},
+			expected: output{
+				summary: Summary{
+					State: "testing",
+					Error: true,
+					Message: []string{
+						"Error in Reason",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
