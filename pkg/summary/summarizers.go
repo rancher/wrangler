@@ -93,7 +93,7 @@ var (
 		{Group: "apps", Version: "v1", Kind: "ReplicaSet"}: {
 			"ReplicaFailure": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
-		
+
 		// FALLBACK: In case we cannot match any Groups, Versions and Kinds then we fallback to this mapping.
 		{Group: "", Version: "", Kind: ""}: {
 			"Stalled": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
@@ -308,7 +308,7 @@ func checkErrors(data data.Object, conditions []Condition, summary Summary) Summ
 			continue
 		}
 
-		if status.Has(metav1.ConditionStatus(c.Status())) {
+		if status.Has(metav1.ConditionStatus(c.Status())) || c.Reason() == "Error" {
 			summary.Error = true
 			summary.Message = append(summary.Message, c.Message())
 			if summary.State == "active" || summary.State == "" {
