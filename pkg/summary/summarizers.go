@@ -310,7 +310,7 @@ func checkErrors(data data.Object, conditions []Condition, summary Summary) Summ
 			continue
 		}
 
-		if status.Has(metav1.ConditionStatus(c.Status())) || reasonIsError {
+		if reasonIsError || status.Has(metav1.ConditionStatus(c.Status())) {
 			summary.Error = true
 			summary.Message = append(summary.Message, c.Message())
 			if summary.State == "active" || summary.State == "" {
