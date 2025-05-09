@@ -304,11 +304,13 @@ func checkErrors(data data.Object, conditions []Condition, summary Summary) Summ
 
 	for _, c := range conditions {
 		status, found := conditionMapping[c.Type()]
-		if !found {
+		reasonIsError := c.Reason() == "Error"
+
+		if !found && !reasonIsError {
 			continue
 		}
 
-		if status.Has(metav1.ConditionStatus(c.Status())) || c.Reason() == "Error" {
+		if status.Has(metav1.ConditionStatus(c.Status())) || reasonIsError {
 			summary.Error = true
 			summary.Message = append(summary.Message, c.Message())
 			if summary.State == "active" || summary.State == "" {

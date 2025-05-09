@@ -332,7 +332,7 @@ func TestCheckErrors(t *testing.T) {
 					"Kind":       "Sample",
 				},
 				conditions: []Condition{
-					NewCondition("Failed", "True", "Error", "Error in Reason"),
+					NewCondition("SampleFailed", "True", "Error", "Error in Reason"),
 				},
 				summary: Summary{
 					State: "testing",
