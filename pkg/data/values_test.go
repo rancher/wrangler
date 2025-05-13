@@ -186,6 +186,24 @@ func TestGetValueFromAny(t *testing.T) {
 			wantSuccess: false,
 		},
 		{
+			name: "keys nested too far on a string array",
+			data: map[string]interface{}{
+				"block1": []string{
+					"ink",
+					"wink",
+					"blink",
+				},
+				"block2": []string{
+					"ball",
+					"bell",
+					"bill",
+				},
+			},
+			keys:        []string{"block1", "2", "3"},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
 			name: "map blank key with value",
 			data: map[string]interface{}{
 				"": "bob",
@@ -208,6 +226,55 @@ func TestGetValueFromAny(t *testing.T) {
 			data: map[string]interface{}{
 				"": "bob",
 			},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name: "contains an array of strings at top-level",
+			data: map[string]interface{}{
+				"kind": "apple",
+				"metadata": map[string]interface{}{
+					"name": "granny-smith",
+					"fields": []string{
+						"a3",
+						"position2",
+						"more...",
+					},
+				},
+				"data": map[string]interface{}{
+					"color": "green",
+				},
+			},
+			keys:        []string{"metadata", "fields", "1"},
+			wantValue:   "position2",
+			wantSuccess: true,
+		},
+		{
+			name: "contains an array of strings at top-level",
+			data: []string{
+				"a4",
+				"position4",
+				"more...",
+			},
+			keys:        []string{"2"},
+			wantValue:   "more...",
+			wantSuccess: true,
+		},
+		{
+			name: "index out of bounds for top-level array",
+			data: []string{
+				"a4",
+				"position4",
+				"more...",
+			},
+			keys:        []string{"-5"},
+			wantValue:   nil,
+			wantSuccess: false,
+		},
+		{
+			name:        "doesn't handle array of ints",
+			data:        []int{1, 3, 5},
+			keys:        []string{"1"},
 			wantValue:   nil,
 			wantSuccess: false,
 		},
