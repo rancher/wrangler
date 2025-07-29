@@ -3,7 +3,6 @@ package leader
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
@@ -47,13 +46,10 @@ func (m *Manager) Start(ctx context.Context) {
 func (m *Manager) OnLeader(f func(ctx context.Context) error) {
 	go func() {
 		<-m.leaderChan
-		for {
-			if err := f(m.leaderCTX); err != nil {
-				logrus.Errorf("failed to call leader func: %v", err)
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			break
+		if err := f(m.leaderCTX); err != nil {
+			logrus.Errorf("failed to call leader func: %v", err)
+		} else {
+			logrus.Infof("leader func executed successfully")
 		}
 	}()
 }
