@@ -3,6 +3,7 @@ package leader
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
@@ -42,14 +43,29 @@ func (m *Manager) Start(ctx context.Context) {
 	})
 }
 
+// OnLeaderOrDie this function will be called when leadership is acquired or die if failed
+func (m *Manager) OnLeaderOrDie(f func(ctx context.Context) error) {
+	go func() {
+		<-m.leaderChan
+		if err := f(m.leaderCTX); err != nil {
+			logrus.Fatalf("leader func: %s failed be executed :: %v", m.name, err)
+		} else {
+			logrus.Infof("leader func executed successfully :: %v", m.name)
+		}
+	}()
+}
+
 // OnLeader this function will be called when leadership is acquired.
 func (m *Manager) OnLeader(f func(ctx context.Context) error) {
 	go func() {
 		<-m.leaderChan
-		if err := f(m.leaderCTX); err != nil {
-			logrus.Errorf("failed to call leader func: %v", err)
-		} else {
-			logrus.Infof("leader func executed successfully")
+		for {
+			if err := f(m.leaderCTX); err != nil {
+				logrus.Errorf("failed to call leader func: %v", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			break
 		}
 	}()
 }
