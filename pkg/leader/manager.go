@@ -44,13 +44,13 @@ func (m *Manager) Start(ctx context.Context) {
 }
 
 // OnLeaderOrDie this function will be called when leadership is acquired or die if failed
-func (m *Manager) OnLeaderOrDie(f func(ctx context.Context) error) {
+func (m *Manager) OnLeaderOrDie(name string, f func(ctx context.Context) error) {
 	go func() {
 		<-m.leaderChan
 		if err := f(m.leaderCTX); err != nil {
-			logrus.Fatalf("leader func: %s failed be executed :: %v", m.name, err)
+			logrus.Fatalf("%s leader func failed be executed: %v", name, err)
 		} else {
-			logrus.Infof("leader func executed successfully :: %v", m.name)
+			logrus.Infof("%s leader func executed successfully", name)
 		}
 	}()
 }
