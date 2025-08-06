@@ -364,3 +364,114 @@ func TestCheckErrors(t *testing.T) {
 	}
 
 }
+
+func TestCheckGeneration(t *testing.T) {
+	tests := []struct {
+		name      string
+		obj       data.Object
+		summary   Summary
+		wantState string
+		wantTrans bool
+	}{
+		{
+			name: "generation is int, observedGeneration is int, does nothing",
+			obj: data.Object{
+				"metadata": map[string]interface{}{
+					"generation": int(7),
+				},
+				"status": map[string]interface{}{
+					"observedGeneration": int(6),
+				},
+			},
+			summary:   Summary{HasObservedGeneration: true, State: ""},
+			wantState: "",
+			wantTrans: false,
+		},
+		{
+			name: "generation is int32, observedGeneration is int32, does nothing",
+			obj: data.Object{
+				"metadata": map[string]interface{}{
+					"generation": int32(5),
+				},
+				"status": map[string]interface{}{
+					"observedGeneration": int32(5),
+				},
+			},
+			summary:   Summary{HasObservedGeneration: true, State: ""},
+			wantState: "",
+			wantTrans: false,
+		},
+		{
+			name: "HasObservedGeneration false, does nothing",
+			obj: data.Object{
+				"metadata": map[string]interface{}{
+					"generation": int64(2),
+				},
+				"status": map[string]interface{}{
+					"observedGeneration": int64(2),
+				},
+			},
+			summary:   Summary{HasObservedGeneration: false, State: ""},
+			wantState: "",
+			wantTrans: false,
+		},
+		{
+			name: "metadata.generation not found, does nothing",
+			obj: data.Object{
+				"status": map[string]interface{}{
+					"observedGeneration": int64(2),
+				},
+			},
+			summary:   Summary{HasObservedGeneration: true, State: ""},
+			wantState: "",
+			wantTrans: false,
+		},
+		{
+			name: "observedGeneration equals generation, does nothing",
+			obj: data.Object{
+				"metadata": map[string]interface{}{
+					"generation": int64(2),
+				},
+				"status": map[string]interface{}{
+					"observedGeneration": int64(2),
+				},
+			},
+			summary:   Summary{HasObservedGeneration: true, State: ""},
+			wantState: "",
+			wantTrans: false,
+		},
+		{
+			name: "observedGeneration does not equal generation, sets in-progress and transitioning",
+			obj: data.Object{
+				"metadata": map[string]interface{}{
+					"generation": int64(3),
+				},
+				"status": map[string]interface{}{
+					"observedGeneration": int64(2),
+				},
+			},
+			summary:   Summary{HasObservedGeneration: true, State: ""},
+			wantState: "in-progress",
+			wantTrans: true,
+		},
+		{
+			name: "status does not exist, should set in-progress and transitioning",
+			obj: data.Object{
+				"metadata": map[string]interface{}{
+					"generation": int64(5),
+				},
+			},
+			summary:   Summary{HasObservedGeneration: true, State: ""},
+			wantState: "in-progress",
+			wantTrans: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := checkGeneration(tt.obj, nil, tt.summary)
+			assert.Equal(t, tt.wantState, got.State)
+			assert.Equal(t, tt.wantTrans, got.Transitioning)
+		})
+	}
+}
