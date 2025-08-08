@@ -46,6 +46,27 @@ type RuntimeMetaObject interface {
 }
 
 // ControllerInterface interface for managing K8s Objects.
+type ControllerInterfaceNoStatus[T RuntimeMetaObject, TList runtime.Object] interface {
+	ControllerMeta
+	ClientInterfaceNoStatus[T, TList]
+
+	// OnChange runs the given object handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// OnRemove runs the given object handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() CacheInterface[T]
+}
+
+// ControllerInterface interface for managing K8s Objects.
 type ControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	ControllerMeta
 	ClientInterface[T, TList]
@@ -64,6 +85,27 @@ type ControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 
 	// Cache returns a cache for the resource type T.
 	Cache() CacheInterface[T]
+}
+
+// NonNamespacedControllerInterface interface for managing non namespaced K8s Objects.
+type NonNamespacedControllerInterfaceNoStatus[T RuntimeMetaObject, TList runtime.Object] interface {
+	ControllerMeta
+	NonNamespacedClientInterfaceNoStatus[T, TList]
+
+	// OnChange runs the given object handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// OnRemove runs the given object handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() NonNamespacedCacheInterface[T]
 }
 
 // NonNamespacedControllerInterface interface for managing non namespaced K8s Objects.
@@ -116,6 +158,60 @@ type ClientInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 
 	// WithImpersonation returns a new copy of the client that uses impersonation.
 	WithImpersonation(impersonate rest.ImpersonationConfig) (ClientInterface[T, TList], error)
+}
+
+// ClientInterface is an interface to performs CRUD like operations on an Objects.
+type ClientInterfaceNoStatus[T RuntimeMetaObject, TList runtime.Object] interface {
+	// Create creates a new object and return the newly created Object or an error.
+	Create(T) (T, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(T) (T, error)
+
+	// Delete deletes the Object in the given name and namespace.
+	Delete(namespace, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the given name in the given namespace.
+	Get(namespace, name string, options metav1.GetOptions) (T, error)
+
+	// List will attempt to find resources in the given namespace.
+	List(namespace string, opts metav1.ListOptions) (TList, error)
+
+	// Watch will start watching resources in the given namespace.
+	Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name in the matching namespace.
+	Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+
+	// WithImpersonation returns a new copy of the client that uses impersonation.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (ClientInterface[T, TList], error)
+}
+
+// NonNamespacedClientInterface is an interface to performs CRUD like operations on nonNamespaced Objects.
+type NonNamespacedClientInterfaceNoStatus[T RuntimeMetaObject, TList runtime.Object] interface {
+	// Create creates a new object and return the newly created Object or an error.
+	Create(T) (T, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(T) (T, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(name string, options metav1.GetOptions) (T, error)
+
+	// List will attempt to find multiple resources.
+	List(opts metav1.ListOptions) (TList, error)
+
+	// Watch will start watching resources.
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+
+	// WithImpersonation returns a new copy of the client that uses impersonation.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (NonNamespacedClientInterface[T, TList], error)
 }
 
 // NonNamespacedClientInterface is an interface to performs CRUD like operations on nonNamespaced Objects.
