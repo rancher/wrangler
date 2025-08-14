@@ -46,14 +46,24 @@ func (f *typeGo) Init(c *generator.Context, w io.Writer) error {
 	}
 
 	t := c.Universe.Type(*f.name)
+	hasKubebuilderStatus := false
+	noStatusSuffix := "NoStatus"
+	for _, line := range append(t.SecondClosestCommentLines, t.CommentLines...) {
+		if strings.Contains(line, "+kubebuilder:subresource:status") {
+			hasKubebuilderStatus = true
+			noStatusSuffix = ""
+		}
+	}
+
 	m := map[string]interface{}{
-		"type":       f.name.Name,
-		"lowerName":  namer.IL(f.name.Name),
-		"plural":     plural.Name(t),
-		"version":    f.gv.Version,
-		"namespaced": namespaced(t),
-		"hasStatus":  hasStatus(t),
-		"statusType": statusType(t),
+		"type":           f.name.Name,
+		"lowerName":      namer.IL(f.name.Name),
+		"plural":         plural.Name(t),
+		"version":        f.gv.Version,
+		"namespaced":     namespaced(t),
+		"hasStatus":      hasKubebuilderStatus && hasStatus(t),
+		"noStatusSuffix": noStatusSuffix,
+		"statusType":     statusType(t),
 	}
 
 	sw.Do(typeBody, m)
@@ -81,12 +91,12 @@ func hasStatus(t *types.Type) bool {
 var typeBody = `
 // {{.type}}Controller interface for managing {{.type}} resources.
 type {{.type}}Controller interface {
-    generic.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
+    generic.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface{{.noStatusSuffix}}[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
 }
 
 // {{.type}}Client interface for managing {{.type}} resources in Kubernetes.
 type {{.type}}Client interface {
-	generic.{{ if not .namespaced}}NonNamespaced{{end}}ClientInterface[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
+	generic.{{ if not .namespaced}}NonNamespaced{{end}}ClientInterface{{.noStatusSuffix}}[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
 }
 
 // {{.type}}Cache interface for retrieving {{.type}} resources in memory.
