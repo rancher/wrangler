@@ -909,10 +909,6 @@ func TestHandler_GenerateSecret_StaleCacheAlreadyExists(t *testing.T) {
 
 	secret, err := h.generateSecret(service)
 
-	// Current implementation does NOT handle AlreadyExists, so we expect an error and nil secret
-	assert.Error(t, err, "expected AlreadyExists error when cache is stale")
-	assert.Nil(t, secret, "secret should be nil on AlreadyExists")
-	// After fixing the generateSecret function, we expect no error and a valid secret
-	// assert.NoError(t, err)
-	// assert.NotNil(t, updated)
+	assert.NoError(t, err)
+	assert.NotNil(t, secret)
 }
