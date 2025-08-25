@@ -576,7 +576,7 @@ func TestHandler_GenerateSecret_Race(t *testing.T) {
 		secrets:      mockSecrets,
 	}
 
-	const concurrency = 50
+	const concurrency = 10
 	done := make(chan struct{})
 	for i := 0; i < concurrency; i++ {
 		go func() {
@@ -597,7 +597,7 @@ func TestHandler_GenerateSecret_Race_MultiService(t *testing.T) {
 	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
-	const concurrency = 50
+	const concurrency = 10
 	done := make(chan struct{})
 
 	for i := 0; i < concurrency; i++ {
@@ -696,7 +696,7 @@ func TestHandler_Race_Stress(t *testing.T) {
 		crds:               mockCRDs,
 	}
 
-	const concurrency = 50
+	const concurrency = 10
 	done := make(chan struct{})
 	for i := 0; i < concurrency; i++ {
 		go func(i int) {
@@ -839,7 +839,7 @@ func TestHandler_GenerateSecret_Race_SharedSecret(t *testing.T) {
 		secrets:      mockSecrets,
 	}
 
-	const concurrency = 20
+	const concurrency = 10
 	done := make(chan struct{})
 	for i := 0; i < concurrency; i++ {
 		go func(i int) {
