@@ -306,11 +306,11 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 	if err != nil {
 		return nil, err
 	}
-	logrus.Infof("checking cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
+	logrus.Debugf("checking cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 	if time.Now().Add(24*60*time.Hour).After(cert.NotAfter) ||
 		len(cert.DNSNames) == 0 ||
 		!slice.StringsEqual(cert.DNSNames[1:], dnsNames) {
-		logrus.Infof("regenerating cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
+		logrus.Debugf("regenerating cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 		newSecret, err := h.createSecret(owner, secret.Namespace, secret.Name, dnsNames)
 		if err != nil {
 			return nil, err
@@ -319,7 +319,7 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 		secret.Data = newSecret.Data
 		return secret, nil
 	} else {
-		logrus.Infof("cert %s for %s/%s is valid until %s and covers %v", cert.Subject.CommonName, secret.Namespace, secret.Name, cert.NotAfter, cert.DNSNames)
+		logrus.Debugf("cert %s for %s/%s is valid until %s and covers %v", cert.Subject.CommonName, secret.Namespace, secret.Name, cert.NotAfter, cert.DNSNames)
 	}
 
 	return nil, nil

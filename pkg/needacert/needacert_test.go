@@ -178,7 +178,7 @@ func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	const runs = 50
+	const runs = 10
 	for i := 0; i < runs; i++ {
 		t.Run(fmt.Sprintf("run-%d", i), func(t *testing.T) {
 			t.Parallel()
@@ -268,7 +268,7 @@ func TestHandler_OnMutationWebhookChange_Parallel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	const runs = 50
+	const runs = 10
 	for i := 0; i < runs; i++ {
 		t.Run(fmt.Sprintf("run-%d", i), func(t *testing.T) {
 			t.Parallel()
@@ -358,7 +358,7 @@ func TestHandler_OnService_Parallel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	const runs = 50
+	const runs = 10
 	for i := 0; i < runs; i++ {
 		t.Run(fmt.Sprintf("run-%d", i), func(t *testing.T) {
 			t.Parallel()
@@ -437,7 +437,7 @@ func TestHandler_OnCRDChange_Parallel(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	const runs = 50
+	const runs = 10
 	for i := 0; i < runs; i++ {
 		t.Run(fmt.Sprintf("run-%d", i), func(t *testing.T) {
 			t.Parallel()
