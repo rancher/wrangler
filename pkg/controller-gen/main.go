@@ -54,6 +54,7 @@ func Run(opts cgargs.Options) {
 		ImportPackage:      opts.ImportPackage,
 		Options:            opts,
 		TypesByGroup:       map[schema.GroupVersion][]*types.Name{},
+		WithContextByGroup: map[schema.GroupVersion]bool{},
 		Package:            opts.OutputPackage,
 		OutputBase:         genericArgs.OutputBase,
 		BoilerplateContent: boilerplate,
@@ -468,7 +469,7 @@ func parseTypes(customArgs *cgargs.CustomArgs) []string {
 	}
 
 	for groupName, group := range customArgs.Options.Groups {
-		if err := cgargs.ObjectsToGroupVersion(groupName, group.Types, customArgs.TypesByGroup); err != nil {
+		if err := cgargs.ObjectsToGroupVersion(groupName, group.Types, customArgs.TypesByGroup, customArgs.WithContextByGroup, group.WithContext); err != nil {
 			// sorry, should really handle this better
 			panic(err)
 		}

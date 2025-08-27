@@ -28,14 +28,14 @@ func translate(types []Type, err error) (result []interface{}, _ error) {
 	return result, err
 }
 
-func ObjectsToGroupVersion(group string, objs []interface{}, ret map[schema.GroupVersion][]*types.Name) error {
+func ObjectsToGroupVersion(group string, objs []interface{}, ret map[schema.GroupVersion][]*types.Name, withContextByGroup map[schema.GroupVersion]bool, withContext bool) error {
 	for _, obj := range objs {
 		if s, ok := obj.(string); ok {
 			types, err := translate(ScanDirectory(s))
 			if err != nil {
 				return err
 			}
-			if err := ObjectsToGroupVersion(group, types, ret); err != nil {
+			if err := ObjectsToGroupVersion(group, types, ret, withContextByGroup, withContext); err != nil {
 				return err
 			}
 			continue
@@ -46,6 +46,7 @@ func ObjectsToGroupVersion(group string, objs []interface{}, ret map[schema.Grou
 			Group:   group,
 			Version: version,
 		}
+		withContextByGroup[gv] = withContext
 		ret[gv] = append(ret[gv], t)
 	}
 
