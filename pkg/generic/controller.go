@@ -108,6 +108,27 @@ type NonNamespacedControllerInterface[T RuntimeMetaObject, TList runtime.Object]
 	Cache() NonNamespacedCacheInterface[T]
 }
 
+// NonNamespacedControllerInterface interface for managing non namespaced K8s Objects.
+type NonNamespacedControllerInterfaceContext[T RuntimeMetaObject, TList runtime.Object] interface {
+	ControllerMeta
+	NonNamespacedClientInterfaceContext[T, TList]
+
+	// OnChange runs the given object handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// OnRemove runs the given object handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// Enqueue adds the resource with the given name to the worker queue of the controller.
+	Enqueue(name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() NonNamespacedCacheInterface[T]
+}
+
 // ClientInterface is an interface to performs CRUD like operations on an Objects.
 type ClientInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	// Create creates a new object and return the newly created Object or an error.
@@ -199,6 +220,37 @@ type NonNamespacedClientInterface[T RuntimeMetaObject, TList runtime.Object] int
 
 	// WithImpersonation returns a new copy of the client that uses impersonation.
 	WithImpersonation(impersonate rest.ImpersonationConfig) (NonNamespacedClientInterface[T, TList], error)
+}
+
+// NonNamespacedClientInterface is an interface to performs CRUD like operations on nonNamespaced Objects.
+type NonNamespacedClientInterfaceContext[T RuntimeMetaObject, TList runtime.Object] interface {
+	// Create creates a new object and return the newly created Object or an error.
+	Create(context.Context, T) (T, error)
+
+	// Update updates the object and return the newly updated Object or an error.
+	Update(context.Context, T) (T, error)
+
+	// UpdateStatus updates the Status field of a the object and return the newly updated Object or an error.
+	// Will always return an error if the object does not have a status field.
+	UpdateStatus(context.Context, T) (T, error)
+
+	// Delete deletes the Object in the given name.
+	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error
+
+	// Get will attempt to retrieve the resource with the specified name.
+	Get(ctx context.Context, name string, options metav1.GetOptions) (T, error)
+
+	// List will attempt to find multiple resources.
+	List(ctx context.Context, opts metav1.ListOptions) (TList, error)
+
+	// Watch will start watching resources.
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+
+	// Patch will patch the resource with the matching name.
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (result T, err error)
+
+	// WithImpersonation returns a new copy of the client that uses impersonation.
+	WithImpersonation(impersonate rest.ImpersonationConfig) (NonNamespacedClientInterfaceContext[T, TList], error)
 }
 
 // ObjectHandler performs operations on the given runtime.Object and returns the new runtime.Object or an error
@@ -515,8 +567,9 @@ func (c *ControllerContext[T, TList]) WithImpersonation(impersonate rest.Imperso
 	}, nil
 }
 
-// NewNonNamespacedController returns a Controller controller that is not namespaced.
-// NonNamespacedController redefines specific functions to no longer accept the namespace parameter.
+// NewNonNamespacedControllerContext returns a Controller controller that is not namespaced.
+// NonNamespacedControllerContext redefines specific functions to no longer accept the namespace parameter.
+// Deprecated: Use NewNonNamespacedControllerContext
 func NewNonNamespacedController[T RuntimeMetaObject, TList runtime.Object](gvk schema.GroupVersionKind, resource string,
 	controller controller.SharedControllerFactory,
 ) *NonNamespacedController[T, TList] {
@@ -579,5 +632,72 @@ func (c *NonNamespacedController[T, TList]) WithImpersonation(impersonate rest.I
 func (c *NonNamespacedController[T, TList]) Cache() NonNamespacedCacheInterface[T] {
 	return &NonNamespacedCache[T]{
 		CacheInterface: c.Controller.Cache(),
+	}
+}
+
+// NewNonNamespacedControllerContext returns a Controller controller that is not namespaced.
+// NonNamespacedControllerContext redefines specific functions to no longer accept the namespace parameter.
+func NewNonNamespacedControllerContext[T RuntimeMetaObject, TList runtime.Object](gvk schema.GroupVersionKind, resource string,
+	controller controller.SharedControllerFactory,
+) *NonNamespacedControllerContext[T, TList] {
+	ctrl := NewControllerContext[T, TList](gvk, resource, false, controller)
+	return &NonNamespacedControllerContext[T, TList]{
+		ControllerContext: ctrl,
+	}
+}
+
+// Enqueue calls Controller.Enqueue(...) with an empty namespace parameter.
+func (c *NonNamespacedControllerContext[T, TList]) Enqueue(name string) {
+	c.ControllerContext.Enqueue(metav1.NamespaceAll, name)
+}
+
+// EnqueueAfter calls Controller.EnqueueAfter(...) with an empty namespace parameter.
+func (c *NonNamespacedControllerContext[T, TList]) EnqueueAfter(name string, duration time.Duration) {
+	c.ControllerContext.EnqueueAfter(metav1.NamespaceAll, name, duration)
+}
+
+// Delete calls Controller.Delete(...) with an empty namespace parameter.
+func (c *NonNamespacedControllerContext[T, TList]) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) error {
+	return c.ControllerContext.Delete(ctx, metav1.NamespaceAll, name, options)
+}
+
+// Get calls Controller.Get(...) with an empty namespace parameter.
+func (c *NonNamespacedControllerContext[T, TList]) Get(ctx context.Context, name string, options metav1.GetOptions) (T, error) {
+	return c.ControllerContext.Get(ctx, metav1.NamespaceAll, name, options)
+}
+
+// List calls Controller.List(...) with an empty namespace parameter.
+func (c *NonNamespacedControllerContext[T, TList]) List(ctx context.Context, opts metav1.ListOptions) (TList, error) {
+	return c.ControllerContext.List(ctx, metav1.NamespaceAll, opts)
+}
+
+// Watch calls Controller.Watch(...) with an empty namespace parameter.
+func (c *NonNamespacedControllerContext[T, TList]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+	return c.ControllerContext.Watch(ctx, metav1.NamespaceAll, opts)
+}
+
+// Patch calls the Controller.Patch(...) with an empty namespace parameter.
+func (c *NonNamespacedControllerContext[T, TList]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
+	return c.ControllerContext.Patch(ctx, metav1.NamespaceAll, name, pt, data, subresources...)
+}
+
+// WithImpersonation returns a new copy of the client that uses impersonation.
+func (c *NonNamespacedControllerContext[T, TList]) WithImpersonation(impersonate rest.ImpersonationConfig) (NonNamespacedClientInterfaceContext[T, TList], error) {
+	newClient, err := c.ControllerContext.WithImpersonation(impersonate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make new client: %w", err)
+	}
+	// get the underlying controller so we can wrap it in a NonNamespacedControllerContext
+	newCtrl, ok := newClient.(*ControllerContext[T, TList])
+	if !ok {
+		return nil, fmt.Errorf("failed to make new client from: %T", newCtrl)
+	}
+	return &NonNamespacedControllerContext[T, TList]{newCtrl}, nil
+}
+
+// Cache calls ControllerInterface.Cache(...) and wraps the result in a new NonNamespacedCache.
+func (c *NonNamespacedControllerContext[T, TList]) Cache() NonNamespacedCacheInterface[T] {
+	return &NonNamespacedCache[T]{
+		CacheInterface: c.ControllerContext.Cache(),
 	}
 }
