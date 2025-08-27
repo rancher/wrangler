@@ -66,6 +66,27 @@ type ControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	Cache() CacheInterface[T]
 }
 
+// ControllerInterfaceContext interface for managing K8s Objects.
+type ControllerInterfaceContext[T RuntimeMetaObject, TList runtime.Object] interface {
+	ControllerMeta
+	ClientInterfaceContext[T, TList]
+
+	// OnChange runs the given object handler when the controller detects a resource was changed.
+	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// OnRemove runs the given object handler when the controller detects a resource was changed.
+	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+
+	// Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
+	Enqueue(namespace, name string)
+
+	// EnqueueAfter runs Enqueue after the provided duration.
+	EnqueueAfter(namespace, name string, duration time.Duration)
+
+	// Cache returns a cache for the resource type T.
+	Cache() CacheInterface[T]
+}
+
 // NonNamespacedControllerInterface interface for managing non namespaced K8s Objects.
 type NonNamespacedControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 	ControllerMeta
