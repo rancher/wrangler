@@ -7,11 +7,12 @@ import (
 
 type CustomArgs struct {
 	// Package is the directory path where generated code output will be located
-	Package       string
-	ImportPackage string
-	TypesByGroup  map[schema.GroupVersion][]*types.Name
-	Options       Options
-	OutputBase    string
+	Package            string
+	ImportPackage      string
+	TypesByGroup       map[schema.GroupVersion][]*types.Name
+	Options            Options
+	OutputBase         string
+	WithContextByGroup map[schema.GroupVersion]bool
 	// BoilerplateContent is the actual boilerplate content that has been
 	// read. It will be added to every generated files.
 	BoilerplateContent []byte
@@ -38,8 +39,10 @@ type Group struct {
 	// Instance of any struct: used for reflection to describe the type
 	// string: a directory that will be listed (non-recursively) for types
 	// Type: a description of a type
-	Types         []interface{}
-	GenerateTypes bool
+	Types                    []interface{}
+	WithContext              bool
+	GenerateTypes            bool
+	GenerateTypesWithContext bool
 	// Generate clientsets
 	GenerateClients             bool
 	OutputControllerPackageName string
