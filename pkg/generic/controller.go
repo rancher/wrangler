@@ -38,6 +38,24 @@ type ControllerMeta interface {
 	Updater() Updater
 }
 
+// ControllerMeta holds meta information shared by all controllers.
+type ControllerMetaContext interface {
+	// Informer returns the SharedIndexInformer used by this controller.
+	Informer() cache.SharedIndexInformer
+
+	// GroupVersionKind returns the GVK used to create this Controller.
+	GroupVersionKind() schema.GroupVersionKind
+
+	// AddGenericHandler adds a generic handler that runs when a resource changes.
+	AddGenericHandler(ctx context.Context, name string, handler HandlerContext)
+
+	// AddGenericHandler adds a generic handler that runs when a resource is removed.
+	AddGenericRemoveHandler(ctx context.Context, name string, handler HandlerContext)
+
+	// Updater returns a update function that will attempt to perform an update for a specific resource type.
+	Updater() UpdaterContext
+}
+
 // RuntimeMetaObject is an interface for a K8s Object to be used with a specific controller.
 type RuntimeMetaObject interface {
 	comparable
@@ -68,14 +86,14 @@ type ControllerInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 
 // ControllerInterfaceContext interface for managing K8s Objects.
 type ControllerInterfaceContext[T RuntimeMetaObject, TList runtime.Object] interface {
-	ControllerMeta
+	ControllerMetaContext
 	ClientInterfaceContext[T, TList]
 
 	// OnChange runs the given object handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+	OnChange(ctx context.Context, name string, sync ObjectHandlerContext[T])
 
 	// OnRemove runs the given object handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+	OnRemove(ctx context.Context, name string, sync ObjectHandlerContext[T])
 
 	// Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
 	Enqueue(namespace, name string)
@@ -110,14 +128,14 @@ type NonNamespacedControllerInterface[T RuntimeMetaObject, TList runtime.Object]
 
 // NonNamespacedControllerInterface interface for managing non namespaced K8s Objects.
 type NonNamespacedControllerInterfaceContext[T RuntimeMetaObject, TList runtime.Object] interface {
-	ControllerMeta
+	ControllerMetaContext
 	NonNamespacedClientInterfaceContext[T, TList]
 
 	// OnChange runs the given object handler when the controller detects a resource was changed.
-	OnChange(ctx context.Context, name string, sync ObjectHandler[T])
+	OnChange(ctx context.Context, name string, sync ObjectHandlerContext[T])
 
 	// OnRemove runs the given object handler when the controller detects a resource was changed.
-	OnRemove(ctx context.Context, name string, sync ObjectHandler[T])
+	OnRemove(ctx context.Context, name string, sync ObjectHandlerContext[T])
 
 	// Enqueue adds the resource with the given name to the worker queue of the controller.
 	Enqueue(name string)
@@ -256,8 +274,26 @@ type NonNamespacedClientInterfaceContext[T RuntimeMetaObject, TList runtime.Obje
 // ObjectHandler performs operations on the given runtime.Object and returns the new runtime.Object or an error
 type Handler func(key string, obj runtime.Object) (runtime.Object, error)
 
+// ObjectHandlerContext performs operations on the given runtime.Object and returns the new runtime.Object or an error
+type HandlerContext func(ctx context.Context, key string, obj runtime.Object) (runtime.Object, error)
+
+func toHandlerContext(handler Handler) HandlerContext {
+	return func(_ context.Context, key string, obj runtime.Object) (runtime.Object, error) {
+		return handler(key, obj)
+	}
+}
+
 // ObjectHandler performs operations on the given object and returns the new object or an error
 type ObjectHandler[T runtime.Object] func(string, T) (T, error)
+
+// ObjectHandlerContext performs operations on the given object and returns the new object or an error
+type ObjectHandlerContext[T runtime.Object] func(context.Context, string, T) (T, error)
+
+func toObjectHandlerContext[T runtime.Object](handler ObjectHandler[T]) ObjectHandlerContext[T] {
+	return func(_ context.Context, key string, obj T) (T, error) {
+		return handler(key, obj)
+	}
+}
 
 // Indexer computes a set of indexed values for the provided object.
 type Indexer[T runtime.Object] func(obj T) ([]string, error)
@@ -271,6 +307,23 @@ func FromObjectHandlerToHandler[T RuntimeMetaObject](sync ObjectHandler[T]) Hand
 			retObj, err = sync(key, nilObj)
 		} else {
 			retObj, err = sync(key, obj.(T))
+		}
+		if retObj == nilObj {
+			return nil, err
+		}
+		return retObj, err
+	}
+}
+
+// FromObjectHandlerToHandler converts an ObjecHandler to a Handler.
+func FromObjectHandlerContextToHandlerContext[T RuntimeMetaObject](sync ObjectHandlerContext[T]) HandlerContext {
+	return func(ctx context.Context, key string, obj runtime.Object) (runtime.Object, error) {
+		var nilObj, retObj T
+		var err error
+		if obj == nil {
+			retObj, err = sync(ctx, key, nilObj)
+		} else {
+			retObj, err = sync(ctx, key, obj.(T))
 		}
 		if retObj == nilObj {
 			return nil, err
@@ -312,27 +365,29 @@ func NewController[T RuntimeMetaObject, TList runtime.Object](gvk schema.GroupVe
 
 // Updater creates a new Updater for the Object type T.
 func (c *Controller[T, TList]) Updater() Updater {
-	return c.embeddedController.Updater()
+	return func(obj runtime.Object) (runtime.Object, error) {
+		return c.embeddedController.Updater()(context.TODO(), obj)
+	}
 }
 
 // AddGenericHandler runs the given handler when the controller detects an object was changed.
 func (c *Controller[T, TList]) AddGenericHandler(ctx context.Context, name string, handler Handler) {
-	c.embeddedController.AddGenericHandler(ctx, name, handler)
+	c.embeddedController.AddGenericHandler(ctx, name, toHandlerContext(handler))
 }
 
 // AddGenericRemoveHandler runs the given handler when the controller detects an object was removed.
 func (c *Controller[T, TList]) AddGenericRemoveHandler(ctx context.Context, name string, handler Handler) {
-	c.embeddedController.AddGenericRemoveHandler(ctx, name, handler)
+	c.embeddedController.AddGenericRemoveHandler(ctx, name, toHandlerContext(handler))
 }
 
 // OnChange runs the given object handler when the controller detects a resource was changed.
 func (c *Controller[T, TList]) OnChange(ctx context.Context, name string, sync ObjectHandler[T]) {
-	c.embeddedController.OnChange(ctx, name, sync)
+	c.embeddedController.OnChange(ctx, name, toObjectHandlerContext(sync))
 }
 
 // OnRemove runs the given object handler when the controller detects a resource was changed.
 func (c *Controller[T, TList]) OnRemove(ctx context.Context, name string, sync ObjectHandler[T]) {
-	c.embeddedController.OnRemove(ctx, name, sync)
+	c.embeddedController.OnRemove(ctx, name, toObjectHandlerContext(sync))
 }
 
 // Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
@@ -440,10 +495,10 @@ func NewControllerContext[T RuntimeMetaObject, TList runtime.Object](gvk schema.
 }
 
 // Updater creates a new Updater for the Object type T.
-func (c *ControllerContext[T, TList]) Updater() Updater {
+func (c *ControllerContext[T, TList]) Updater() UpdaterContext {
 	var nilObj T
-	return func(obj runtime.Object) (runtime.Object, error) {
-		newObj, err := c.Update(context.TODO(), obj.(T))
+	return func(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
+		newObj, err := c.Update(ctx, obj.(T))
 		if newObj == nilObj {
 			return nil, err
 		}
@@ -452,23 +507,23 @@ func (c *ControllerContext[T, TList]) Updater() Updater {
 }
 
 // AddGenericHandler runs the given handler when the controller detects an object was changed.
-func (c *ControllerContext[T, TList]) AddGenericHandler(ctx context.Context, name string, handler Handler) {
+func (c *ControllerContext[T, TList]) AddGenericHandler(ctx context.Context, name string, handler HandlerContext) {
 	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
 // AddGenericRemoveHandler runs the given handler when the controller detects an object was removed.
-func (c *ControllerContext[T, TList]) AddGenericRemoveHandler(ctx context.Context, name string, handler Handler) {
-	c.AddGenericHandler(ctx, name, NewRemoveHandler(name, c.Updater(), handler))
+func (c *ControllerContext[T, TList]) AddGenericRemoveHandler(ctx context.Context, name string, handler HandlerContext) {
+	c.AddGenericHandler(ctx, name, NewRemoveHandlerContext(name, c.Updater(), handler))
 }
 
 // OnChange runs the given object handler when the controller detects a resource was changed.
-func (c *ControllerContext[T, TList]) OnChange(ctx context.Context, name string, sync ObjectHandler[T]) {
-	c.AddGenericHandler(ctx, name, FromObjectHandlerToHandler(sync))
+func (c *ControllerContext[T, TList]) OnChange(ctx context.Context, name string, sync ObjectHandlerContext[T]) {
+	c.AddGenericHandler(ctx, name, FromObjectHandlerContextToHandlerContext(sync))
 }
 
 // OnRemove runs the given object handler when the controller detects a resource was changed.
-func (c *ControllerContext[T, TList]) OnRemove(ctx context.Context, name string, sync ObjectHandler[T]) {
-	c.AddGenericHandler(ctx, name, NewRemoveHandler(name, c.Updater(), FromObjectHandlerToHandler(sync)))
+func (c *ControllerContext[T, TList]) OnRemove(ctx context.Context, name string, sync ObjectHandlerContext[T]) {
+	c.AddGenericHandler(ctx, name, NewRemoveHandlerContext(name, c.Updater(), FromObjectHandlerContextToHandlerContext(sync)))
 }
 
 // Enqueue adds the resource with the given name in the provided namespace to the worker queue of the controller.
