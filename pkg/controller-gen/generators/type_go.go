@@ -45,12 +45,24 @@ func (f *typeGo) Init(c *generator.Context, w io.Writer) error {
 		return err
 	}
 
+	ctxStr := ""
+	ctxParam := ""
+	ctxArg := ""
+	if f.customArgs.WithContextByGroup[f.gv] {
+		ctxStr = "Context"
+		ctxParam = "ctx context.Context, "
+		ctxArg = "ctx, "
+	}
+
 	t := c.Universe.Type(*f.name)
 	m := map[string]interface{}{
 		"type":       f.name.Name,
 		"lowerName":  namer.IL(f.name.Name),
 		"plural":     plural.Name(t),
 		"version":    f.gv.Version,
+		"ctxStr":     ctxStr,
+		"ctxParam":   ctxParam,
+		"ctxArg":     ctxArg,
 		"namespaced": namespaced(t),
 		"hasStatus":  hasStatus(t),
 		"statusType": statusType(t),
@@ -81,12 +93,12 @@ func hasStatus(t *types.Type) bool {
 var typeBody = `
 // {{.type}}Controller interface for managing {{.type}} resources.
 type {{.type}}Controller interface {
-    generic.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
+    generic.{{ if not .namespaced}}NonNamespaced{{end}}ControllerInterface{{.ctxStr}}[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
 }
 
 // {{.type}}Client interface for managing {{.type}} resources in Kubernetes.
 type {{.type}}Client interface {
-	generic.{{ if not .namespaced}}NonNamespaced{{end}}ClientInterface[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
+	generic.{{ if not .namespaced}}NonNamespaced{{end}}ClientInterface{{.ctxStr}}[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List]
 }
 
 // {{.type}}Cache interface for retrieving {{.type}} resources in memory.
@@ -96,10 +108,10 @@ type {{.type}}Cache interface {
 
 {{ if .hasStatus -}}
 // {{.type}}StatusHandler is executed for every added or modified {{.type}}. Should return the new status to be updated
-type {{.type}}StatusHandler func(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error)
+type {{.type}}StatusHandler func({{.ctxParam}}obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error)
 
 // {{.type}}GeneratingHandler is the top-level handler that is executed for every {{.type}} event. It extends {{.type}}StatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type {{.type}}GeneratingHandler func(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ([]runtime.Object, {{.version}}.{{.statusType}}, error)
+type {{.type}}GeneratingHandler func({{.ctxParam}}obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ([]runtime.Object, {{.version}}.{{.statusType}}, error)
 
 // Register{{.type}}StatusHandler configures a {{.type}}Controller to execute a {{.type}}StatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -109,7 +121,7 @@ func Register{{.type}}StatusHandler(ctx context.Context, controller {{.type}}Con
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandler{{.ctxStr}}ToHandler{{.ctxStr}}(statusHandler.sync))
 }
 
 // Register{{.type}}GeneratingHandler configures a {{.type}}Controller to execute a {{.type}}GeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -136,14 +148,14 @@ type {{.lowerName}}StatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
+func (a *{{.lowerName}}StatusHandler) sync({{.ctxParam}}key string, obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler({{.ctxArg}}obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -164,7 +176,7 @@ func (a *{{.lowerName}}StatusHandler) sync(key string, obj *{{.version}}.{{.type
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus({{.ctxArg}}obj)
 		if err == nil {
 			err = newErr
 		}
@@ -185,7 +197,7 @@ type {{.lowerName}}GeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *{{.lowerName}}GeneratingHandler) Remove(key string, obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
+func (a *{{.lowerName}}GeneratingHandler) Remove({{.ctxParam}}key string, obj *{{.version}}.{{.type}}) (*{{.version}}.{{.type}}, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -205,12 +217,12 @@ func (a *{{.lowerName}}GeneratingHandler) Remove(key string, obj *{{.version}}.{
 }
 
 // Handle executes the configured {{.type}}GeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *{{.lowerName}}GeneratingHandler) Handle(obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error) {
+func (a *{{.lowerName}}GeneratingHandler) Handle({{.ctxParam}}obj *{{.version}}.{{.type}}, status {{.version}}.{{.statusType}}) ({{.version}}.{{.statusType}}, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.{{.type}}GeneratingHandler(obj, status)
+	objs, newStatus, err := a.{{.type}}GeneratingHandler({{.ctxArg}}obj, status)
 	if err != nil {
 		return newStatus, err
 	}

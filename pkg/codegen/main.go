@@ -18,90 +18,103 @@ import (
 )
 
 func main() {
+	groups := map[string]args.Group{
+		v1.GroupName: {
+			Types: []interface{}{
+				v1.Event{},
+				v1.Node{},
+				v1.Namespace{},
+				v1.Secret{},
+				v1.Service{},
+				v1.ServiceAccount{},
+				v1.Endpoints{},
+				v1.ConfigMap{},
+				v1.PersistentVolume{},
+				v1.PersistentVolumeClaim{},
+				v1.Pod{},
+			},
+		},
+		discoveryv1.GroupName: {
+			Types: []interface{}{
+				discoveryv1.EndpointSlice{},
+			},
+			OutputControllerPackageName: "discovery",
+		},
+		extensionsv1beta1.GroupName: {
+			Types: []interface{}{
+				extensionsv1beta1.Ingress{},
+			},
+		},
+		rbacv1.GroupName: {
+			Types: []interface{}{
+				rbacv1.Role{},
+				rbacv1.RoleBinding{},
+				rbacv1.ClusterRole{},
+				rbacv1.ClusterRoleBinding{},
+			},
+			OutputControllerPackageName: "rbac",
+		},
+		appsv1.GroupName: {
+			Types: []interface{}{
+				appsv1.Deployment{},
+				appsv1.DaemonSet{},
+				appsv1.StatefulSet{},
+			},
+		},
+		storagev1.GroupName: {
+			OutputControllerPackageName: "storage",
+			Types: []interface{}{
+				storagev1.StorageClass{},
+			},
+		},
+		apiextv1.GroupName: {
+			Types: []interface{}{
+				apiextv1.CustomResourceDefinition{},
+			},
+		},
+		apiv1.GroupName: {
+			Types: []interface{}{
+				apiv1.APIService{},
+			},
+		},
+		batchv1.GroupName: {
+			Types: []interface{}{
+				batchv1.Job{},
+			},
+		},
+		networkingv1.GroupName: {
+			Types: []interface{}{
+				networkingv1.NetworkPolicy{},
+			},
+		},
+		admissionregistrationv1.GroupName: {
+			Types: []interface{}{
+				admissionregistrationv1.ValidatingWebhookConfiguration{},
+				admissionregistrationv1.MutatingWebhookConfiguration{},
+			},
+		},
+		coordinationv1.GroupName: {
+			Types: []interface{}{
+				coordinationv1.Lease{},
+			},
+		},
+	}
+	groupsWithContext := map[string]args.Group{}
+	for groupName, group := range groups {
+		groupWithContext := group
+		groupWithContext.WithContext = true
+		groupsWithContext[groupName] = groupWithContext
+	}
 	controllergen.Run(args.Options{
 		ImportPackage: "github.com/rancher/wrangler/v3/pkg/generated",
 		OutputPackage: "github.com/rancher/wrangler/pkg/generated",
 		Boilerplate:   "scripts/boilerplate.go.txt",
-		Groups: map[string]args.Group{
-			v1.GroupName: {
-				Types: []interface{}{
-					v1.Event{},
-					v1.Node{},
-					v1.Namespace{},
-					v1.Secret{},
-					v1.Service{},
-					v1.ServiceAccount{},
-					v1.Endpoints{},
-					v1.ConfigMap{},
-					v1.PersistentVolume{},
-					v1.PersistentVolumeClaim{},
-					v1.Pod{},
-				},
-			},
-			discoveryv1.GroupName: {
-				Types: []interface{}{
-					discoveryv1.EndpointSlice{},
-				},
-				OutputControllerPackageName: "discovery",
-			},
-			extensionsv1beta1.GroupName: {
-				Types: []interface{}{
-					extensionsv1beta1.Ingress{},
-				},
-			},
-			rbacv1.GroupName: {
-				Types: []interface{}{
-					rbacv1.Role{},
-					rbacv1.RoleBinding{},
-					rbacv1.ClusterRole{},
-					rbacv1.ClusterRoleBinding{},
-				},
-				OutputControllerPackageName: "rbac",
-			},
-			appsv1.GroupName: {
-				Types: []interface{}{
-					appsv1.Deployment{},
-					appsv1.DaemonSet{},
-					appsv1.StatefulSet{},
-				},
-			},
-			storagev1.GroupName: {
-				OutputControllerPackageName: "storage",
-				Types: []interface{}{
-					storagev1.StorageClass{},
-				},
-			},
-			apiextv1.GroupName: {
-				Types: []interface{}{
-					apiextv1.CustomResourceDefinition{},
-				},
-			},
-			apiv1.GroupName: {
-				Types: []interface{}{
-					apiv1.APIService{},
-				},
-			},
-			batchv1.GroupName: {
-				Types: []interface{}{
-					batchv1.Job{},
-				},
-			},
-			networkingv1.GroupName: {
-				Types: []interface{}{
-					networkingv1.NetworkPolicy{},
-				},
-			},
-			admissionregistrationv1.GroupName: {
-				Types: []interface{}{
-					admissionregistrationv1.ValidatingWebhookConfiguration{},
-					admissionregistrationv1.MutatingWebhookConfiguration{},
-				},
-			},
-			coordinationv1.GroupName: {
-				Types: []interface{}{
-					coordinationv1.Lease{},
-				},
-			},
-		},
+		Groups:        groups,
+	})
+	controllergen.Run(args.Options{
+		ImportPackage: "github.com/rancher/wrangler/v3/pkg/generatedctx",
+		OutputPackage: "github.com/rancher/wrangler/pkg/generatedctx",
+		Boilerplate:   "scripts/boilerplate.go.txt",
+		Groups:        groupsWithContext,
 	})
 }

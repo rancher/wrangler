@@ -34,6 +34,11 @@ type ControllerWrapper interface {
 	AddGenericHandler(ctx context.Context, name string, handler generic.Handler)
 }
 
+type ControllerWrapperContext interface {
+	Informer() cache.SharedIndexInformer
+	AddGenericHandler(ctx context.Context, name string, handler generic.HandlerContext)
+}
+
 type ClusterScopedEnqueuer interface {
 	Enqueue(name string)
 }
@@ -42,19 +47,45 @@ type Enqueuer interface {
 	Enqueue(namespace, name string)
 }
 
+// TODO: Probably want context variant?
 type Resolver func(namespace, name string, obj runtime.Object) ([]Key, error)
 
 func WatchClusterScoped(ctx context.Context, name string, resolve Resolver, enq ClusterScopedEnqueuer, watching ...ControllerWrapper) {
 	Watch(ctx, name, resolve, &wrapper{ClusterScopedEnqueuer: enq}, watching...)
 }
 
+func WatchClusterScopedContext(ctx context.Context, name string, resolve Resolver, enq ClusterScopedEnqueuer, watching ...ControllerWrapperContext) {
+	WatchContext(ctx, name, resolve, &wrapper{ClusterScopedEnqueuer: enq}, watching...)
+}
+
+// TODO: Name
+type oldToNew struct {
+	old ControllerWrapper
+}
+
+func (o *oldToNew) Informer() cache.SharedIndexInformer {
+	return o.old.Informer()
+}
+
+func (o *oldToNew) AddGenericHandler(ctx context.Context, name string, handler generic.HandlerContext) {
+	o.old.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
+		return handler(context.TODO(), key, obj)
+	})
+}
+
 func Watch(ctx context.Context, name string, resolve Resolver, enq Enqueuer, watching ...ControllerWrapper) {
+	for _, c := range watching {
+		watch(ctx, name, enq, resolve, &oldToNew{old: c})
+	}
+}
+
+func WatchContext(ctx context.Context, name string, resolve Resolver, enq Enqueuer, watching ...ControllerWrapperContext) {
 	for _, c := range watching {
 		watch(ctx, name, enq, resolve, c)
 	}
 }
 
-func watch(ctx context.Context, name string, enq Enqueuer, resolve Resolver, controller ControllerWrapper) {
+func watch(ctx context.Context, name string, enq Enqueuer, resolve Resolver, controller ControllerWrapperContext) {
 	runResolve := func(ns, name string, obj runtime.Object) error {
 		keys, err := resolve(ns, name, obj)
 		if err != nil {
@@ -89,7 +120,7 @@ func watch(ctx context.Context, name string, enq Enqueuer, resolve Resolver, con
 		},
 	})
 
-	controller.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
+	controller.AddGenericHandler(ctx, name, func(_ context.Context, key string, obj runtime.Object) (runtime.Object, error) {
 		ns, name := kv.RSplit(key, "/")
 		return obj, runResolve(ns, name, obj)
 	})

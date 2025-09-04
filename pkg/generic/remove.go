@@ -1,6 +1,8 @@
 package generic
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -11,13 +13,28 @@ var (
 
 type Updater func(runtime.Object) (runtime.Object, error)
 
+type UpdaterContext func(context.Context, runtime.Object) (runtime.Object, error)
+
 type objectLifecycleAdapter struct {
 	name    string
-	handler Handler
-	updater Updater
+	handler HandlerContext
+	updater UpdaterContext
 }
 
 func NewRemoveHandler(name string, updater Updater, handler Handler) Handler {
+	updaterCtx := func(_ context.Context, obj runtime.Object) (runtime.Object, error) {
+		return updater(obj)
+	}
+	handlerCtx := func(_ context.Context, key string, obj runtime.Object) (runtime.Object, error) {
+		return handler(key, obj)
+	}
+	fn := NewRemoveHandlerContext(name, updaterCtx, handlerCtx)
+	return func(key string, obj runtime.Object) (runtime.Object, error) {
+		return fn(context.TODO(), key, obj)
+	}
+}
+
+func NewRemoveHandlerContext(name string, updater UpdaterContext, handler HandlerContext) HandlerContext {
 	o := objectLifecycleAdapter{
 		name:    name,
 		handler: handler,
@@ -26,7 +43,7 @@ func NewRemoveHandler(name string, updater Updater, handler Handler) Handler {
 	return o.sync
 }
 
-func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) (runtime.Object, error) {
+func (o *objectLifecycleAdapter) sync(ctx context.Context, key string, obj runtime.Object) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -37,14 +54,14 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) (runtime.O
 	}
 
 	if metadata.GetDeletionTimestamp() == nil {
-		return o.addFinalizer(obj)
+		return o.addFinalizer(ctx, obj)
 	}
 
 	if !o.hasFinalizer(obj) {
 		return obj, nil
 	}
 
-	newObj, err := o.handler(key, obj)
+	newObj, err := o.handler(ctx, key, obj)
 	if err != nil {
 		return newObj, err
 	}
@@ -53,7 +70,7 @@ func (o *objectLifecycleAdapter) sync(key string, obj runtime.Object) (runtime.O
 		obj = newObj
 	}
 
-	return o.removeFinalizer(obj)
+	return o.removeFinalizer(ctx, obj)
 }
 
 func (o *objectLifecycleAdapter) constructFinalizerKey() string {
@@ -77,7 +94,7 @@ func (o *objectLifecycleAdapter) hasFinalizer(obj runtime.Object) bool {
 	return false
 }
 
-func (o *objectLifecycleAdapter) removeFinalizer(obj runtime.Object) (runtime.Object, error) {
+func (o *objectLifecycleAdapter) removeFinalizer(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
 	if !o.hasFinalizer(obj) {
 		return obj, nil
 	}
@@ -100,10 +117,10 @@ func (o *objectLifecycleAdapter) removeFinalizer(obj runtime.Object) (runtime.Ob
 	}
 
 	metadata.SetFinalizers(newFinalizers)
-	return o.updater(obj)
+	return o.updater(ctx, obj)
 }
 
-func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Object, error) {
+func (o *objectLifecycleAdapter) addFinalizer(ctx context.Context, obj runtime.Object) (runtime.Object, error) {
 	if o.hasFinalizer(obj) {
 		return obj, nil
 	}
@@ -115,5 +132,5 @@ func (o *objectLifecycleAdapter) addFinalizer(obj runtime.Object) (runtime.Objec
 	}
 
 	metadata.SetFinalizers(append(metadata.GetFinalizers(), o.constructFinalizerKey()))
-	return o.updater(obj)
+	return o.updater(ctx, obj)
 }
