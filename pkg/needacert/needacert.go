@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
@@ -273,19 +274,23 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 	dnsNames := dnsNameSet.List()
 	secret, err := h.secretsCache.Get(service.Namespace, secretName)
 	if apierror.IsNotFound(err) {
-		secret, err := h.createSecret(service, service.Namespace, secretName, dnsNames)
+		newSecret, err := h.createSecret(service, service.Namespace, secretName, dnsNames)
 		if err != nil {
 			return nil, err
 		}
-		return h.secrets.Create(secret)
+		created, err := h.secrets.Create(newSecret)
+		if apierror.IsAlreadyExists(err) {
+			return h.secrets.Get(service.Namespace, secretName, metav1.GetOptions{})
+		}
+		return created, err
 	} else if err != nil {
 		return nil, err
 	}
 
-	if secret, err := h.updateSecret(service, secret, dnsNames); err != nil {
+	if updated, err := h.updateSecret(service, secret, dnsNames); err != nil {
 		return nil, err
-	} else if secret != nil {
-		return h.secrets.Update(secret)
+	} else if updated != nil {
+		return h.secrets.Update(updated)
 	}
 
 	return secret, nil
@@ -301,10 +306,11 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 	if err != nil {
 		return nil, err
 	}
-
+	logrus.Debugf("checking cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 	if time.Now().Add(24*60*time.Hour).After(cert.NotAfter) ||
 		len(cert.DNSNames) == 0 ||
 		!slice.StringsEqual(cert.DNSNames[1:], dnsNames) {
+		logrus.Debugf("regenerating cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 		newSecret, err := h.createSecret(owner, secret.Namespace, secret.Name, dnsNames)
 		if err != nil {
 			return nil, err
@@ -312,6 +318,8 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 		secret = secret.DeepCopy()
 		secret.Data = newSecret.Data
 		return secret, nil
+	} else {
+		logrus.Debugf("cert %s for %s/%s is valid until %s and covers %v", cert.Subject.CommonName, secret.Namespace, secret.Name, cert.NotAfter, cert.DNSNames)
 	}
 
 	return nil, nil
