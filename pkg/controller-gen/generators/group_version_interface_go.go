@@ -84,12 +84,14 @@ func (f *groupInterfaceGo) Init(c *generator.Context, w io.Writer) error {
 			"version":      f.gv.Version,
 			"group":        f.gv.Group,
 			"namespaced":   namespaced(t),
+			"withContext":  f.customArgs.WithContextByGroup[f.gv],
 			"versionUpper": namer.IC(f.gv.Version),
 			"groupUpper":   upperLowercase(f.gv.Group),
 		}
+
 		body := `
 		func (v *version) {{.type}}() {{.type}}Controller {
-			return generic.New{{ if not .namespaced}}NonNamespaced{{end}}Controller[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List](schema.GroupVersionKind{Group: "{{.group}}", Version: "{{.version}}", Kind: "{{.type}}"}, "{{.pluralLower}}", {{ if .namespaced}}true, {{end}}v.controllerFactory)
+			return generic.New{{ if not .namespaced}}NonNamespaced{{end}}Controller{{if .withContext}}Context{{end}}[*{{.version}}.{{.type}}, *{{.version}}.{{.type}}List](schema.GroupVersionKind{Group: "{{.group}}", Version: "{{.version}}", Kind: "{{.type}}"}, "{{.pluralLower}}", {{ if .namespaced}}true, {{end}}v.controllerFactory)
 		}
 		`
 		sw.Do(body, m)
