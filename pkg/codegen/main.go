@@ -36,6 +36,8 @@ func main() {
 					v1.PersistentVolume{},
 					v1.PersistentVolumeClaim{},
 					v1.Pod{},
+					v1.LimitRange{},
+					v1.ResourceQuota{},
 				},
 			},
 			discoveryv1.GroupName: {
