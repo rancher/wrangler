@@ -45,6 +45,7 @@ func Register(ctx context.Context,
 	h := handler{
 		secretsCache:       secrets.Cache(),
 		secrets:            secrets,
+		services:           service,
 		serviceCache:       service.Cache(),
 		mutatingWebHooks:   mutatingController,
 		validatingWebHooks: validatingController,
@@ -59,6 +60,27 @@ func Register(ctx context.Context,
 	validatingController.OnChange(ctx, "need-a-cert", h.OnValidatingWebhookChange)
 	crdController.OnChange(ctx, "need-a-cert", h.OnCRDChange)
 	service.OnChange(ctx, "need-a-cert", h.OnService)
+	secrets.OnChange(ctx, "need-a-cert", h.OnSecretChange)
+}
+
+// OnSecretChange handles Secret changes and enqueues the related Service.
+func (h *handler) OnSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
+	if secret == nil {
+		return secret, nil
+	}
+
+	services, err := h.services.List(secret.Namespace, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, service := range services.Items {
+		if service.Annotations[SecretAnnotation] == secret.Name {
+			h.services.Enqueue(service.Namespace, service.Name)
+		}
+	}
+
+	return secret, nil
 }
 
 type handler struct {
@@ -66,6 +88,7 @@ type handler struct {
 	secretsCache       corecontrollers.SecretCache
 	secrets            corecontrollers.SecretClient
 	serviceCache       corecontrollers.ServiceCache
+	services           corecontrollers.ServiceController
 	mutatingWebHooks   admissionregcontrollers.MutatingWebhookConfigurationController
 	validatingWebHooks admissionregcontrollers.ValidatingWebhookConfigurationController
 	crds               apiextcontrollers.CustomResourceDefinitionController
@@ -226,7 +249,7 @@ func (h *handler) OnService(key string, service *corev1.Service) (*corev1.Servic
 		h.crds.Enqueue(crd.Name)
 	}
 
-	return nil, err
+	return service, err
 }
 
 func (h *handler) OnCRDChange(key string, crd *apiextv1.CustomResourceDefinition) (*apiextv1.CustomResourceDefinition, error) {

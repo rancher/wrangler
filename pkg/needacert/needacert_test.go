@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	"go.uber.org/mock/gomock"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	adminregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -941,4 +941,122 @@ func TestHandler_GenerateSecret_StaleCacheAlreadyExists(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, secret)
+}
+
+func TestHandler_OnSecretChange_Then_OnService_UpdatesCABundle(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	//Mocks
+	mockServiceController := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
+	mockServiceCache := fake.NewMockCacheInterface[*corev1.Service](ctrl)
+	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	mockMutatingWebHooks := fake.NewMockNonNamespacedControllerInterface[*adminregv1.MutatingWebhookConfiguration, *adminregv1.MutatingWebhookConfigurationList](ctrl)
+	mockValidatingWebHooks := fake.NewMockNonNamespacedControllerInterface[*adminregv1.ValidatingWebhookConfiguration, *adminregv1.ValidatingWebhookConfigurationList](ctrl)
+	mockCRDs := fake.NewMockNonNamespacedControllerInterface[*apiextv1.CustomResourceDefinition, *apiextv1.CustomResourceDefinitionList](ctrl)
+	mockCRDCache := fake.NewMockNonNamespacedCacheInterface[*apiextv1.CustomResourceDefinition](ctrl)
+	mockMutatingWebHooksCache := fake.NewMockNonNamespacedCacheInterface[*adminregv1.MutatingWebhookConfiguration](ctrl)
+	mockValidatingWebHooksCache := fake.NewMockNonNamespacedCacheInterface[*adminregv1.ValidatingWebhookConfiguration](ctrl)
+
+	// Generate self-signed cert
+	certPEM, keyPEM, err := cert.GenerateSelfSignedCertKey("svc-mysecret", nil, []string{"svc.ns", "svc.ns.svc", "svc.ns.svc.cluster.local"})
+	require.NoError(t, err)
+
+	// Objects already created
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mysecret",
+			Namespace: "ns",
+		},
+		Type: corev1.SecretTypeTLS,
+		Data: map[string][]byte{
+			corev1.TLSCertKey:       certPEM,
+			corev1.TLSPrivateKeyKey: keyPEM,
+		},
+	}
+
+	service := corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				SecretAnnotation: "mysecret",
+			},
+		},
+	}
+
+	serviceList := &corev1.ServiceList{Items: []corev1.Service{service}}
+
+	webhook := &adminregv1.MutatingWebhookConfiguration{
+		ObjectMeta: metav1.ObjectMeta{Name: "webhook"},
+		Webhooks: []adminregv1.MutatingWebhook{
+			{
+				Name: "wh",
+				ClientConfig: adminregv1.WebhookClientConfig{
+					Service: &adminregv1.ServiceReference{
+						Namespace: "ns",
+						Name:      "svc",
+					},
+					CABundle: []byte(""), // empty → should trigger Update
+				},
+			},
+		},
+	}
+
+	webhookList := []*adminregv1.MutatingWebhookConfiguration{webhook}
+
+	// Expected mock calls
+	mockServiceController.EXPECT().List("ns", gomock.Any()).Return(serviceList, nil).Times(1)
+	mockServiceController.EXPECT().Enqueue("ns", "svc").Times(1)
+
+	mockSecretsCache.EXPECT().Get("ns", "mysecret").Return(secret, nil).Times(2)
+
+	mockMutatingWebHooks.EXPECT().Cache().Return(mockMutatingWebHooksCache).AnyTimes()
+	mockMutatingWebHooksCache.EXPECT().GetByIndex(byServiceIndex, "ns/svc").Return(webhookList, nil).Times(1)
+	mockMutatingWebHooks.EXPECT().Enqueue("webhook").Times(1)
+	mockMutatingWebHooks.EXPECT().Update(gomock.Any()).DoAndReturn(func(updated *adminregv1.MutatingWebhookConfiguration) (*adminregv1.MutatingWebhookConfiguration, error) {
+		for _, wh := range updated.Webhooks {
+			assert.NotEmpty(t, wh.ClientConfig.CABundle, "CABundle should be updated")
+		}
+		return updated, nil
+	}).Times(1)
+
+	mockValidatingWebHooks.EXPECT().Cache().Return(mockValidatingWebHooksCache).AnyTimes()
+	mockValidatingWebHooksCache.EXPECT().GetByIndex(byServiceIndex, "ns/svc").Return([]*adminregv1.ValidatingWebhookConfiguration{}, nil).AnyTimes()
+
+	mockCRDs.EXPECT().Cache().Return(mockCRDCache).Times(1)
+	mockCRDCache.EXPECT().GetByIndex(byServiceIndex, "ns/svc").Return([]*apiextv1.CustomResourceDefinition{}, nil).Times(1)
+
+	mockServiceCache.EXPECT().
+		Get("ns", "svc").
+		Return(&service, nil).
+		Times(1)
+
+	h := &handler{
+		services:           mockServiceController,
+		serviceCache:       mockServiceCache,
+		secrets:            mockSecrets,
+		secretsCache:       mockSecretsCache,
+		mutatingWebHooks:   mockMutatingWebHooks,
+		validatingWebHooks: mockValidatingWebHooks,
+		crds:               mockCRDs,
+	}
+
+	// Run OnSecretChange ---
+	gotSecret, err := h.OnSecretChange("ns/mysecret", secret)
+	assert.NoError(t, err)
+	assert.Equal(t, secret, gotSecret)
+
+	// Run OnService triggered by OnSecretChange
+	gotService, err := h.OnService("ns/svc", &service)
+	assert.NoError(t, err)
+	assert.Equal(t, &service, gotService)
+
+	// Run OnMutationWebhookChange triggered by OnService
+	updatedWebhook, err := h.OnMutationWebhookChange("webhook", webhook)
+	assert.NoError(t, err)
+	for _, wh := range updatedWebhook.Webhooks {
+		assert.NotEmpty(t, wh.ClientConfig.CABundle, "CABundle should be updated")
+	}
 }
