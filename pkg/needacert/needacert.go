@@ -6,9 +6,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/moby/locker"
 	admissionregcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/admissionregistration.k8s.io/v1"
@@ -45,6 +46,7 @@ func Register(ctx context.Context,
 	h := handler{
 		secretsCache:       secrets.Cache(),
 		secrets:            secrets,
+		services:           service,
 		serviceCache:       service.Cache(),
 		mutatingWebHooks:   mutatingController,
 		validatingWebHooks: validatingController,
@@ -59,6 +61,27 @@ func Register(ctx context.Context,
 	validatingController.OnChange(ctx, "need-a-cert", h.OnValidatingWebhookChange)
 	crdController.OnChange(ctx, "need-a-cert", h.OnCRDChange)
 	service.OnChange(ctx, "need-a-cert", h.OnService)
+	secrets.OnChange(ctx, "need-a-cert", h.OnSecretChange)
+}
+
+// OnSecretChange handles Secret changes and enqueues the related Service.
+func (h *handler) OnSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
+	if secret == nil {
+		return secret, nil
+	}
+
+	services, err := h.serviceCache.List(secret.Namespace, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, service := range services {
+		if service.Annotations[SecretAnnotation] == secret.Name {
+			h.services.Enqueue(service.Namespace, service.Name)
+		}
+	}
+
+	return secret, nil
 }
 
 type handler struct {
@@ -66,6 +89,7 @@ type handler struct {
 	secretsCache       corecontrollers.SecretCache
 	secrets            corecontrollers.SecretClient
 	serviceCache       corecontrollers.ServiceCache
+	services           corecontrollers.ServiceController
 	mutatingWebHooks   admissionregcontrollers.MutatingWebhookConfigurationController
 	validatingWebHooks admissionregcontrollers.ValidatingWebhookConfigurationController
 	crds               apiextcontrollers.CustomResourceDefinitionController
