@@ -3,10 +3,11 @@ package needacert
 import (
 	"bytes"
 	"fmt"
-	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	"go.uber.org/mock/gomock"
 	"testing"
 	"time"
+
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
 	adminregv1 "k8s.io/api/admissionregistration/v1"
@@ -124,23 +125,25 @@ func TestHandler_OnMutationWebhookChange(t *testing.T) {
 
 	mockServiceCache.EXPECT().
 		Get("ns", "svc").
-		Return(mockService, nil)
+		Return(mockService, nil).
+		Times(2)
 
 	mockSecretsCache.EXPECT().
 		Get("ns", "mysecret").
-		Return(mockSecret, nil)
+		Return(mockSecret, nil).
+		Times(2)
 
 	mockSecrets.EXPECT().
 		Update(gomock.Any()).
 		DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 			return secret, nil
-		})
+		}).Times(2)
 
 	mockMutatingWebHooks.EXPECT().
 		Update(gomock.Any()).
 		DoAndReturn(func(webhook *adminregv1.MutatingWebhookConfiguration) (*adminregv1.MutatingWebhookConfiguration, error) {
 			return webhook, nil
-		})
+		}).Times(1)
 
 	h := &handler{
 		serviceCache:     mockServiceCache,
@@ -164,6 +167,16 @@ func TestHandler_OnMutationWebhookChange(t *testing.T) {
 					CABundle: []byte{},
 				},
 			},
+			{
+				Name: "wh2",
+				ClientConfig: adminregv1.WebhookClientConfig{
+					Service: &adminregv1.ServiceReference{
+						Namespace: "ns",
+						Name:      "svc",
+					},
+					CABundle: []byte{},
+				},
+			},
 		},
 	}
 
@@ -171,7 +184,9 @@ func TestHandler_OnMutationWebhookChange(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, updated)
 	assert.NotEmpty(t, updated.Webhooks[0].ClientConfig.CABundle)
+	assert.NotEmpty(t, updated.Webhooks[1].ClientConfig.CABundle)
 	assert.True(t, bytes.HasPrefix(updated.Webhooks[0].ClientConfig.CABundle, []byte("-----BEGIN CERTIFICATE-----")))
+	assert.True(t, bytes.HasPrefix(updated.Webhooks[1].ClientConfig.CABundle, []byte("-----BEGIN CERTIFICATE-----")))
 }
 
 func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
@@ -212,23 +227,26 @@ func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
 
 			mockServiceCache.EXPECT().
 				Get("ns", "svc").
-				Return(mockService, nil)
+				Return(mockService, nil).
+				Times(2)
 
 			mockSecretsCache.EXPECT().
 				Get("ns", "mysecret").
-				Return(mockSecret, nil)
+				Return(mockSecret, nil).
+				Times(2)
 
 			mockSecrets.EXPECT().
 				Update(gomock.Any()).
 				DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 					return secret, nil
-				})
+				}).
+				Times(2)
 
 			mockValidatingWebHooks.EXPECT().
 				Update(gomock.Any()).
 				DoAndReturn(func(webhook *adminregv1.ValidatingWebhookConfiguration) (*adminregv1.ValidatingWebhookConfiguration, error) {
 					return webhook, nil
-				})
+				}).Times(1)
 
 			h := &handler{
 				serviceCache:       mockServiceCache,
@@ -252,6 +270,16 @@ func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
 							CABundle: []byte{},
 						},
 					},
+					{
+						Name: "wh2",
+						ClientConfig: adminregv1.WebhookClientConfig{
+							Service: &adminregv1.ServiceReference{
+								Namespace: "ns",
+								Name:      "svc",
+							},
+							CABundle: []byte{},
+						},
+					},
 				},
 			}
 
@@ -259,7 +287,9 @@ func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, updated)
 			assert.NotEmpty(t, updated.Webhooks[0].ClientConfig.CABundle)
+			assert.NotEmpty(t, updated.Webhooks[1].ClientConfig.CABundle)
 			assert.True(t, bytes.HasPrefix(updated.Webhooks[0].ClientConfig.CABundle, []byte("-----BEGIN CERTIFICATE-----")))
+			assert.True(t, bytes.HasPrefix(updated.Webhooks[1].ClientConfig.CABundle, []byte("-----BEGIN CERTIFICATE-----")))
 		})
 	}
 }

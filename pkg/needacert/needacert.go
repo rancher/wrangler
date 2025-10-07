@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/gvk"
 	"github.com/rancher/wrangler/v3/pkg/slice"
+	"github.com/sirupsen/logrus"
 	adminregv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -107,6 +107,7 @@ func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.Mutati
 	if webhook == nil {
 		return nil, nil
 	}
+	needUpdate := false
 	for i, webhookConfig := range webhook.Webhooks {
 		if webhookConfig.ClientConfig.Service == nil || webhookConfig.ClientConfig.Service.Name == "" {
 			continue
@@ -131,10 +132,15 @@ func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.Mutati
 		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 			webhook = webhook.DeepCopy()
 			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
-			webhook, err = h.mutatingWebHooks.Update(webhook)
-			if err != nil {
-				return webhook, err
-			}
+			needUpdate = true
+		}
+	}
+
+	if needUpdate {
+		logrus.Debugf("Updating MutatingWebhookConfiguration %s/%s", webhook.GetNamespace(), webhook.GetName())
+		webhook, err := h.mutatingWebHooks.Update(webhook)
+		if err != nil {
+			return webhook, err
 		}
 	}
 
@@ -145,6 +151,7 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 	if webhook == nil {
 		return nil, nil
 	}
+	needUpdate := false
 	for i, webhookConfig := range webhook.Webhooks {
 		if webhookConfig.ClientConfig.Service == nil || webhookConfig.ClientConfig.Service.Name == "" {
 			continue
@@ -169,10 +176,15 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
 			webhook = webhook.DeepCopy()
 			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
-			webhook, err = h.validatingWebHooks.Update(webhook)
-			if err != nil {
-				return webhook, err
-			}
+			needUpdate = true
+		}
+	}
+
+	if needUpdate {
+		logrus.Debugf("Updating ValidatingWebhookConfiguration %s/%s", webhook.GetNamespace(), webhook.GetName())
+		webhook, err := h.validatingWebHooks.Update(webhook)
+		if err != nil {
+			return webhook, err
 		}
 	}
 
