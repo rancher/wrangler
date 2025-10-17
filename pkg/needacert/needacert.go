@@ -315,9 +315,22 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 		}
 		created, err := h.secrets.Create(newSecret)
 		if apierror.IsAlreadyExists(err) {
-			return h.secrets.Get(service.Namespace, secretName, metav1.GetOptions{})
+			existing, getErr := h.secrets.Get(service.Namespace, secretName, metav1.GetOptions{})
+			if getErr != nil {
+				return nil, getErr
+			}
+			if err := h.scheduleNextCertCheck(service, existing, nil); err != nil {
+				return nil, fmt.Errorf("schedule next cert check failed for existing secret: %w", err)
+			}
+			return existing, nil
+		} else if err != nil {
+			return created, err
 		}
-		return created, err
+
+		if err := h.scheduleNextCertCheck(service, created, nil); err != nil {
+			return nil, fmt.Errorf("schedule next cert check failed for new secret: %w", err)
+		}
+		return created, nil
 	} else if err != nil {
 		return nil, err
 	}
@@ -332,15 +345,20 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 }
 
 func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsNames []string) (*corev1.Secret, error) {
-	tlsCert, err := tls.X509KeyPair(secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey])
-	if err != nil || len(tlsCert.Certificate) == 0 {
-		return nil, err
-	}
-
-	cert, err := x509.ParseCertificate(tlsCert.Certificate[0])
+	cert, err := parseCert(secret)
 	if err != nil {
 		return nil, err
 	}
+
+	metaObj, err := meta.Accessor(owner)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.scheduleNextCertCheck(metaObj, secret, cert); err != nil {
+		return nil, fmt.Errorf("failed to schedule next cert check: %w", err)
+	}
+
 	logrus.Debugf("checking cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 	if time.Now().Add(24*60*time.Hour).After(cert.NotAfter) ||
 		len(cert.DNSNames) == 0 ||
@@ -358,6 +376,28 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 	}
 
 	return nil, nil
+}
+
+func (h *handler) scheduleNextCertCheck(obj metav1.Object, secret *corev1.Secret, cert *x509.Certificate) error {
+	if cert == nil {
+		var err error
+		cert, err = parseCert(secret)
+		if err != nil {
+			return fmt.Errorf("cannot parse certificate: %w", err)
+		}
+	}
+
+	renewBefore := 24 * time.Hour
+	nextCheck := time.Until(cert.NotAfter.Add(-renewBefore))
+	if nextCheck < time.Minute {
+		nextCheck = time.Minute
+	}
+
+	logrus.Debugf("Next cert check for %s/%s scheduled in %v (expires %v)",
+		obj.GetNamespace(), obj.GetName(), nextCheck.Round(time.Second), cert.NotAfter)
+
+	h.services.EnqueueAfter(obj.GetNamespace(), obj.GetName(), nextCheck)
+	return nil
 }
 
 func (h *handler) createSecret(owner runtime.Object, ns, name string, dnsNames []string) (*corev1.Secret, error) {
@@ -395,4 +435,22 @@ func (h *handler) createSecret(owner runtime.Object, ns, name string, dnsNames [
 		},
 		Type: corev1.SecretTypeTLS,
 	}, nil
+}
+
+func parseCert(secret *corev1.Secret) (*x509.Certificate, error) {
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("secret or secret.Data is nil")
+	}
+
+	tlsPair, err := tls.X509KeyPair(secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey])
+	if err != nil || len(tlsPair.Certificate) == 0 {
+		return nil, fmt.Errorf("failed to load TLS keypair: %w", err)
+	}
+
+	cert, err := x509.ParseCertificate(tlsPair.Certificate[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse X509 certificate: %w", err)
+	}
+
+	return cert, nil
 }
