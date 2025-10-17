@@ -3,6 +3,7 @@ package needacert
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -41,7 +42,11 @@ func TestUpdateSecret_ExpiredCert_ManyParallel(t *testing.T) {
 	for i := 0; i < runs; i++ {
 		t.Run(fmt.Sprintf("run-%d", i), func(t *testing.T) {
 			t.Parallel()
-			h := &handler{}
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
+			mockServices.EXPECT().EnqueueAfter("ns", "svc", gomock.Any()).AnyTimes()
+			h := &handler{services: mockServices}
 			service := &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "svc",
@@ -71,7 +76,9 @@ func TestUpdateSecret_ExpiredCert_ManyParallel(t *testing.T) {
 
 			time.Sleep(2 * time.Second)
 
-			updated, err := h.updateSecret(service, secret, dnsNames)
+			parsedCerts, parseErr := cert.ParseCertsPEM(certPEM)
+			assert.NoError(t, parseErr)
+			updated, err := h.updateSecret(service, secret, dnsNames, parsedCerts[0])
 			assert.NoError(t, err)
 			assert.NotNil(t, updated)
 		})
@@ -97,6 +104,7 @@ func TestHandler_OnMutationWebhookChange(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockServiceCache := fake.NewMockCacheInterface[*corev1.Service](ctrl)
+	mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 	mockMutatingWebHooks := fake.NewMockNonNamespacedControllerInterface[*adminregv1.MutatingWebhookConfiguration, *adminregv1.MutatingWebhookConfigurationList](ctrl)
@@ -123,6 +131,10 @@ func TestHandler_OnMutationWebhookChange(t *testing.T) {
 		},
 	}
 
+	mockServices.EXPECT().
+		EnqueueAfter("ns", "svc", gomock.Any()).
+		AnyTimes()
+
 	mockServiceCache.EXPECT().
 		Get("ns", "svc").
 		Return(mockService, nil).
@@ -146,6 +158,7 @@ func TestHandler_OnMutationWebhookChange(t *testing.T) {
 		}).Times(1)
 
 	h := &handler{
+		services:         mockServices,
 		serviceCache:     mockServiceCache,
 		secretsCache:     mockSecretsCache,
 		secrets:          mockSecrets,
@@ -199,6 +212,7 @@ func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
 			t.Parallel()
 
 			mockServiceCache := fake.NewMockCacheInterface[*corev1.Service](ctrl)
+			mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 			mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			mockValidatingWebHooks := fake.NewMockNonNamespacedControllerInterface[*adminregv1.ValidatingWebhookConfiguration, *adminregv1.ValidatingWebhookConfigurationList](ctrl)
@@ -225,6 +239,10 @@ func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
 				},
 			}
 
+			mockServices.EXPECT().
+				EnqueueAfter("ns", "svc", gomock.Any()).
+				AnyTimes()
+
 			mockServiceCache.EXPECT().
 				Get("ns", "svc").
 				Return(mockService, nil).
@@ -249,6 +267,7 @@ func TestHandler_OnValidatingWebhookChange_Parallel(t *testing.T) {
 				}).Times(1)
 
 			h := &handler{
+				services:           mockServices,
 				serviceCache:       mockServiceCache,
 				secretsCache:       mockSecretsCache,
 				secrets:            mockSecrets,
@@ -304,6 +323,7 @@ func TestHandler_OnMutationWebhookChange_Parallel(t *testing.T) {
 			t.Parallel()
 
 			mockServiceCache := fake.NewMockCacheInterface[*corev1.Service](ctrl)
+			mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 			mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			mockMutatingWebHooks := fake.NewMockNonNamespacedControllerInterface[*adminregv1.MutatingWebhookConfiguration, *adminregv1.MutatingWebhookConfigurationList](ctrl)
@@ -330,6 +350,10 @@ func TestHandler_OnMutationWebhookChange_Parallel(t *testing.T) {
 				},
 			}
 
+			mockServices.EXPECT().
+				EnqueueAfter("ns", "svc", gomock.Any()).
+				AnyTimes()
+
 			mockServiceCache.EXPECT().
 				Get("ns", "svc").
 				Return(mockService, nil)
@@ -351,6 +375,7 @@ func TestHandler_OnMutationWebhookChange_Parallel(t *testing.T) {
 				})
 
 			h := &handler{
+				services:         mockServices,
 				serviceCache:     mockServiceCache,
 				secretsCache:     mockSecretsCache,
 				secrets:          mockSecrets,
@@ -394,6 +419,7 @@ func TestHandler_OnService_Parallel(t *testing.T) {
 			t.Parallel()
 
 			mockServiceCache := fake.NewMockCacheInterface[*corev1.Service](ctrl)
+			mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 			mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			mockMutatingWebHooks := fake.NewMockNonNamespacedControllerInterface[*adminregv1.MutatingWebhookConfiguration, *adminregv1.MutatingWebhookConfigurationList](ctrl)
@@ -439,6 +465,9 @@ func TestHandler_OnService_Parallel(t *testing.T) {
 				},
 			}
 
+			mockServices.EXPECT().
+				EnqueueAfter("ns", "svc", gomock.Any()).
+				AnyTimes()
 			mockSecretsCache.EXPECT().
 				Get("ns", "mysecret").
 				Return(mockSecret, nil).AnyTimes()
@@ -449,6 +478,7 @@ func TestHandler_OnService_Parallel(t *testing.T) {
 				}).AnyTimes()
 
 			h := &handler{
+				services:           mockServices,
 				serviceCache:       mockServiceCache,
 				secretsCache:       mockSecretsCache,
 				secrets:            mockSecrets,
@@ -473,6 +503,7 @@ func TestHandler_OnCRDChange_Parallel(t *testing.T) {
 			t.Parallel()
 
 			mockServiceCache := fake.NewMockCacheInterface[*corev1.Service](ctrl)
+			mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 			mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			mockCRDs := fake.NewMockNonNamespacedControllerInterface[*apiextv1.CustomResourceDefinition, *apiextv1.CustomResourceDefinitionList](ctrl)
@@ -504,6 +535,9 @@ func TestHandler_OnCRDChange_Parallel(t *testing.T) {
 				},
 			}
 
+			mockServices.EXPECT().
+				EnqueueAfter("ns", "svc", gomock.Any()).
+				AnyTimes()
 			mockServiceCache.EXPECT().
 				Get("ns", "svc").
 				Return(service, nil).AnyTimes()
@@ -527,6 +561,7 @@ func TestHandler_OnCRDChange_Parallel(t *testing.T) {
 				}).AnyTimes()
 
 			h := &handler{
+				services:     mockServices,
 				serviceCache: mockServiceCache,
 				secretsCache: mockSecretsCache,
 				secrets:      mockSecrets,
@@ -566,6 +601,7 @@ func TestHandler_GenerateSecret_Race(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
@@ -592,6 +628,9 @@ func TestHandler_GenerateSecret_Race(t *testing.T) {
 		},
 	}
 
+	mockServices.EXPECT().
+		EnqueueAfter("ns", "svc", gomock.Any()).
+		AnyTimes()
 	mockSecretsCache.EXPECT().
 		Get("ns", "mysecret").
 		Return(mockSecret, nil).AnyTimes()
@@ -602,6 +641,7 @@ func TestHandler_GenerateSecret_Race(t *testing.T) {
 		}).AnyTimes()
 
 	h := &handler{
+		services:     mockServices,
 		secretsCache: mockSecretsCache,
 		secrets:      mockSecrets,
 	}
@@ -624,6 +664,7 @@ func TestHandler_GenerateSecret_Race_MultiService(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
@@ -655,6 +696,9 @@ func TestHandler_GenerateSecret_Race_MultiService(t *testing.T) {
 			},
 		}
 
+		mockServices.EXPECT().
+			EnqueueAfter("ns", gomock.Any(), gomock.Any()).
+			AnyTimes()
 		mockSecretsCache.EXPECT().
 			Get("ns", secretName).
 			Return(mockSecret, nil).AnyTimes()
@@ -666,6 +710,7 @@ func TestHandler_GenerateSecret_Race_MultiService(t *testing.T) {
 
 		go func(svc *corev1.Service) {
 			h := &handler{
+				services:     mockServices,
 				secretsCache: mockSecretsCache,
 				secrets:      mockSecrets,
 			}
@@ -685,6 +730,7 @@ func TestHandler_Race_Stress(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockServiceCache := fake.NewMockCacheInterface[*corev1.Service](ctrl)
+	mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 	mockMutatingWebHooks := fake.NewMockNonNamespacedControllerInterface[*adminregv1.MutatingWebhookConfiguration, *adminregv1.MutatingWebhookConfigurationList](ctrl)
@@ -718,6 +764,7 @@ func TestHandler_Race_Stress(t *testing.T) {
 	}).AnyTimes()
 
 	h := &handler{
+		services:           mockServices,
 		serviceCache:       mockServiceCache,
 		secretsCache:       mockSecretsCache,
 		secrets:            mockSecrets,
@@ -741,6 +788,9 @@ func TestHandler_Race_Stress(t *testing.T) {
 					},
 				},
 			}
+			mockServices.EXPECT().
+				EnqueueAfter("ns", gomock.Any(), gomock.Any()).
+				AnyTimes()
 			mockServiceCache.EXPECT().
 				Get("ns", serviceName).
 				Return(service, nil).AnyTimes()
@@ -798,9 +848,7 @@ func TestHandler_Race_Stress(t *testing.T) {
 	}
 }
 
-func TestHandler_UpdateSecret_CorruptedData(t *testing.T) {
-	h := &handler{}
-
+func TestHandler_ParseCert_CorruptedData(t *testing.T) {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "badsecret",
@@ -813,17 +861,16 @@ func TestHandler_UpdateSecret_CorruptedData(t *testing.T) {
 		},
 	}
 
-	dnsNames := []string{"svc.ns", "svc.ns.svc"}
-
-	updated, err := h.updateSecret(secret, secret, dnsNames)
+	parsed, err := parseCert(secret)
 	assert.Error(t, err, "expected error when parsing corrupted TLS secret")
-	assert.Nil(t, updated, "no updated secret should be returned on corrupted data")
+	assert.Nil(t, parsed, "no updated secret should be returned on corrupted data")
 }
 
 func TestHandler_GenerateSecret_Race_SharedSecret(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
@@ -849,6 +896,9 @@ func TestHandler_GenerateSecret_Race_SharedSecret(t *testing.T) {
 
 	// Intentionally returning notfound from the cache each time so that
 	// multiple goroutines will attempt to create the same secret concurrently.
+	mockServices.EXPECT().
+		EnqueueAfter("ns", gomock.Any(), gomock.Any()).
+		AnyTimes()
 	mockSecretsCache.EXPECT().
 		Get("ns", "shared-secret").
 		Return(nil, apierror.NewNotFound(corev1.Resource("secrets"), "shared-secret")).
@@ -865,6 +915,7 @@ func TestHandler_GenerateSecret_Race_SharedSecret(t *testing.T) {
 		}).AnyTimes()
 
 	h := &handler{
+		services:     mockServices,
 		secretsCache: mockSecretsCache,
 		secrets:      mockSecrets,
 	}
@@ -894,6 +945,7 @@ func TestHandler_GenerateSecret_StaleCacheAlreadyExists(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
 	mockSecretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	mockSecrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 
@@ -908,6 +960,9 @@ func TestHandler_GenerateSecret_StaleCacheAlreadyExists(t *testing.T) {
 	}
 
 	// Simulate cache always lags and reports NotFound
+	mockServices.EXPECT().
+		EnqueueAfter("ns", "svc", gomock.Any()).
+		AnyTimes()
 	mockSecretsCache.EXPECT().
 		Get("ns", "mysecret").
 		Return(nil, apierror.NewNotFound(corev1.Resource("secrets"), "mysecret")).
@@ -920,19 +975,31 @@ func TestHandler_GenerateSecret_StaleCacheAlreadyExists(t *testing.T) {
 		}).
 		AnyTimes()
 
+	certPEM, keyPEM, err := cert.GenerateSelfSignedCertKey("mysecret", nil, []string{"svc.ns"})
+	assert.NoError(t, err)
+
 	expectedSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mysecret",
 			Namespace: "ns",
 		},
 		Type: corev1.SecretTypeTLS,
+		Data: map[string][]byte{
+			corev1.TLSCertKey:       certPEM,
+			corev1.TLSPrivateKeyKey: keyPEM,
+		},
 	}
 	mockSecrets.EXPECT().
 		Get("ns", "mysecret", gomock.Any()).
 		Return(expectedSecret, nil).
 		AnyTimes()
+	mockSecrets.EXPECT().
+		Update(gomock.Any()).
+		Return(expectedSecret, nil).
+		AnyTimes()
 
 	h := &handler{
+		services:     mockServices,
 		secretsCache: mockSecretsCache,
 		secrets:      mockSecrets,
 	}
@@ -1028,6 +1095,9 @@ func TestHandler_OnSecretChange_Then_OnService_UpdatesCABundle(t *testing.T) {
 	mockCRDs.EXPECT().Cache().Return(mockCRDCache).Times(1)
 	mockCRDCache.EXPECT().GetByIndex(byServiceIndex, "ns/svc").Return([]*apiextv1.CustomResourceDefinition{}, nil).Times(1)
 
+	mockServiceController.EXPECT().
+		EnqueueAfter("ns", gomock.Any(), gomock.Any()).
+		AnyTimes()
 	mockServiceCache.EXPECT().
 		Get("ns", "svc").
 		Return(&service, nil).
@@ -1058,5 +1128,87 @@ func TestHandler_OnSecretChange_Then_OnService_UpdatesCABundle(t *testing.T) {
 	assert.NoError(t, err)
 	for _, wh := range updatedWebhook.Webhooks {
 		assert.NotEmpty(t, wh.ClientConfig.CABundle, "CABundle should be updated")
+	}
+}
+
+func TestHandler_scheduleNextCertCheck(t *testing.T) {
+	type enqueueCall struct {
+		ns, name string
+		delay    time.Duration
+	}
+	var calls []enqueueCall
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockServices := fake.NewMockControllerInterface[*corev1.Service, *corev1.ServiceList](ctrl)
+	mockServices.EXPECT().
+		EnqueueAfter(gomock.Any(), gomock.Any(), gomock.Any()).
+		Do(func(ns, name string, delay time.Duration) {
+			calls = append(calls, enqueueCall{ns, name, delay})
+		}).
+		Times(2)
+
+	h := &handler{services: mockServices}
+
+	tests := []struct {
+		name      string
+		maxAge    time.Duration
+		wantDelay time.Duration
+		wantErr   bool
+	}{
+		{
+			name:      "expiring in 30 days",
+			maxAge:    30 * 24 * time.Hour,
+			wantDelay: 29*24*time.Hour - 1*time.Hour,
+			wantErr:   false,
+		},
+		{
+			name:      "expiring in 12 hours (less than renewBefore)",
+			maxAge:    12 * time.Hour,
+			wantDelay: time.Minute,
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			calls = nil
+
+			certPEM, keyPEM, err := cert.GenerateSelfSignedCertKeyWithOptions(cert.SelfSignedCertKeyOptions{
+				Host:   "ns-mysecret",
+				MaxAge: tt.maxAge,
+			})
+			require.NoError(t, err)
+
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mysecret",
+					Namespace: "ns",
+				},
+				Type: corev1.SecretTypeTLS,
+				Data: map[string][]byte{
+					corev1.TLSCertKey:       certPEM,
+					corev1.TLSPrivateKeyKey: keyPEM,
+				},
+			}
+
+			obj := &corev1.Service{}
+			err = h.scheduleNextCertCheck(obj, secret)
+
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("scheduleNextCertCheck() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if len(calls) != 1 {
+				t.Fatalf("expected 1 EnqueueAfter call, got %d", len(calls))
+			}
+
+			got := calls[0].delay
+			tolerance := time.Second * 10
+			if math.Abs(got.Seconds()-tt.wantDelay.Seconds()) > tolerance.Seconds() {
+				t.Errorf("expected delay ~%v, got %v", tt.wantDelay, got)
+			}
+		})
 	}
 }
