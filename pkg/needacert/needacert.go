@@ -45,6 +45,7 @@ func Register(ctx context.Context,
 	h := handler{
 		secretsCache:       secrets.Cache(),
 		secrets:            secrets,
+		services:           service,
 		serviceCache:       service.Cache(),
 		mutatingWebHooks:   mutatingController,
 		validatingWebHooks: validatingController,
@@ -59,6 +60,27 @@ func Register(ctx context.Context,
 	validatingController.OnChange(ctx, "need-a-cert", h.OnValidatingWebhookChange)
 	crdController.OnChange(ctx, "need-a-cert", h.OnCRDChange)
 	service.OnChange(ctx, "need-a-cert", h.OnService)
+	secrets.OnChange(ctx, "need-a-cert", h.OnSecretChange)
+}
+
+// OnSecretChange handles Secret changes and enqueues the related Service.
+func (h *handler) OnSecretChange(key string, secret *corev1.Secret) (*corev1.Secret, error) {
+	if secret == nil {
+		return secret, nil
+	}
+
+	services, err := h.services.List(secret.Namespace, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, service := range services.Items {
+		if service.Annotations[SecretAnnotation] == secret.Name {
+			h.services.Enqueue(service.Namespace, service.Name)
+		}
+	}
+
+	return secret, nil
 }
 
 type handler struct {
@@ -66,6 +88,7 @@ type handler struct {
 	secretsCache       corecontrollers.SecretCache
 	secrets            corecontrollers.SecretClient
 	serviceCache       corecontrollers.ServiceCache
+	services           corecontrollers.ServiceController
 	mutatingWebHooks   admissionregcontrollers.MutatingWebhookConfigurationController
 	validatingWebHooks admissionregcontrollers.ValidatingWebhookConfigurationController
 	crds               apiextcontrollers.CustomResourceDefinitionController
@@ -226,7 +249,7 @@ func (h *handler) OnService(key string, service *corev1.Service) (*corev1.Servic
 		h.crds.Enqueue(crd.Name)
 	}
 
-	return nil, err
+	return service, err
 }
 
 func (h *handler) OnCRDChange(key string, crd *apiextv1.CustomResourceDefinition) (*apiextv1.CustomResourceDefinition, error) {
@@ -318,6 +341,11 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 	if err != nil {
 		return nil, err
 	}
+
+	if err := h.scheduleNextCertCheck(owner, cert); err != nil {
+		return nil, fmt.Errorf("failed to schedule next cert check: %w", err)
+	}
+
 	logrus.Debugf("checking cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 	if time.Now().Add(24*60*time.Hour).After(cert.NotAfter) ||
 		len(cert.DNSNames) == 0 ||
@@ -335,6 +363,28 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 	}
 
 	return nil, nil
+}
+
+func (h *handler) scheduleNextCertCheck(owner runtime.Object, cert *x509.Certificate) error {
+	objMeta, err := meta.Accessor(owner)
+	if err != nil {
+		return fmt.Errorf("failed to get metadata for owner: %w", err)
+	}
+	ns, name := objMeta.GetNamespace(), objMeta.GetName()
+
+	renewBefore := 24 * time.Hour
+	minRetry := time.Minute
+
+	nextCheck := time.Until(cert.NotAfter.Add(-renewBefore))
+	if nextCheck < minRetry {
+		nextCheck = minRetry
+	}
+
+	logrus.Debugf("Scheduling next cert check for %s/%s in %v (cert expires: %v)",
+		ns, name, nextCheck, cert.NotAfter)
+	h.services.EnqueueAfter(ns, name, nextCheck)
+
+	return nil
 }
 
 func (h *handler) createSecret(owner runtime.Object, ns, name string, dnsNames []string) (*corev1.Secret, error) {
