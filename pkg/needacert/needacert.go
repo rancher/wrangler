@@ -313,52 +313,41 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 		if err != nil {
 			return nil, err
 		}
-		created, err := h.secrets.Create(newSecret)
+		secret, err = h.secrets.Create(newSecret)
 		if apierror.IsAlreadyExists(err) {
-			existing, getErr := h.secrets.Get(service.Namespace, secretName, metav1.GetOptions{})
-			if getErr != nil {
-				return nil, getErr
+			secret, err = h.secrets.Get(service.Namespace, secretName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
 			}
-			if err := h.scheduleNextCertCheck(service, existing, nil); err != nil {
-				return nil, fmt.Errorf("schedule next cert check failed for existing secret: %w", err)
-			}
-			return existing, nil
 		} else if err != nil {
-			return created, err
+			return nil, err
 		}
-
-		if err := h.scheduleNextCertCheck(service, created, nil); err != nil {
-			return nil, fmt.Errorf("schedule next cert check failed for new secret: %w", err)
-		}
-		return created, nil
 	} else if err != nil {
 		return nil, err
 	}
 
-	if updated, err := h.updateSecret(service, secret, dnsNames); err != nil {
-		return nil, err
+	cert, parseErr := parseCert(secret)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	if updated, updateErr := h.updateSecret(service, secret, dnsNames, cert); updateErr != nil {
+		return nil, updateErr
 	} else if updated != nil {
-		return h.secrets.Update(updated)
+		secret, err = h.secrets.Update(updated)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := h.scheduleNextCertCheck(service, secret); err != nil {
+		return nil, fmt.Errorf("failed to schedule next cert check: %w", err)
 	}
 
 	return secret, nil
 }
 
-func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsNames []string) (*corev1.Secret, error) {
-	cert, err := parseCert(secret)
-	if err != nil {
-		return nil, err
-	}
-
-	metaObj, err := meta.Accessor(owner)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := h.scheduleNextCertCheck(metaObj, secret, cert); err != nil {
-		return nil, fmt.Errorf("failed to schedule next cert check: %w", err)
-	}
-
+func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsNames []string, cert *x509.Certificate) (*corev1.Secret, error) {
 	logrus.Debugf("checking cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 	if time.Now().Add(24*60*time.Hour).After(cert.NotAfter) ||
 		len(cert.DNSNames) == 0 ||
@@ -378,13 +367,10 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 	return nil, nil
 }
 
-func (h *handler) scheduleNextCertCheck(obj metav1.Object, secret *corev1.Secret, cert *x509.Certificate) error {
-	if cert == nil {
-		var err error
-		cert, err = parseCert(secret)
-		if err != nil {
-			return fmt.Errorf("cannot parse certificate: %w", err)
-		}
+func (h *handler) scheduleNextCertCheck(obj metav1.Object, secret *corev1.Secret) error {
+	cert, err := parseCert(secret)
+	if err != nil {
+		return fmt.Errorf("cannot parse certificate: %w", err)
 	}
 
 	renewBefore := 24 * time.Hour
