@@ -44,6 +44,22 @@ type NonNamespacedCacheInterface[T runtime.Object] interface {
 	GetByIndex(indexName, key string) ([]T, error)
 }
 
+func NewCache[T runtime.Object](indexer cache.Indexer, resource schema.GroupResource) *Cache[T] {
+	return &Cache[T]{
+		indexer:  indexer,
+		resource: resource,
+	}
+}
+
+func NewNonNamespacedCache[T runtime.Object](indexer cache.Indexer, resource schema.GroupResource) *NonNamespacedCache[T] {
+	return &NonNamespacedCache[T]{
+		CacheInterface: &Cache[T]{
+			indexer:  indexer,
+			resource: resource,
+		},
+	}
+}
+
 // Cache is a object cache stored in memory for objects of type T.
 type Cache[T runtime.Object] struct {
 	indexer  cache.Indexer
