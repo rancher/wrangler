@@ -1,6 +1,8 @@
 package generic
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -85,7 +87,11 @@ func (c *Cache[T]) Get(namespace, name string) (T, error) {
 	if !exists {
 		return nilObj, errors.NewNotFound(c.resource, name)
 	}
-	return obj.(T), nil
+	ret, ok := obj.(T)
+	if !ok {
+		return ret, fmt.Errorf("could not convert cache item to %T", *new(T))
+	}
+	return ret, nil
 }
 
 // List will attempt to find resources in the given namespace from the Cache.
@@ -116,7 +122,11 @@ func (c *Cache[T]) GetByIndex(indexName, key string) (result []T, err error) {
 	}
 	result = make([]T, 0, len(objs))
 	for _, obj := range objs {
-		result = append(result, obj.(T))
+		ret, ok := obj.(T)
+		if !ok {
+			return nil, fmt.Errorf("could not convert cache item to %T", *new(T))
+		}
+		result = append(result, ret)
 	}
 	return result, nil
 }
