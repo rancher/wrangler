@@ -14,6 +14,7 @@ import (
 	apiextcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/gvk"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	"github.com/sirupsen/logrus"
 	adminregv1 "k8s.io/api/admissionregistration/v1"
@@ -34,6 +35,7 @@ var (
 
 const (
 	byServiceIndex = "byService"
+	bySecretIndex  = "bySecret"
 )
 
 func Register(ctx context.Context,
@@ -55,10 +57,42 @@ func Register(ctx context.Context,
 	validatingController.Cache().AddIndexer(byServiceIndex, validatingWebhookServices)
 	crdController.Cache().AddIndexer(byServiceIndex, crdWebhookServices)
 
+	service.Cache().AddIndexer(bySecretIndex, serviceSecret)
+
 	mutatingController.OnChange(ctx, "need-a-cert", h.OnMutationWebhookChange)
 	validatingController.OnChange(ctx, "need-a-cert", h.OnValidatingWebhookChange)
 	crdController.OnChange(ctx, "need-a-cert", h.OnCRDChange)
 	service.OnChange(ctx, "need-a-cert", h.OnService)
+
+	relatedresource.Watch(ctx, "resolve-service-from-secret", h.resolveServiceFromSecret, service, secrets)
+
+}
+
+func (h *handler) resolveServiceFromSecret(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if _, ok := obj.(*corev1.Secret); !ok {
+		return nil, nil
+	}
+
+	services, err := h.serviceCache.GetByIndex(bySecretIndex, namespace+"/"+name)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []relatedresource.Key
+	for _, service := range services {
+		result = append(result, relatedresource.NewKey(service.GetNamespace(), service.GetName()))
+	}
+	return result, nil
+}
+
+func serviceSecret(obj *corev1.Service) ([]string, error) {
+	secretName := obj.Annotations[SecretAnnotation]
+	if secretName == "" {
+		return nil, nil
+	}
+	return []string{
+		obj.Namespace + "/" + secretName,
+	}, nil
 }
 
 type handler struct {
