@@ -389,6 +389,7 @@ func (h *handler) scheduleNextCertCheck(obj metav1.Object, secret *corev1.Secret
 
 	renewBefore := 24 * 60 * time.Hour
 	nextCheck := time.Until(cert.NotAfter.Add(-renewBefore))
+
 	if nextCheck < time.Minute {
 		nextCheck = time.Minute
 	}
