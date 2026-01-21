@@ -16,6 +16,6 @@ Each wrangler major version supports a range of Kubernetes minor versions. The r
 The current supported release lines are:
 
 | Wrangler Branch | Wrangler Major version | Supported Kubernetes Versions |
-|--------------------------|------------------------------------|------------------------------------------------|
-| main | v3 | v1.26 - v1.33 |
+|--------------------------|------------------------------------|-------------------------------|
+| main | v3 | v1.26 - v1.35 |
 | release/v2 | v2 | v1.23 - v1.26 |
