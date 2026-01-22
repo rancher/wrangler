@@ -306,6 +306,9 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 
 	inputDirsMap := map[string]bool{}
 	inputDirs := []string{}
+	inputModelDirsMap := map[string]bool{}
+	inputModelDirs := []string{}
+
 	for gv, names := range customArgs.TypesByGroup {
 		if !groups[gv.Group] {
 			continue
@@ -314,6 +317,8 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		if _, found := inputDirsMap[names[0].Package]; !found {
 			inputDirsMap[names[0].Package] = true
 			inputDirs = append(inputDirs, names[0].Package)
+			inputModelDirsMap[names[0].Package] = true
+			inputModelDirs = append(inputModelDirs, names[0].Package)
 		}
 
 		group := customArgs.Options.Groups[gv.Group]
@@ -329,12 +334,23 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		return oa.GetOpenAPITargets(context, openAPIArgs, []byte(customArgs.Options.Boilerplate))
 	}
 
-	return gengo.Execute(
+	if err := gengo.Execute(
 		oa.NameSystems(),
 		oa.DefaultNameSystem(),
 		getTargets,
 		gengo.StdBuildTag,
 		inputDirs,
+	); err != nil {
+		return err
+	}
+
+	openAPIArgs.OutputModelNameFile = "zz_generated_model.go"
+	return gengo.Execute(
+		oa.NameSystems(),
+		oa.DefaultNameSystem(),
+		getTargets,
+		gengo.StdBuildTag,
+		inputModelDirs,
 	)
 }
 
