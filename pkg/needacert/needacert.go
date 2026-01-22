@@ -330,9 +330,8 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 		secret = secret.DeepCopy()
 		secret.Data = newSecret.Data
 		return secret, nil
-	} else {
-		logrus.Debugf("cert %s for %s/%s is valid until %s and covers %v", cert.Subject.CommonName, secret.Namespace, secret.Name, cert.NotAfter, cert.DNSNames)
 	}
+	logrus.Debugf("cert %s for %s/%s is valid until %s and covers %v", cert.Subject.CommonName, secret.Namespace, secret.Name, cert.NotAfter, cert.DNSNames)
 
 	return nil, nil
 }
