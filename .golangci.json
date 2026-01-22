@@ -1,37 +1,130 @@
 {
-    "linters": {
-        "disable-all": true,
+    "formatters": {
         "enable": [
-            "ineffassign",
-            "goimports",
-            "govet",
-            "misspell",
-            "revive",
-            "unused"
-        ]
-    },
-    "linters-settings": {
-        "govet": {
-            "disable": [
-                "shadow"
+            "gofmt",
+            "goimports"
+        ],
+        "exclusions": {
+            "generated": "lax",
+            "paths": [
+                "vendor",
+                "tests",
+                "pkg/client",
+                "pkg/generated",
+                "third_party$",
+                "builtin$",
+                "examples$"
             ]
         },
-        "revive": {
+        "settings": {
+            "gofmt": {
+                "simplify": false
+            }
+        }
+    },
+    "linters": {
+        "default": "none",
+        "enable": [
+            "govet",
+            "ineffassign",
+            "misspell",
+            "revive"
+        ],
+        "exclusions": {
+            "generated": "lax",
+            "paths": [
+                "vendor",
+                "tests",
+                "pkg/client",
+                "pkg/generated",
+                "third_party$",
+                "builtin$",
+                "examples$"
+            ],
+            "presets": [
+                "comments",
+                "common-false-positives",
+                "legacy",
+                "std-error-handling"
+            ],
             "rules": [
                 {
-                    "name": "confusing-naming",
-                    "disabled": true
+                    "linters": [
+                        "govet"
+                    ],
+                    "text": "^(nilness|structtag)"
+                },
+                {
+                    "path": "pkg/apis/management.cattle.io/v3/globaldns_types.go",
+                    "text": ".*lobalDns.*"
+                },
+                {
+                    "path": "pkg/apis/management.cattle.io/v3/zz_generated_register.go",
+                    "text": ".*lobalDns.*"
+                },
+                {
+                    "path": "pkg/apis/management.cattle.io/v3/zz_generated_list_types.go",
+                    "text": ".*lobalDns.*"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "should have comment"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "should be of the form"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "by other packages, and that stutters"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "unused-parameter"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "redefines-builtin-id"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "superfluous-else"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "empty-block"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "if-return: redundant if"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "var-naming: avoid meaningless package names"
                 }
             ]
         }
     },
     "run": {
-        "tests": false,
-        "timeout": "10m"
+        "tests": false
     },
-    "issues": {
-        "exclude-dirs": [
-            "pkg/generated"
-        ]
-    }
+    "version": "2"
 }

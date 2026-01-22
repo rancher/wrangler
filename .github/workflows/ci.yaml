@@ -17,12 +17,39 @@ jobs:
         - amd64
         - arm64
     runs-on: org-${{ github.repository_owner_id }}-${{ matrix.arch }}-k8s
-    container: registry.suse.com/bci/golang:1.24
+    container: registry.suse.com/bci/golang:1.25
     steps:
     - name : Checkout repository
       # https://github.com/actions/checkout/releases/tag/v4.1.1
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
     - name : Install mockgen
-      run: go install -v -x go.uber.org/mock/mockgen@v0.5.0
+      run: go install -v -x go.uber.org/mock/mockgen@v0.6.0
     - name : Run CI
       run: bash scripts/ci
+  golangci:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    env:
+      SETUP_GO_VERSION: '^1.25'
+      GOLANG_CI_LINT_VERSION: v2.7.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          submodules: recursive
+
+      - name: Setup Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        with:
+          go-version: ${{ env.SETUP_GO_VERSION }}
+
+      - name: Generate Golang
+        run: |
+          export PATH=$PATH:/home/runner/go/bin/
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: ${{ env.GOLANG_CI_LINT_VERSION }}
+
