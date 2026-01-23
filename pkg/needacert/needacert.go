@@ -14,6 +14,7 @@ import (
 	apiextcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/gvk"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/rancher/wrangler/v3/pkg/slice"
 	"github.com/sirupsen/logrus"
 	adminregv1 "k8s.io/api/admissionregistration/v1"
@@ -34,6 +35,7 @@ var (
 
 const (
 	byServiceIndex = "byService"
+	bySecretIndex  = "bySecret"
 )
 
 func Register(ctx context.Context,
@@ -45,6 +47,7 @@ func Register(ctx context.Context,
 	h := handler{
 		secretsCache:       secrets.Cache(),
 		secrets:            secrets,
+		services:           service,
 		serviceCache:       service.Cache(),
 		mutatingWebHooks:   mutatingController,
 		validatingWebHooks: validatingController,
@@ -55,10 +58,42 @@ func Register(ctx context.Context,
 	validatingController.Cache().AddIndexer(byServiceIndex, validatingWebhookServices)
 	crdController.Cache().AddIndexer(byServiceIndex, crdWebhookServices)
 
+	service.Cache().AddIndexer(bySecretIndex, serviceSecret)
+
 	mutatingController.OnChange(ctx, "need-a-cert", h.OnMutationWebhookChange)
 	validatingController.OnChange(ctx, "need-a-cert", h.OnValidatingWebhookChange)
 	crdController.OnChange(ctx, "need-a-cert", h.OnCRDChange)
 	service.OnChange(ctx, "need-a-cert", h.OnService)
+
+	relatedresource.Watch(ctx, "resolve-service-from-secret", h.resolveServiceFromSecret, service, secrets)
+
+}
+
+func (h *handler) resolveServiceFromSecret(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if _, ok := obj.(*corev1.Secret); !ok {
+		return nil, nil
+	}
+
+	services, err := h.serviceCache.GetByIndex(bySecretIndex, namespace+"/"+name)
+	if err != nil {
+		return nil, err
+	}
+
+	var result []relatedresource.Key
+	for _, service := range services {
+		result = append(result, relatedresource.NewKey(service.GetNamespace(), service.GetName()))
+	}
+	return result, nil
+}
+
+func serviceSecret(obj *corev1.Service) ([]string, error) {
+	secretName := obj.Annotations[SecretAnnotation]
+	if secretName == "" {
+		return nil, nil
+	}
+	return []string{
+		obj.Namespace + "/" + secretName,
+	}, nil
 }
 
 type handler struct {
@@ -66,6 +101,7 @@ type handler struct {
 	secretsCache       corecontrollers.SecretCache
 	secrets            corecontrollers.SecretClient
 	serviceCache       corecontrollers.ServiceCache
+	services           corecontrollers.ServiceController
 	mutatingWebHooks   admissionregcontrollers.MutatingWebhookConfigurationController
 	validatingWebHooks admissionregcontrollers.ValidatingWebhookConfigurationController
 	crds               apiextcontrollers.CustomResourceDefinitionController
@@ -290,34 +326,42 @@ func (h *handler) generateSecret(service *corev1.Service) (*corev1.Secret, error
 		if err != nil {
 			return nil, err
 		}
-		created, err := h.secrets.Create(newSecret)
+		secret, err = h.secrets.Create(newSecret)
 		if apierror.IsAlreadyExists(err) {
-			return h.secrets.Get(service.Namespace, secretName, metav1.GetOptions{})
+			secret, err = h.secrets.Get(service.Namespace, secretName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+		} else if err != nil {
+			return nil, err
 		}
-		return created, err
 	} else if err != nil {
 		return nil, err
 	}
 
-	if updated, err := h.updateSecret(service, secret, dnsNames); err != nil {
-		return nil, err
+	cert, parseErr := parseCert(secret)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	updated, updateErr := h.updateSecret(service, secret, dnsNames, cert)
+	if updateErr != nil {
+		return nil, updateErr
 	} else if updated != nil {
-		return h.secrets.Update(updated)
+		secret, err = h.secrets.Update(updated)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := h.scheduleNextCertCheck(service, secret); err != nil {
+		return nil, fmt.Errorf("failed to schedule next cert check: %w", err)
 	}
 
 	return secret, nil
 }
 
-func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsNames []string) (*corev1.Secret, error) {
-	tlsCert, err := tls.X509KeyPair(secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey])
-	if err != nil || len(tlsCert.Certificate) == 0 {
-		return nil, err
-	}
-
-	cert, err := x509.ParseCertificate(tlsCert.Certificate[0])
-	if err != nil {
-		return nil, err
-	}
+func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsNames []string, cert *x509.Certificate) (*corev1.Secret, error) {
 	logrus.Debugf("checking cert %s for %s/%s", cert.Subject.CommonName, secret.Namespace, secret.Name)
 	if time.Now().Add(24*60*time.Hour).After(cert.NotAfter) ||
 		len(cert.DNSNames) == 0 ||
@@ -334,6 +378,26 @@ func (h *handler) updateSecret(owner runtime.Object, secret *corev1.Secret, dnsN
 	logrus.Debugf("cert %s for %s/%s is valid until %s and covers %v", cert.Subject.CommonName, secret.Namespace, secret.Name, cert.NotAfter, cert.DNSNames)
 
 	return nil, nil
+}
+
+func (h *handler) scheduleNextCertCheck(obj metav1.Object, secret *corev1.Secret) error {
+	cert, err := parseCert(secret)
+	if err != nil {
+		return fmt.Errorf("cannot parse certificate: %w", err)
+	}
+
+	renewBefore := 24 * 60 * time.Hour
+	nextCheck := time.Until(cert.NotAfter.Add(-renewBefore))
+
+	if nextCheck < time.Minute {
+		nextCheck = time.Minute
+	}
+
+	logrus.Debugf("Next cert check for %s/%s scheduled in %v (expires %v)",
+		obj.GetNamespace(), obj.GetName(), nextCheck.Round(time.Second), cert.NotAfter)
+
+	h.services.EnqueueAfter(obj.GetNamespace(), obj.GetName(), nextCheck)
+	return nil
 }
 
 func (h *handler) createSecret(owner runtime.Object, ns, name string, dnsNames []string) (*corev1.Secret, error) {
@@ -371,4 +435,22 @@ func (h *handler) createSecret(owner runtime.Object, ns, name string, dnsNames [
 		},
 		Type: corev1.SecretTypeTLS,
 	}, nil
+}
+
+func parseCert(secret *corev1.Secret) (*x509.Certificate, error) {
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("secret or secret.Data is nil")
+	}
+
+	tlsPair, err := tls.X509KeyPair(secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey])
+	if err != nil || len(tlsPair.Certificate) == 0 {
+		return nil, fmt.Errorf("failed to load TLS keypair: %w", err)
+	}
+
+	cert, err := x509.ParseCertificate(tlsPair.Certificate[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse X509 certificate: %w", err)
+	}
+
+	return cert, nil
 }
