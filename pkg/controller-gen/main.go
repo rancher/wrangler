@@ -299,6 +299,7 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 	openAPIArgs.OutputFile = "zz_generated_openapi.go"
 	openAPIArgs.OutputPkg = customArgs.Options.OutputPackage + "/openapi"
 	openAPIArgs.GoHeaderFile = customArgs.Options.Boilerplate
+	openAPIArgs.OutputModelNameFile = "zz_generated.model_name.go"
 
 	if err := openAPIArgs.Validate(); err != nil {
 		return err
@@ -313,15 +314,17 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		if !groups[gv.Group] {
 			continue
 		}
+		group := customArgs.Options.Groups[gv.Group]
 
 		if _, found := inputDirsMap[names[0].Package]; !found {
 			inputDirsMap[names[0].Package] = true
 			inputDirs = append(inputDirs, names[0].Package)
-			inputModelDirsMap[names[0].Package] = true
-			inputModelDirs = append(inputModelDirs, names[0].Package)
+			if group.OpenAPIModelPackageName != "" {
+				inputModelDirsMap[names[0].Package] = true
+				inputModelDirs = append(inputModelDirs, names[0].Package)
+			}
 		}
 
-		group := customArgs.Options.Groups[gv.Group]
 		for _, dep := range group.OpenAPIDependencies {
 			if _, found := inputDirsMap[dep]; !found {
 				inputDirsMap[dep] = true
@@ -330,8 +333,13 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		}
 	}
 
+	boilerplate, err := gengo.GoBoilerplate(openAPIArgs.GoHeaderFile, gengo.StdBuildTag, gengo.StdGeneratedBy)
+	if err != nil {
+		return err
+	}
+
 	getTargets := func(context *generator.Context) []generator.Target {
-		return oa.GetOpenAPITargets(context, openAPIArgs, []byte(customArgs.Options.Boilerplate))
+		return oa.GetOpenAPITargets(context, openAPIArgs, []byte(boilerplate))
 	}
 
 	if err := gengo.Execute(
@@ -344,11 +352,18 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		return err
 	}
 
-	openAPIArgs.OutputModelNameFile = "zz_generated_model.go"
+	if len(inputModelDirs) <= 0 {
+		return nil
+	}
+
+	getModelNameTargets := func(context *generator.Context) []generator.Target {
+		return oa.GetModelNameTargets(context, openAPIArgs, []byte(boilerplate))
+	}
+
 	return gengo.Execute(
 		oa.NameSystems(),
 		oa.DefaultNameSystem(),
-		getTargets,
+		getModelNameTargets,
 		gengo.StdBuildTag,
 		inputModelDirs,
 	)
