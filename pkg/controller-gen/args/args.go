@@ -15,8 +15,6 @@ type CustomArgs struct {
 	// BoilerplateContent is the actual boilerplate content that has been
 	// read. It will be added to every generated files.
 	BoilerplateContent []byte
-	// Open API model package name
-	OpenAPIModelPackageName string
 }
 
 type Options struct {
