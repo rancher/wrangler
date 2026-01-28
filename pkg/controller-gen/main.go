@@ -339,7 +339,7 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 	}
 
 	getTargets := func(context *generator.Context) []generator.Target {
-		return oa.GetOpenAPITargets(context, openAPIArgs, []byte(boilerplate))
+		return oa.GetOpenAPITargets(context, openAPIArgs, boilerplate)
 	}
 
 	if err := gengo.Execute(
@@ -357,7 +357,7 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 	}
 
 	getModelNameTargets := func(context *generator.Context) []generator.Target {
-		return oa.GetModelNameTargets(context, openAPIArgs, []byte(boilerplate))
+		return oa.GetModelNameTargets(context, openAPIArgs, boilerplate)
 	}
 
 	return gengo.Execute(
