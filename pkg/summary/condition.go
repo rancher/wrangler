@@ -14,14 +14,45 @@ func GetUnstructuredConditions(obj map[string]interface{}) []Condition {
 }
 
 func getRawConditions(obj data.Object) []data.Object {
-	statusAnn := obj.String("metadata", "annotations", "cattle.io/status")
-	if statusAnn != "" {
-		status := data.Object{}
-		if err := json.Unmarshal([]byte(statusAnn), &status); err == nil {
-			return append(obj.Slice("status", "conditions"), status.Slice("conditions")...)
-		}
+	// Extract conditions from status field
+	conditions := getStatusConditions(obj)
+
+	// Append conditions from cattle.io/status annotation
+	conditions = append(conditions, getAnnotationConditions(obj)...)
+
+	return conditions
+}
+
+// getStatusConditions extracts conditions from the status field.
+// It prioritizes deprecated CAPI v1beta1 conditions if they exist.
+func getStatusConditions(obj data.Object) []data.Object {
+	// CAPI - use the deprecated v1beta1 conditions if they exist
+	deprecatedConditions := obj.Slice("status", "deprecated", "v1beta1", "conditions")
+	if len(deprecatedConditions) > 0 {
+		return deprecatedConditions
 	}
+
 	return obj.Slice("status", "conditions")
+}
+
+// getAnnotationConditions extracts conditions from the cattle.io/status annotation.
+// Returns an empty slice if the annotation doesn't exist or cannot be parsed.
+func getAnnotationConditions(obj data.Object) []data.Object {
+	statusAnn := obj.String("metadata", "annotations", "cattle.io/status")
+	if statusAnn == "" {
+		return []data.Object{}
+	}
+
+	var status data.Object
+	if err := json.Unmarshal([]byte(statusAnn), &status); err != nil {
+		return []data.Object{}
+	}
+
+	conditions := status.Slice("conditions")
+	if conditions == nil {
+		return []data.Object{}
+	}
+	return conditions
 }
 
 func getConditions(obj data.Object) (result []Condition) {
