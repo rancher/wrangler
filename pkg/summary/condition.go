@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data"
 )
 
-const capiVersionV1beta2 = "cluster.x-k8s.io/v1beta2"
+const capiAPIVersionV1Beta2 = "cluster.x-k8s.io/v1beta2"
 
 func GetUnstructuredConditions(obj map[string]interface{}) []Condition {
 	return getConditions(obj)
@@ -32,7 +32,7 @@ func getRawConditions(obj data.Object) []data.Object {
 // getDeprecatedV1beta1Conditions returns the deprecated v1beta1 conditions for CAPI v1beta2 resources.
 // Returns nil if not a CAPI v1beta2 resource or if no deprecated conditions exist.
 func getDeprecatedV1beta1Conditions(obj data.Object) []data.Object {
-	if obj.String("apiVersion") != capiVersionV1beta2 {
+	if obj.String("apiVersion") != capiAPIVersionV1Beta2 {
 		return nil
 	}
 	return obj.Slice("status", "deprecated", "v1beta1", "conditions")
