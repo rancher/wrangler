@@ -4,9 +4,16 @@ set -e
 cd $(dirname $0)/..
 echo "Validating"
 
+if [[ ! $(command -v golangci-lint) ]]; then
+    echo Skipping validation: no golangci-lint available
+else
+    echo Running: golangci-lint
+    golangci-lint run
+fi
+
 if [[ -z $(type -p "mockgen") ]]; then
     echo "'mockgen': executable file not found in \$PATH. mockgen is needed to compelete code generation."
-    echo "Install mockgen with 'go install go.uber.org/mock/mockgen@v0.6.0'"
+    echo "Install mockgen with 'go install go.uber.org/mock/mockgen@v0.5.0'"
     exit 1
 fi
 
