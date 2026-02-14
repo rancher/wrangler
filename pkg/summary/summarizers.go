@@ -25,9 +25,10 @@ const (
 )
 
 var (
-	// True ==
-	// False == error
-	// Unknown == transitioning
+	// TransitioningUnknown maps condition types where:
+	//   - True    == condition satisfied (no error/transitioning state)
+	//   - False   == error
+	//   - Unknown == transitioning
 	TransitioningUnknown = map[string]string{
 		"Active":                      "activating",
 		"AddonDeploy":                 "provisioning",
@@ -53,7 +54,7 @@ var (
 		"Pending":                     "pending",
 		"PodScheduled":                "scheduling",
 		"Provisioned":                 "provisioning",
-		"Reconciled":                  "reconciling",
+		"Reconciled":                  "reconciling", // CAPI Machine, RKEControlPlane
 		"Refreshed":                   "refreshed",
 		"Registered":                  "registering",
 		"Removed":                     "removing",
@@ -67,6 +68,33 @@ var (
 		"AbleToScale":                 "pending",
 		"RunCompleted":                "running",
 		"Processed":                   "processed",
+		"NodeHealthy":                 reason, // CAPI Machine
+		"NodeReady":                   reason, // CAPI Machine
+	}
+
+	// TransitioningFalse maps condition types where:
+	//   - True    == condition satisfied (no error/transitioning state)
+	//   - False   == transitioning
+	//   - Unknown == error
+	TransitioningFalse = map[string]string{
+		"Completed":            "activating",
+		"Ready":                "unavailable",
+		"Available":            "updating",
+		"BootstrapConfigReady": reason,     // CAPI Machine
+		"InfrastructureReady":  reason,     // CAPI Machine
+		"MachinesReady":        "updating", // CAPI MachineDeployment, MachineSet
+	}
+
+	// TransitioningTrue maps condition types where:
+	//   - True    == transitioning
+	//   - False   == condition satisfied (no error/transitioning state)
+	//   - Unknown == error, but not explicitly handled
+	TransitioningTrue = map[string]string{
+		"Reconciling": "reconciling",
+		"ScalingUp":   reason, // CAPI Cluster, MachineDeployment, MachineSet
+		"ScalingDown": reason, // CAPI Cluster, MachineDeployment, MachineSet
+		"Deleting":    reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
+		"Paused":      reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
 	}
 
 	// For given GVK, This condition Type and this Status, indicates an error or not
@@ -99,25 +127,6 @@ var (
 			"Stalled": sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 			"Failed":  sets.New[metav1.ConditionStatus](metav1.ConditionTrue),
 		},
-	}
-
-	// True ==
-	// False == transitioning
-	// Unknown == error
-	TransitioningFalse = map[string]string{
-		"Completed":           "activating",
-		"Ready":               "unavailable",
-		"Available":           "updating",
-		"BootstrapReady":      reason,
-		"InfrastructureReady": reason,
-		"NodeHealthy":         reason,
-	}
-
-	// True == transitioning
-	// False ==
-	// Unknown == error
-	TransitioningTrue = map[string]string{
-		"Reconciling": "reconciling",
 	}
 
 	Summarizers          []Summarizer
@@ -352,21 +361,41 @@ func checkErrors(data data.Object, conditions []Condition, summary Summary) Summ
 	return summary
 }
 
-func checkTransitioning(_ data.Object, conditions []Condition, summary Summary) Summary {
+func checkTransitioning(obj data.Object, conditions []Condition, summary Summary) Summary {
+	isMachine := obj.String("kind") == "Machine" && strings.HasPrefix(obj.String("apiVersion"), "cluster.x-k8s.io/")
+	reconMsg := ""
+
 	for _, c := range conditions {
-		newState, ok := TransitioningUnknown[c.Type()]
+		mappedState, ok := TransitioningUnknown[c.Type()]
 		if !ok {
 			continue
 		}
 
-		if c.Status() == "False" {
+		// Capture Reconciled message for CAPI Machines (used at the end to override summary message).
+		if c.Type() == "Reconciled" && isMachine {
+			reconMsg = c.Message()
+		}
+
+		state := resolveConditionState(c, mappedState)
+
+		// Check data-driven overrides before applying default logic.
+		if override := findOverride(StatusOverrides, obj, c); override != nil {
+			if applyOverride(override, c, &summary, state) {
+				continue
+			}
+		}
+
+		switch c.Status() {
+		case "False":
 			summary.Error = true
-			summary.State = newState
-			summary.Message = append(summary.Message, c.Message())
-		} else if c.Status() == "Unknown" && summary.State == "" {
-			summary.Transitioning = true
-			summary.State = newState
-			summary.Message = append(summary.Message, c.Message())
+			summary.State = state
+			appendNonEmptyMessage(&summary, c.Message())
+		case "Unknown":
+			if summary.State == "" {
+				summary.Transitioning = true
+				summary.State = state
+				appendNonEmptyMessage(&summary, c.Message())
+			}
 		}
 	}
 
@@ -374,14 +403,25 @@ func checkTransitioning(_ data.Object, conditions []Condition, summary Summary) 
 		if summary.State != "" {
 			break
 		}
-		newState, ok := TransitioningTrue[c.Type()]
+
+		mappedState, ok := TransitioningTrue[c.Type()]
 		if !ok {
 			continue
 		}
+
+		state := resolveConditionState(c, mappedState)
+
+		// Check data-driven overrides before applying default logic.
+		if override := findOverride(StatusOverrides, obj, c); override != nil {
+			if applyOverride(override, c, &summary, state) {
+				continue
+			}
+		}
+
 		if c.Status() == "True" {
 			summary.Transitioning = true
-			summary.State = newState
-			summary.Message = append(summary.Message, c.Message())
+			summary.State = state
+			appendNonEmptyMessage(&summary, c.Message())
 		}
 	}
 
@@ -397,31 +437,90 @@ func checkTransitioning(_ data.Object, conditions []Condition, summary Summary) 
 			readyMessage = c.Message()
 			continue
 		}
-		newState, ok := TransitioningFalse[c.Type()]
+
+		mappedState, ok := TransitioningFalse[c.Type()]
 		if !ok {
 			continue
 		}
-		if newState == reason {
-			newState = c.Reason()
+
+		state := resolveConditionState(c, mappedState)
+
+		// Check data-driven overrides before applying default logic.
+		if override := findOverride(StatusOverrides, obj, c); override != nil {
+			if applyOverride(override, c, &summary, state) {
+				continue
+			}
 		}
-		if c.Status() == "False" {
+
+		switch c.Status() {
+		case "False":
 			summary.Transitioning = true
-			summary.State = newState
-			summary.Message = append(summary.Message, c.Message())
-		} else if c.Status() == "Unknown" {
+			summary.State = state
+			appendNonEmptyMessage(&summary, c.Message())
+		case "Unknown":
 			summary.Error = true
-			summary.State = newState
-			summary.Message = append(summary.Message, c.Message())
+			summary.State = state
+			appendNonEmptyMessage(&summary, c.Message())
 		}
 	}
 
+	// Fallback: if no state was determined but Ready is False, mark as transitioning and unavailable.
 	if summary.State == "" && !ready {
 		summary.Transitioning = true
 		summary.State = "unavailable"
-		summary.Message = append(summary.Message, readyMessage)
+		appendNonEmptyMessage(&summary, readyMessage)
+	}
+
+	// For CAPI Machines, override the message with the Reconciled condition's message
+	// (which is a summary of all conditions during provisioning).
+	if isMachine && reconMsg != "" {
+		summary.Message = []string{reconMsg}
 	}
 
 	return summary
+}
+
+// resolveConditionState computes the state string for a condition.
+// If mappedState is the special "%REASON%" placeholder, it uses the condition's reason.
+func resolveConditionState(c Condition, mappedState string) string {
+	state := mappedState
+	if state == reason {
+		state = c.Reason()
+	}
+	return state
+}
+
+// appendNonEmptyMessage appends msg to summary.Message only if msg is non-empty.
+// This prevents accumulating empty strings in the message slice.
+func appendNonEmptyMessage(summary *Summary, msg string) {
+	if msg != "" {
+		summary.Message = append(summary.Message, msg)
+	}
+}
+
+// applyOverride applies a StatusOverride to the summary. It returns true if the
+// condition should be skipped (i.e., the caller should continue to the next condition).
+// For non-skip actions, it sets the appropriate error/transitioning flag and state.
+func applyOverride(override *StatusOverride, c Condition, summary *Summary, newState string) bool {
+	switch override.Action {
+	case OverrideSkip:
+		return true
+	case OverrideTransitioning:
+		summary.Transitioning = true
+	case OverrideError:
+		summary.Error = true
+	default:
+		return false
+	}
+
+	if override.StateOverride != "" {
+		summary.State = override.StateOverride
+	} else {
+		summary.State = newState
+	}
+
+	appendNonEmptyMessage(summary, c.Message())
+	return true
 }
 
 func checkActive(obj data.Object, _ []Condition, summary Summary) Summary {
