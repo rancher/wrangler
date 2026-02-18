@@ -26,6 +26,7 @@ import (
 type MockembeddedClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockembeddedClientMockRecorder
+	isgomock struct{}
 }
 
 // MockembeddedClientMockRecorder is the mock recorder for MockembeddedClient.
@@ -71,6 +72,20 @@ func (m *MockembeddedClient) Delete(ctx context.Context, namespace, name string,
 func (mr *MockembeddedClientMockRecorder) Delete(ctx, namespace, name, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockembeddedClient)(nil).Delete), ctx, namespace, name, opts)
+}
+
+// DeleteCollection mocks base method.
+func (m *MockembeddedClient) DeleteCollection(ctx context.Context, namespace string, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCollection", ctx, namespace, opts, listOpts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCollection indicates an expected call of DeleteCollection.
+func (mr *MockembeddedClientMockRecorder) DeleteCollection(ctx, namespace, opts, listOpts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCollection", reflect.TypeOf((*MockembeddedClient)(nil).DeleteCollection), ctx, namespace, opts, listOpts)
 }
 
 // Get mocks base method.

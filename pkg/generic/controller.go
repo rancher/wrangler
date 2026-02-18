@@ -116,6 +116,10 @@ type ClientInterface[T RuntimeMetaObject, TList runtime.Object] interface {
 
 	// WithImpersonation returns a new copy of the client that uses impersonation.
 	WithImpersonation(impersonate rest.ImpersonationConfig) (ClientInterface[T, TList], error)
+
+	// DeleteCollection deletes all resources matching the ListOptions in the
+	// provided namespace.
+	DeleteCollection(namespace string, deleteOpts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 }
 
 // NonNamespacedClientInterface is an interface to performs CRUD like operations on nonNamespaced Objects.
@@ -321,6 +325,12 @@ func (c *Controller[T, TList]) Watch(namespace string, opts metav1.ListOptions) 
 func (c *Controller[T, TList]) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (T, error) {
 	result := reflect.New(c.objType).Interface().(T)
 	return result, c.embeddedClient.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
+}
+
+// DeleteCollection will delete the resources in the given namespace matching
+// the listOpts.
+func (c *Controller[T, TList]) DeleteCollection(namespace string, deleteOpts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+	return c.embeddedClient.DeleteCollection(context.TODO(), namespace, deleteOpts, listOpts)
 }
 
 // WithImpersonation returns a new copy of the client that uses impersonation.

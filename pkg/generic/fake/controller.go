@@ -29,6 +29,7 @@ import (
 type MockControllerMeta struct {
 	ctrl     *gomock.Controller
 	recorder *MockControllerMetaMockRecorder
+	isgomock struct{}
 }
 
 // MockControllerMetaMockRecorder is the mock recorder for MockControllerMeta.
@@ -118,6 +119,7 @@ func (mr *MockControllerMetaMockRecorder) Updater() *gomock.Call {
 type MockRuntimeMetaObject struct {
 	ctrl     *gomock.Controller
 	recorder *MockRuntimeMetaObjectMockRecorder
+	isgomock struct{}
 }
 
 // MockRuntimeMetaObjectMockRecorder is the mock recorder for MockRuntimeMetaObject.
@@ -559,6 +561,7 @@ func (mr *MockRuntimeMetaObjectMockRecorder) SetUID(uid any) *gomock.Call {
 type MockControllerInterface[T generic.RuntimeMetaObject, TList runtime.Object] struct {
 	ctrl     *gomock.Controller
 	recorder *MockControllerInterfaceMockRecorder[T, TList]
+	isgomock struct{}
 }
 
 // MockControllerInterfaceMockRecorder is the mock recorder for MockControllerInterface.
@@ -643,6 +646,20 @@ func (m *MockControllerInterface[T, TList]) Delete(namespace, name string, optio
 func (mr *MockControllerInterfaceMockRecorder[T, TList]) Delete(namespace, name, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).Delete), namespace, name, options)
+}
+
+// DeleteCollection mocks base method.
+func (m *MockControllerInterface[T, TList]) DeleteCollection(namespace string, deleteOpts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCollection", namespace, deleteOpts, listOpts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCollection indicates an expected call of DeleteCollection.
+func (mr *MockControllerInterfaceMockRecorder[T, TList]) DeleteCollection(namespace, deleteOpts, listOpts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCollection", reflect.TypeOf((*MockControllerInterface[T, TList])(nil).DeleteCollection), namespace, deleteOpts, listOpts)
 }
 
 // Enqueue mocks base method.
@@ -849,6 +866,7 @@ func (mr *MockControllerInterfaceMockRecorder[T, TList]) WithImpersonation(imper
 type MockNonNamespacedControllerInterface[T generic.RuntimeMetaObject, TList runtime.Object] struct {
 	ctrl     *gomock.Controller
 	recorder *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]
+	isgomock struct{}
 }
 
 // MockNonNamespacedControllerInterfaceMockRecorder is the mock recorder for MockNonNamespacedControllerInterface.
@@ -1139,6 +1157,7 @@ func (mr *MockNonNamespacedControllerInterfaceMockRecorder[T, TList]) WithImpers
 type MockClientInterface[T generic.RuntimeMetaObject, TList runtime.Object] struct {
 	ctrl     *gomock.Controller
 	recorder *MockClientInterfaceMockRecorder[T, TList]
+	isgomock struct{}
 }
 
 // MockClientInterfaceMockRecorder is the mock recorder for MockClientInterface.
@@ -1185,6 +1204,20 @@ func (m *MockClientInterface[T, TList]) Delete(namespace, name string, options *
 func (mr *MockClientInterfaceMockRecorder[T, TList]) Delete(namespace, name, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockClientInterface[T, TList])(nil).Delete), namespace, name, options)
+}
+
+// DeleteCollection mocks base method.
+func (m *MockClientInterface[T, TList]) DeleteCollection(namespace string, deleteOpts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCollection", namespace, deleteOpts, listOpts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCollection indicates an expected call of DeleteCollection.
+func (mr *MockClientInterfaceMockRecorder[T, TList]) DeleteCollection(namespace, deleteOpts, listOpts any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCollection", reflect.TypeOf((*MockClientInterface[T, TList])(nil).DeleteCollection), namespace, deleteOpts, listOpts)
 }
 
 // Get mocks base method.
@@ -1301,6 +1334,7 @@ func (mr *MockClientInterfaceMockRecorder[T, TList]) WithImpersonation(impersona
 type MockNonNamespacedClientInterface[T generic.RuntimeMetaObject, TList runtime.Object] struct {
 	ctrl     *gomock.Controller
 	recorder *MockNonNamespacedClientInterfaceMockRecorder[T, TList]
+	isgomock struct{}
 }
 
 // MockNonNamespacedClientInterfaceMockRecorder is the mock recorder for MockNonNamespacedClientInterface.

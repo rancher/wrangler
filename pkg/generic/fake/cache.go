@@ -22,6 +22,7 @@ import (
 type MockCacheInterface[T runtime.Object] struct {
 	ctrl     *gomock.Controller
 	recorder *MockCacheInterfaceMockRecorder[T]
+	isgomock struct{}
 }
 
 // MockCacheInterfaceMockRecorder is the mock recorder for MockCacheInterface.
@@ -102,6 +103,7 @@ func (mr *MockCacheInterfaceMockRecorder[T]) List(namespace, selector any) *gomo
 type MockNonNamespacedCacheInterface[T runtime.Object] struct {
 	ctrl     *gomock.Controller
 	recorder *MockNonNamespacedCacheInterfaceMockRecorder[T]
+	isgomock struct{}
 }
 
 // MockNonNamespacedCacheInterfaceMockRecorder is the mock recorder for MockNonNamespacedCacheInterface.
