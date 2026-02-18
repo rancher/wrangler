@@ -497,6 +497,9 @@ func (s *Schemas) determineSchemaType(t reflect.Type) (string, error) {
 		if t.Name() == "Time" {
 			return "date", nil
 		}
+		if t.Name() == "MicroTime" {
+			return "date", nil
+		}
 		if t.Name() == "IntOrString" {
 			return "intOrString", nil
 		}
