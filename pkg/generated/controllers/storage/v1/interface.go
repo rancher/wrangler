@@ -32,6 +32,7 @@ func init() {
 
 type Interface interface {
 	StorageClass() StorageClassController
+	VolumeAttachment() VolumeAttachmentController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -46,4 +47,8 @@ type version struct {
 
 func (v *version) StorageClass() StorageClassController {
 	return generic.NewNonNamespacedController[*v1.StorageClass, *v1.StorageClassList](schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}, "storageclasses", v.controllerFactory)
+}
+
+func (v *version) VolumeAttachment() VolumeAttachmentController {
+	return generic.NewNonNamespacedController[*v1.VolumeAttachment, *v1.VolumeAttachmentList](schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "VolumeAttachment"}, "volumeattachments", v.controllerFactory)
 }
