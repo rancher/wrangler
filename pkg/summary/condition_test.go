@@ -42,36 +42,6 @@ func TestGetRawConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "deprecated CAPI v1beta1 conditions take priority",
-			input: data.Object{
-				"apiVersion": "cluster.x-k8s.io/v1beta2",
-				"status": map[string]interface{}{
-					"conditions": []interface{}{
-						map[string]interface{}{
-							"type":   "Ready",
-							"status": "True",
-						},
-					},
-					"deprecated": map[string]interface{}{
-						"v1beta1": map[string]interface{}{
-							"conditions": []interface{}{
-								map[string]interface{}{
-									"type":   "LegacyReady",
-									"status": "True",
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: []data.Object{
-				{
-					"type":   "LegacyReady",
-					"status": "True",
-				},
-			},
-		},
-		{
 			name: "annotation conditions are appended to status conditions",
 			input: data.Object{
 				"metadata": map[string]interface{}{
@@ -100,7 +70,7 @@ func TestGetRawConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "annotation conditions with deprecated CAPI conditions",
+			name: "annotation conditions with CAPI v1beta2 standard conditions",
 			input: data.Object{
 				"apiVersion": "cluster.x-k8s.io/v1beta2",
 				"metadata": map[string]interface{}{
@@ -115,21 +85,11 @@ func TestGetRawConditions(t *testing.T) {
 							"status": "True",
 						},
 					},
-					"deprecated": map[string]interface{}{
-						"v1beta1": map[string]interface{}{
-							"conditions": []interface{}{
-								map[string]interface{}{
-									"type":   "LegacyReady",
-									"status": "True",
-								},
-							},
-						},
-					},
 				},
 			},
 			expected: []data.Object{
 				{
-					"type":   "LegacyReady",
+					"type":   "Ready",
 					"status": "True",
 				},
 				{
@@ -157,7 +117,7 @@ func TestGetRawConditions(t *testing.T) {
 		{
 			name:     "no conditions at all",
 			input:    data.Object{},
-			expected: nil,
+			expected: []data.Object{},
 		},
 		{
 			name: "invalid annotation JSON is ignored",
@@ -346,106 +306,11 @@ func TestGetAnnotationConditions(t *testing.T) {
 	}
 }
 
-func TestGetDeprecatedV1beta1Conditions(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    data.Object
-		expected []data.Object
-	}{
-		{
-			name: "returns deprecated conditions for CAPI v1beta2 resource",
-			input: data.Object{
-				"apiVersion": "cluster.x-k8s.io/v1beta2",
-				"status": map[string]interface{}{
-					"deprecated": map[string]interface{}{
-						"v1beta1": map[string]interface{}{
-							"conditions": []interface{}{
-								map[string]interface{}{
-									"type":   "LegacyReady",
-									"status": "True",
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: []data.Object{
-				{
-					"type":   "LegacyReady",
-					"status": "True",
-				},
-			},
-		},
-		{
-			name: "returns nil for non-CAPI resource",
-			input: data.Object{
-				"apiVersion": "apps/v1",
-				"status": map[string]interface{}{
-					"deprecated": map[string]interface{}{
-						"v1beta1": map[string]interface{}{
-							"conditions": []interface{}{
-								map[string]interface{}{
-									"type":   "Ready",
-									"status": "True",
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: nil,
-		},
-		{
-			name: "returns nil for CAPI v1beta1 resource",
-			input: data.Object{
-				"apiVersion": "cluster.x-k8s.io/v1beta1",
-				"status": map[string]interface{}{
-					"conditions": []interface{}{
-						map[string]interface{}{
-							"type":   "Ready",
-							"status": "True",
-						},
-					},
-				},
-			},
-			expected: nil,
-		},
-		{
-			name: "returns nil when CAPI v1beta2 has no deprecated conditions",
-			input: data.Object{
-				"apiVersion": "cluster.x-k8s.io/v1beta2",
-				"status": map[string]interface{}{
-					"conditions": []interface{}{
-						map[string]interface{}{
-							"type":   "Ready",
-							"status": "True",
-						},
-					},
-				},
-			},
-			expected: nil,
-		},
-		{
-			name:     "returns nil for empty object",
-			input:    data.Object{},
-			expected: nil,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := getDeprecatedV1beta1Conditions(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestNormalizeConditions(t *testing.T) {
 	tests := []struct {
-		name                         string
-		input                        *unstructured.Unstructured
-		expectedStatusConditions     []interface{}
-		expectedDeprecatedConditions []interface{}
+		name                     string
+		input                    *unstructured.Unstructured
+		expectedStatusConditions []interface{}
 	}{
 		{
 			name: "normalizes standard status conditions",
@@ -474,43 +339,9 @@ func TestNormalizeConditions(t *testing.T) {
 					"transitioning":      false,
 				},
 			},
-			expectedDeprecatedConditions: nil,
 		},
 		{
-			name: "normalizes CAPI v1beta2 deprecated conditions only when they exist",
-			input: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "cluster.x-k8s.io/v1beta2",
-					"kind":       "Cluster",
-					"status": map[string]interface{}{
-						"deprecated": map[string]interface{}{
-							"v1beta1": map[string]interface{}{
-								"conditions": []interface{}{
-									map[string]interface{}{
-										"type":               "Ready",
-										"status":             "True",
-										"lastTransitionTime": "2024-01-01T00:00:00Z",
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedStatusConditions: nil,
-			expectedDeprecatedConditions: []interface{}{
-				map[string]interface{}{
-					"type":               "Ready",
-					"status":             "True",
-					"lastTransitionTime": "2024-01-01T00:00:00Z",
-					"lastUpdateTime":     "2024-01-01T00:00:00Z",
-					"error":              false,
-					"transitioning":      false,
-				},
-			},
-		},
-		{
-			name: "normalizes both CAPI v1beta2 deprecated and standard conditions",
+			name: "normalizes CAPI v1beta2 standard conditions",
 			input: &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "cluster.x-k8s.io/v1beta2",
@@ -523,17 +354,6 @@ func TestNormalizeConditions(t *testing.T) {
 								"lastTransitionTime": "2024-01-02T00:00:00Z",
 							},
 						},
-						"deprecated": map[string]interface{}{
-							"v1beta1": map[string]interface{}{
-								"conditions": []interface{}{
-									map[string]interface{}{
-										"type":               "Ready",
-										"status":             "True",
-										"lastTransitionTime": "2024-01-01T00:00:00Z",
-									},
-								},
-							},
-						},
 					},
 				},
 			},
@@ -543,16 +363,6 @@ func TestNormalizeConditions(t *testing.T) {
 					"status":             "True",
 					"lastTransitionTime": "2024-01-02T00:00:00Z",
 					"lastUpdateTime":     "2024-01-02T00:00:00Z",
-					"error":              false,
-					"transitioning":      false,
-				},
-			},
-			expectedDeprecatedConditions: []interface{}{
-				map[string]interface{}{
-					"type":               "Ready",
-					"status":             "True",
-					"lastTransitionTime": "2024-01-01T00:00:00Z",
-					"lastUpdateTime":     "2024-01-01T00:00:00Z",
 					"error":              false,
 					"transitioning":      false,
 				},
@@ -586,7 +396,6 @@ func TestNormalizeConditions(t *testing.T) {
 					"transitioning":      false,
 				},
 			},
-			expectedDeprecatedConditions: nil,
 		},
 		{
 			name: "handles empty status",
@@ -596,8 +405,7 @@ func TestNormalizeConditions(t *testing.T) {
 					"kind":       "Deployment",
 				},
 			},
-			expectedStatusConditions:     nil,
-			expectedDeprecatedConditions: nil,
+			expectedStatusConditions: nil,
 		},
 		{
 			name: "sets transitioning for False status condition",
@@ -630,7 +438,6 @@ func TestNormalizeConditions(t *testing.T) {
 					"transitioning":      true,
 				},
 			},
-			expectedDeprecatedConditions: nil,
 		},
 	}
 
@@ -638,24 +445,12 @@ func TestNormalizeConditions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			NormalizeConditions(tt.input)
 
-			obj := data.Object(tt.input.Object)
-
 			// Check standard status conditions
 			statusConditions, _, _ := unstructured.NestedSlice(tt.input.Object, "status", "conditions")
 			if tt.expectedStatusConditions == nil {
 				assert.Nil(t, statusConditions)
 			} else {
 				assert.Equal(t, tt.expectedStatusConditions, statusConditions)
-			}
-
-			// Check deprecated v1beta1 conditions
-			if obj.String("apiVersion") == "cluster.x-k8s.io/v1beta2" {
-				deprecatedConditions, _, _ := unstructured.NestedSlice(tt.input.Object, "status", "deprecated", "v1beta1", "conditions")
-				if tt.expectedDeprecatedConditions == nil {
-					assert.Nil(t, deprecatedConditions)
-				} else {
-					assert.Equal(t, tt.expectedDeprecatedConditions, deprecatedConditions)
-				}
 			}
 		})
 	}
