@@ -9,33 +9,23 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data"
 )
 
-const capiAPIVersionV1Beta2 = "cluster.x-k8s.io/v1beta2"
-
 func GetUnstructuredConditions(obj map[string]interface{}) []Condition {
 	return getConditions(obj)
 }
 
 func getRawConditions(obj data.Object) []data.Object {
-	// For CAPI v1beta2 resources, use the deprecated v1beta1 conditions if they exist
-	// Otherwise, use standard status.conditions
-	conditions := getDeprecatedV1beta1Conditions(obj)
-	if len(conditions) == 0 {
-		conditions = obj.Slice("status", "conditions")
+	result := make([]data.Object, 0)
+	conditions := obj.Slice("status", "conditions")
+	if len(conditions) != 0 {
+		result = append(result, conditions...)
 	}
 
-	// Append conditions from cattle.io/status annotation
-	conditions = append(conditions, getAnnotationConditions(obj)...)
-
-	return conditions
-}
-
-// getDeprecatedV1beta1Conditions returns the deprecated v1beta1 conditions for CAPI v1beta2 resources.
-// Returns nil if not a CAPI v1beta2 resource or if no deprecated conditions exist.
-func getDeprecatedV1beta1Conditions(obj data.Object) []data.Object {
-	if obj.String("apiVersion") != capiAPIVersionV1Beta2 {
-		return nil
+	annoConditions := getAnnotationConditions(obj)
+	if len(annoConditions) != 0 {
+		result = append(result, annoConditions...)
 	}
-	return obj.Slice("status", "deprecated", "v1beta1", "conditions")
+
+	return result
 }
 
 // getAnnotationConditions extracts conditions from the cattle.io/status annotation.
@@ -115,12 +105,6 @@ func NormalizeConditions(runtimeObj runtime.Object) {
 
 	obj := data.Object(unstr.Object)
 
-	// For CAPI v1beta2 resources, normalize the deprecated v1beta1 conditions if they exist
-	if deprecatedConditions := getDeprecatedV1beta1Conditions(obj); len(deprecatedConditions) > 0 {
-		normalizeAndSetConditions(obj, deprecatedConditions, "status", "deprecated", "v1beta1", "conditions")
-	}
-
-	// For all resources, normalize the standard status.conditions
 	if conditions := obj.Slice("status", "conditions"); len(conditions) > 0 {
 		normalizeAndSetConditions(obj, conditions, "status", "conditions")
 	}
