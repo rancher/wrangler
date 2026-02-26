@@ -53,7 +53,7 @@ var (
 		"Pending":                     "pending",
 		"PodScheduled":                "scheduling",
 		"Provisioned":                 "provisioning",
-		"Reconciled":                  "reconciling",
+		"Reconciled":                  "reconciling", // CAPI Machine, RKEControlPlane
 		"Refreshed":                   "refreshed",
 		"Registered":                  "registering",
 		"Removed":                     "removing",
@@ -67,6 +67,8 @@ var (
 		"AbleToScale":                 "pending",
 		"RunCompleted":                "running",
 		"Processed":                   "processed",
+		"NodeHealthy":                 reason, // CAPI Machine
+		"NodeReady":                   reason, // CAPI Machine
 	}
 
 	// For given GVK, This condition Type and this Status, indicates an error or not
@@ -105,12 +107,12 @@ var (
 	// False == transitioning
 	// Unknown == error
 	TransitioningFalse = map[string]string{
-		"Completed":           "activating",
-		"Ready":               "unavailable",
-		"Available":           "updating",
-		"BootstrapReady":      reason,
-		"InfrastructureReady": reason,
-		"NodeHealthy":         reason,
+		"Completed":            "activating",
+		"Ready":                "unavailable",
+		"Available":            "updating",
+		"BootstrapConfigReady": reason,     // CAPI Machine
+		"InfrastructureReady":  reason,     // CAPI Machine
+		"MachinesReady":        "updating", // CAPI MachineDeployment, MachineSet
 	}
 
 	// True == transitioning
@@ -118,6 +120,10 @@ var (
 	// Unknown == error
 	TransitioningTrue = map[string]string{
 		"Reconciling": "reconciling",
+		"ScalingUp":   reason, // CAPI Cluster, MachineDeployment, MachineSet
+		"ScalingDown": reason, // CAPI Cluster, MachineDeployment, MachineSet
+		"Deleting":    reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
+		"Paused":      reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
 	}
 
 	Summarizers          []Summarizer
