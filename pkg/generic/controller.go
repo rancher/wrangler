@@ -415,3 +415,8 @@ func (c *NonNamespacedController[T, TList]) WithImpersonation(impersonate rest.I
 func (c *NonNamespacedController[T, TList]) Cache() NonNamespacedCacheInterface[T] {
 	return NewNonNamespacedCache[T](c.Informer().GetIndexer(), c.groupResource)
 }
+
+// DeleteCollection will delete the resources matching the listOpts.
+func (c *NonNamespacedController[T, TList]) DeleteCollection(deleteOpts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+	return c.Controller.DeleteCollection(metav1.NamespaceAll, deleteOpts, listOpts)
+}
