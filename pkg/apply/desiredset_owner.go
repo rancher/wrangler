@@ -1,6 +1,7 @@
 package apply
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,6 @@ import (
 
 	"github.com/rancher/wrangler/v3/pkg/kv"
 
-	"github.com/pkg/errors"
 	namer "github.com/rancher/wrangler/v3/pkg/name"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
