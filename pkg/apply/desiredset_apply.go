@@ -3,6 +3,7 @@ package apply
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,7 +12,6 @@ import (
 
 	gvk2 "github.com/rancher/wrangler/v3/pkg/gvk"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/wrangler/v3/pkg/apply/injectors"
 	"github.com/rancher/wrangler/v3/pkg/objectset"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -236,7 +236,7 @@ func (o *desiredSet) injectLabelsAndAnnotations(labels, annotations map[string]s
 			obj = obj.DeepCopyObject()
 			meta, err := meta.Accessor(obj)
 			if err != nil {
-				return nil, errors.Wrapf(err, "failed to get metadata for %s", key)
+				return nil, fmt.Errorf("failed to get metadata for %s: %w", key, err)
 			}
 
 			setLabels(meta, labels)

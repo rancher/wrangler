@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"fmt"
 	"io/ioutil"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
 	data2 "github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/rancher/wrangler/v3/pkg/objectset"
@@ -191,7 +191,7 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 
 	patchType, patch, err := doPatch(gvk, original, modified, current, diffPatches)
 	if err != nil {
-		return false, errors.Wrap(err, "patch generation")
+		return false, fmt.Errorf("patch generation: %w", err)
 	}
 
 	if string(patch) == "{}" {
