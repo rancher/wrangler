@@ -68,8 +68,8 @@ var (
 		"AbleToScale":                 "pending",
 		"RunCompleted":                "running",
 		"Processed":                   "processed",
-		// "NodeHealthy":                 reason, // CAPI Machine
-		// "NodeReady":                   reason, // CAPI Machine
+		"NodeHealthy":                 reason, // CAPI Machine
+		"NodeReady":                   reason, // CAPI Machine
 	}
 
 	// For given GVK, This condition Type and this Status, indicates an error or not
@@ -108,12 +108,12 @@ var (
 	// False == transitioning
 	// Unknown == error
 	TransitioningFalse = map[string]string{
-		"Completed": "activating",
-		"Ready":     "unavailable",
-		"Available": "updating",
-		// "BootstrapConfigReady": reason,     // CAPI Machine
-		// "InfrastructureReady":  reason,     // CAPI Machine
-		// "MachinesReady":        "updating", // CAPI MachineDeployment, MachineSet
+		"Completed":            "activating",
+		"Ready":                "unavailable",
+		"Available":            "updating",
+		"BootstrapConfigReady": reason,     // CAPI Machine
+		"InfrastructureReady":  reason,     // CAPI Machine
+		"MachinesReady":        "updating", // CAPI MachineDeployment, MachineSet
 	}
 
 	// True == transitioning
@@ -121,10 +121,10 @@ var (
 	// Unknown == error
 	TransitioningTrue = map[string]string{
 		"Reconciling": "reconciling",
-		// "ScalingUp":   reason, // CAPI Cluster, MachineDeployment, MachineSet
-		// "ScalingDown": reason, // CAPI Cluster, MachineDeployment, MachineSet
-		// "Deleting":    reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
-		// "Paused":      reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
+		"ScalingUp":   reason, // CAPI Cluster, MachineDeployment, MachineSet
+		"ScalingDown": reason, // CAPI Cluster, MachineDeployment, MachineSet
+		"Deleting":    reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
+		"Paused":      reason, // CAPI Cluster, MachineDeployment, MachineSet, Machine
 	}
 
 	Summarizers          []Summarizer
@@ -136,7 +136,7 @@ type Summarizer func(obj data.Object, conditions []Condition, summary Summary) S
 func init() {
 	ConditionSummarizers = []Summarizer{
 		checkErrors,
-		checkTransitioning,
+		checkGenericTransitioning,
 		checkRemoving,
 		checkCattleReady,
 	}
@@ -449,7 +449,7 @@ func checkCAPIMachineTransitioning(conditions []Condition, summary Summary) Summ
 		switch ready.Status() {
 		case "False":
 			// Parse the first bullet line to determine the state.
-			detail, prefix := parseReadyFirstBullet(ready.Message())
+			detail, prefix := parseMessage(ready.Message())
 			switch prefix {
 			case "BootstrapConfigReady":
 				summary.Transitioning = true
@@ -476,7 +476,7 @@ func checkCAPIMachineTransitioning(conditions []Condition, summary Summary) Summ
 		case "Unknown":
 			summary.Transitioning = true
 			summary.State = "reconciling"
-			detail, prefix := parseReadyFirstBullet(ready.Message())
+			detail, prefix := parseMessage(ready.Message())
 			if prefix == "NodeHealthy" {
 				if strings.HasSuffix(detail, "to report spec.providerID") {
 					detail = ""
@@ -664,7 +664,7 @@ func checkCAPIClusterTransitioning(obj data.Object, conditions []Condition, summ
 			summary.Transitioning = true
 			summary.State = "updating"
 			// Parse the first bullet line to determine the state.
-			detail, prefix := parseReadyFirstBullet(available.Message())
+			detail, prefix := parseMessage(available.Message())
 			switch prefix {
 			case "RemoteConnectionProbe":
 				summary.Message = append(summary.Message, "establishing connection to control plane")
@@ -698,6 +698,10 @@ func checkGenericTransitioning(_ data.Object, conditions []Condition, summary Su
 			continue
 		}
 
+		if newState == reason {
+			newState = c.Reason()
+		}
+
 		if c.Status() == "False" {
 			summary.Error = true
 			summary.State = newState
@@ -717,6 +721,11 @@ func checkGenericTransitioning(_ data.Object, conditions []Condition, summary Su
 		if !ok {
 			continue
 		}
+
+		if newState == reason {
+			newState = c.Reason()
+		}
+
 		if c.Status() == "True" {
 			summary.Transitioning = true
 			summary.State = newState
@@ -951,8 +960,8 @@ func isCAPICluster(obj data.Object) bool {
 		obj.String("kind") == "Cluster"
 }
 
-// parseReadyFirstBullet parses the first bullet line from a Ready condition
-// message. The Ready condition message format is:
+// parseMessage parses the first bullet line from a condition message.
+// The condition message format is:
 //
 //	\* <ConditionType>: <detail message>
 //	\* <ConditionType>: <detail message>
@@ -963,15 +972,11 @@ func isCAPICluster(obj data.Object) bool {
 //	  \* <SubCondition>: <detail message>
 //
 // Multiple lines are separated by newlines. This function returns:
-//   - detail: the stripped detail text (without "* " prefix and "ConditionType: "
-//     prefix). When the top-level bullet has no inline detail, the detail from
+//   - detail: the stripped detail text (without "* ConditionType: " prefix).
+//     When the top-level bullet has no inline detail, the detail from
 //     the first indented sub-bullet is returned instead.
-//   - prefix: the condition type name from the first bullet (e.g., "InfrastructureReady")
-//
-// if the message is empty, then the function returns empty strings for both detail and prefix.
-// if the message does not match the expected format, then the function returns the message
-// as the detail and an empty string as the prefix.
-func parseReadyFirstBullet(message string) (detail, prefix string) {
+//   - prefix: the condition type name from the top-level bullet.
+func parseMessage(message string) (detail, prefix string) {
 	if message == "" {
 		return "", ""
 	}

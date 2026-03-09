@@ -503,3 +503,58 @@ func TestIsCAPIMachineDeployment(t *testing.T) {
 		})
 	}
 }
+
+// TestCheckTransitioning_CAPIMachineDeploymentDispatch verifies that
+// checkTransitioning dispatches CAPI MachineDeployment objects to
+// checkCAPIMachineSetAndDeploymentTransitioning and that the replica-field
+// paths behave correctly for deployments (not just MachineSets).
+func TestCheckTransitioning_CAPIMachineDeploymentDispatch(t *testing.T) {
+	// A MachineDeployment scaling up: spec.replicas=3, status.readyReplicas=1.
+	// Even with ScalingUp=False (stale condition), the replica mismatch
+	// should be detected via the CAPI handler.
+	scalingObj := data.Object{
+		"apiVersion": "cluster.x-k8s.io/v1beta2",
+		"kind":       "MachineDeployment",
+		"spec": map[string]interface{}{
+			"replicas": int64(3),
+		},
+		"status": map[string]interface{}{
+			"replicas":      int64(3),
+			"readyReplicas": int64(1),
+		},
+	}
+	conditions := []Condition{
+		NewCondition("Deleting", "False", "NotDeleting", ""),
+		NewCondition("Paused", "False", "NotPaused", ""),
+		NewCondition("ScalingDown", "False", "NotScalingDown", ""),
+		NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+	}
+	result := checkTransitioning(scalingObj, conditions, Summary{})
+	assert.Equal(t, "scalingup", result.State)
+	assert.True(t, result.Transitioning)
+	assert.Equal(t, []string{"Scaling up from 1 to 3 replicas, waiting for machines to be ready"}, result.Message)
+
+	// A MachineDeployment in steady state: all replicas match.
+	steadyObj := data.Object{
+		"apiVersion": "cluster.x-k8s.io/v1beta2",
+		"kind":       "MachineDeployment",
+		"spec": map[string]interface{}{
+			"replicas": int64(2),
+		},
+		"status": map[string]interface{}{
+			"replicas":      int64(2),
+			"readyReplicas": int64(2),
+		},
+	}
+	steadyConditions := []Condition{
+		NewCondition("Deleting", "False", "NotDeleting", ""),
+		NewCondition("Paused", "False", "NotPaused", ""),
+		NewCondition("ScalingDown", "False", "NotScalingDown", ""),
+		NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+		NewCondition("MachinesReady", "True", "Ready", ""),
+	}
+	steadyResult := checkTransitioning(steadyObj, steadyConditions, Summary{})
+	assert.Empty(t, steadyResult.State, "steady-state MachineDeployment should pass through")
+	assert.False(t, steadyResult.Transitioning)
+	assert.False(t, steadyResult.Error)
+}

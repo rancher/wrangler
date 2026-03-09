@@ -67,7 +67,7 @@ func TestIsCAPIMachine(t *testing.T) {
 	}
 }
 
-func TestParseReadyFirstBullet(t *testing.T) {
+func TestParseMessage(t *testing.T) {
 	tests := []struct {
 		name           string
 		message        string
@@ -156,7 +156,7 @@ func TestParseReadyFirstBullet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			detail, prefix := parseReadyFirstBullet(tt.message)
+			detail, prefix := parseMessage(tt.message)
 			assert.Equal(t, tt.expectedDetail, detail)
 			assert.Equal(t, tt.expectedPrefix, prefix)
 		})
