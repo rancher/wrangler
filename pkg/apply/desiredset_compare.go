@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"fmt"
-  "io"
+	"io"
 	"io/ioutil"
 	"strings"
 	"sync"
