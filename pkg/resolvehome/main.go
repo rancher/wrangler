@@ -1,10 +1,9 @@
 package resolvehome
 
 import (
+	"fmt"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 var (
@@ -16,7 +15,7 @@ func Resolve(s string) (string, error) {
 		if strings.Contains(s, home) {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
-				return "", errors.Wrap(err, "determining current user")
+				return "", fmt.Errorf("determining current user: %w", err)
 			}
 			s = strings.Replace(s, home, homeDir, -1)
 		}
