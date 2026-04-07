@@ -13,7 +13,7 @@ fi
 
 if [[ -z $(type -p "mockgen") ]]; then
     echo "'mockgen': executable file not found in \$PATH. mockgen is needed to compelete code generation."
-    echo "Install mockgen with 'go install go.uber.org/mock/mockgen@v0.5.0'"
+    echo "Install mockgen with 'go install go.uber.org/mock/mockgen@a9c44d91ce00ef09603d3822452a4f9c8fefd278'"
     exit 1
 fi
 

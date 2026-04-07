@@ -23,6 +23,7 @@ jobs:
       # https://github.com/actions/checkout/releases/tag/v4.1.1
       uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
     - name : Install mockgen
-      run: go install -v -x go.uber.org/mock/mockgen@v0.5.0
+      # renovate: datasource=github-releases depName=uber-go/mock
+      run: go install go.uber.org/mock/mockgen@a9c44d91ce00ef09603d3822452a4f9c8fefd278
     - name : Run CI
       run: bash scripts/ci
