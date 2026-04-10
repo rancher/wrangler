@@ -503,9 +503,10 @@ func checkCAPIMachineTransitioning(conditions []Condition, summary Summary) Summ
 // Priority order (first match wins):
 //  1. Deleting=True                                          -> state="deleting", transitioning=true
 //  2. Paused=True                                            -> state="paused", transitioning=true
-//  3. ScalingDown=True OR status.replicas > spec.replicas    -> state="scalingdown", transitioning=true
-//  4. ScalingUp=True OR spec.replicas > status.readyReplicas -> state="scalingup", transitioning=true
-//  5. Otherwise                                              -> pass through (no state set)
+//  3. RollingOut=True                                        -> state="rollingout", transitioning=true
+//  4. ScalingDown=True OR status.replicas > spec.replicas    -> state="scalingdown", transitioning=true
+//  5. ScalingUp=True OR spec.replicas > status.readyReplicas -> state="scalingup", transitioning=true
+//  6. Otherwise                                              -> pass through (no state set)
 func checkCAPIMachineSetAndDeploymentTransitioning(obj data.Object, conditions []Condition, summary Summary) Summary {
 	// Read replica counts from the object. We use nestedInt64 instead of
 	// unstructured.NestedInt64 because YAML/JSON decoders store numbers as
@@ -513,9 +514,11 @@ func checkCAPIMachineSetAndDeploymentTransitioning(obj data.Object, conditions [
 	specReplicas, specFound, _ := nestedInt64(obj, "spec", "replicas")
 	statusReplicas, statusFound, _ := nestedInt64(obj, "status", "replicas")
 	readyReplicas, readyFound, _ := nestedInt64(obj, "status", "readyReplicas")
+	upToDateReplicas, upToDateFound, _ := nestedInt64(obj, "status", "upToDateReplicas")
 
 	var scalingUp *Condition
 	var scalingDown *Condition
+	var rollingOut *Condition
 
 	for i := range conditions {
 		c := conditions[i]
@@ -541,10 +544,28 @@ func checkCAPIMachineSetAndDeploymentTransitioning(obj data.Object, conditions [
 			scalingUp = &conditions[i]
 		case "ScalingDown":
 			scalingDown = &conditions[i]
+		case "RollingOut":
+			rollingOut = &conditions[i]
 		}
 	}
 
-	// Priority 3: Scaling down — detected by condition OR replica count mismatch.
+	// Priority 3: Rolling out — RollingOut=True indicates a rolling upgrade
+	// is in progress. This takes priority over ScalingDown/ScalingUp because
+	// those are side effects of the rollout strategy (maxSurge creates extra
+	// machines, then old ones are deleted). Only MachineDeployments have
+	// rolling upgrades; MachineSets do not set this condition.
+	if rollingOut != nil && rollingOut.Status() == "True" {
+		summary.State = "rollingout"
+		summary.Transitioning = true
+		if statusFound && upToDateFound {
+			notUpToDate := statusReplicas - upToDateReplicas
+			summary.Message = append(summary.Message,
+				fmt.Sprintf("rolling out %d not up-to-date replicas", notUpToDate))
+		}
+		return summary
+	}
+
+	// Priority 4: Scaling down — detected by condition OR replica count mismatch.
 	scalingDownByCondition := scalingDown != nil && scalingDown.Status() == "True"
 	scalingDownByReplicas := specFound && statusFound && statusReplicas > specReplicas
 	if scalingDownByCondition || scalingDownByReplicas {
@@ -557,7 +578,7 @@ func checkCAPIMachineSetAndDeploymentTransitioning(obj data.Object, conditions [
 		return summary
 	}
 
-	// Priority 4: Scaling up — detected by spec.replicas > status.readyReplicas.
+	// Priority 5: Scaling up — detected by spec.replicas > status.readyReplicas.
 	// This catches both the transient ScalingUp=True period and the long tail
 	// where ScalingUp has already gone False but the new machine isn't ready yet.
 	scalingUpByReplicas := specFound && readyFound && specReplicas > readyReplicas
@@ -583,21 +604,24 @@ func checkCAPIMachineSetAndDeploymentTransitioning(obj data.Object, conditions [
 // ControlPlaneInitialized, etc. Worker replica counts are under status.workers.*.
 //
 // Priority order (first match wins):
-//  1. Deleting=True                                                           -> state="deleting", transitioning=true
-//  2. Paused=True                                                             -> state="paused", transitioning=true
-//  3. ScalingDown=True OR status.workers.replicas > status.workers.desiredReplicas -> state="updating", transitioning=true
-//  4. ScalingUp=True OR status.workers.desiredReplicas > status.workers.readyReplicas -> state="updating", transitioning=true
-//  5. Available=False                                                         -> state="updating", transitioning=true
-//  6. Available=True (or any other case)                                      -> pass through (no state set)
+//  1. Deleting=True                                                                    -> state="deleting", transitioning=true
+//  2. Paused=True                                                                      -> state="paused", transitioning=true
+//  3. RollingOut=True                                                                  -> state="rollingout", transitioning=true
+//  4. ScalingDown=True OR status.workers.replicas > status.workers.desiredReplicas     -> state="updating", transitioning=true
+//  5. ScalingUp=True OR status.workers.desiredReplicas > status.workers.readyReplicas  -> state="updating", transitioning=true
+//  6. Available=False                                                                  -> state="updating", transitioning=true
+//  7. Available=True (or any other case)                                               -> pass through (no state set)
 func checkCAPIClusterTransitioning(obj data.Object, conditions []Condition, summary Summary) Summary {
 	// Read worker replica counts from status.workers.*.
 	desiredReplicas, desiredFound, _ := nestedInt64(obj, "status", "workers", "desiredReplicas")
 	workersReplicas, workersFound, _ := nestedInt64(obj, "status", "workers", "replicas")
 	readyReplicas, readyFound, _ := nestedInt64(obj, "status", "workers", "readyReplicas")
+	upToDateReplicas, upToDateFound, _ := nestedInt64(obj, "status", "workers", "upToDateReplicas")
 
 	var scalingUp *Condition
 	var scalingDown *Condition
 	var available *Condition
+	var rollingOut *Condition
 
 	for i := range conditions {
 		c := conditions[i]
@@ -628,10 +652,27 @@ func checkCAPIClusterTransitioning(obj data.Object, conditions []Condition, summ
 			scalingDown = &conditions[i]
 		case "Available":
 			available = &conditions[i]
+		case "RollingOut":
+			rollingOut = &conditions[i]
 		}
 	}
 
-	// Priority 3: Scaling down — detected by condition OR replica count mismatch.
+	// Priority 3: Rolling out — RollingOut=True indicates one or more
+	// MachineDeployments are performing a rolling upgrade. This takes
+	// priority over ScalingDown/ScalingUp because those are side effects
+	// of the rollout strategy.
+	if rollingOut != nil && rollingOut.Status() == "True" {
+		summary.State = "rollingout"
+		summary.Transitioning = true
+		if workersFound && upToDateFound {
+			notUpToDate := workersReplicas - upToDateReplicas
+			summary.Message = append(summary.Message,
+				fmt.Sprintf("rolling out %d not up-to-date replicas", notUpToDate))
+		}
+		return summary
+	}
+
+	// Priority 4: Scaling down — detected by condition OR replica count mismatch.
 	scalingDownByCondition := scalingDown != nil && scalingDown.Status() == "True"
 	scalingDownByReplicas := desiredFound && workersFound && workersReplicas > desiredReplicas
 	if scalingDownByCondition || scalingDownByReplicas {
@@ -644,7 +685,7 @@ func checkCAPIClusterTransitioning(obj data.Object, conditions []Condition, summ
 		return summary
 	}
 
-	// Priority 4: Scaling up — detected by condition OR desired > readyReplicas.
+	// Priority 5: Scaling up — Scaling up — detected by condition OR desired > readyReplicas.
 	scalingUpByCondition := scalingUp != nil && scalingUp.Status() == "True"
 	scalingUpByReplicas := desiredFound && readyFound && desiredReplicas > readyReplicas
 	if scalingUpByCondition || scalingUpByReplicas {

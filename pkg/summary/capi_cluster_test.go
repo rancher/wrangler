@@ -77,7 +77,7 @@ func TestIsCAPICluster(t *testing.T) {
 
 // makeClusterObj builds a minimal CAPI Cluster data.Object with the given
 // worker replica fields under status.workers. Use -1 to omit a field.
-func makeClusterObj(desiredReplicas, replicas, readyReplicas, availableReplicas int64) data.Object {
+func makeClusterObj(desiredReplicas, replicas, readyReplicas, availableReplicas, upToDateReplicas int64) data.Object {
 	obj := data.Object{
 		"apiVersion": "cluster.x-k8s.io/v1beta2",
 		"kind":       "Cluster",
@@ -98,6 +98,9 @@ func makeClusterObj(desiredReplicas, replicas, readyReplicas, availableReplicas 
 	if availableReplicas >= 0 {
 		workers["availableReplicas"] = availableReplicas
 	}
+	if upToDateReplicas >= 0 {
+		workers["upToDateReplicas"] = upToDateReplicas
+	}
 	return obj
 }
 
@@ -114,7 +117,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		// --- Priority 1: Deleting ---
 		{
 			name: "Deleting=True takes absolute priority over everything",
-			obj:  makeClusterObj(1, 1, 1, 1),
+			obj:  makeClusterObj(1, 1, 1, 1, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", "* Deleting: ..."),
 				NewCondition("ScalingDown", "True", "ScalingDown", "* MachineDeployment md: Scaling down from 1 to 0 replicas"),
@@ -128,7 +131,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "Deleting=True with empty message",
-			obj:  makeClusterObj(1, 1, 1, 1),
+			obj:  makeClusterObj(1, 1, 1, 1, -1),
 			conditions: []Condition{
 				NewCondition("Deleting", "True", "Deleting", ""),
 			},
@@ -139,7 +142,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "Deleting=False does not trigger removing",
-			obj:  makeClusterObj(2, 2, 2, 2),
+			obj:  makeClusterObj(2, 2, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "True", "Available", ""),
 				NewCondition("Deleting", "False", "NotDeleting", ""),
@@ -155,7 +158,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		// --- Priority 2: Paused ---
 		{
 			name: "Paused=True takes priority over scaling and Available",
-			obj:  makeClusterObj(3, 2, 2, 2),
+			obj:  makeClusterObj(3, 2, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", "something"),
 				NewCondition("ScalingUp", "True", "ScalingUp", "scaling"),
@@ -168,7 +171,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "Paused=False is ignored",
-			obj:  makeClusterObj(2, 2, 2, 2),
+			obj:  makeClusterObj(2, 2, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "True", "Available", ""),
 				NewCondition("Paused", "False", "NotPaused", ""),
@@ -181,10 +184,44 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 			expectedError:   false,
 		},
 
-		// --- Priority 3: ScalingDown ---
+		// --- Priority 3: Rolling out ---
+		{
+			name: "RollingOut=True takes priority over ScalingDown during rolling upgrade",
+			obj:  makeClusterObj(4, 5, 5, 5, 3),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "* MachineDeployment do-check-jiaqi-dow:\n  * Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "True", "ScalingDown", "* MachineDeployment do-check-jiaqi-dow: Scaling down from 4 to 3 replicas"),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+				NewCondition("Available", "True", "Available", ""),
+			},
+			expectedState:    "rollingout",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"rolling out 2 not up-to-date replicas"},
+		},
+		{
+			name: "RollingOut=True takes priority over ScalingUp during rolling upgrade",
+			obj:  makeClusterObj(4, 4, 3, 3, 2),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "* MachineDeployment md:\n  * Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "False", "NotScalingDown", ""),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+				NewCondition("Available", "False", "NotAvailable", "something"),
+			},
+			expectedState:    "rollingout",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"rolling out 2 not up-to-date replicas"},
+		},
+
+		// --- Priority 4: ScalingDown ---
 		{
 			name: "ScalingDown=True — message constructed from worker replicas",
-			obj:  makeClusterObj(2, 3, 3, 3),
+			obj:  makeClusterObj(2, 3, 3, 3, -1),
 			conditions: []Condition{
 				NewCondition("Available", "True", "Available", ""),
 				NewCondition("ScalingDown", "True", "ScalingDown", "* MachineDeployment md: Scaling down from 2 to 1 replicas"),
@@ -199,7 +236,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "ScalingDown detected by replica mismatch only (stale condition)",
-			obj:  makeClusterObj(2, 3, 2, 2),
+			obj:  makeClusterObj(2, 3, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "True", "Available", ""),
 				NewCondition("ScalingDown", "False", "NotScalingDown", ""),
@@ -214,7 +251,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "ScalingDown takes priority over ScalingUp when both detectable",
-			obj:  makeClusterObj(1, 3, 0, 0),
+			obj:  makeClusterObj(1, 3, 0, 0, -1),
 			conditions: []Condition{
 				NewCondition("ScalingDown", "True", "ScalingDown", "scaling down"),
 				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
@@ -227,10 +264,10 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 			expectedMessages: []string{"Scaling down from 3 to 1 machines"},
 		},
 
-		// --- Priority 4: ScalingUp ---
+		// --- Priority 5: ScalingUp ---
 		{
 			name: "ScalingUp=True — scale-up scenario (2→3 workers)",
-			obj:  makeClusterObj(3, 2, 2, 2),
+			obj:  makeClusterObj(3, 2, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", "* WorkersAvailable: insufficient replicas"),
 				NewCondition("ScalingUp", "True", "ScalingUp", "* MachineDeployment md: Scaling up from 1 to 2 replicas"),
@@ -244,8 +281,8 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 			expectedMessages: []string{"Scaling up from 2 to 3 machines"},
 		},
 		{
-			name: "ScalingUp detected by readyReplicas mismatch only (stale condition)",
-			obj:  makeClusterObj(3, 2, 2, 2),
+			name: "ScalingUp detected by replica mismatch (stale condition)",
+			obj:  makeClusterObj(3, 2, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", "something"),
 				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
@@ -260,7 +297,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "ScalingUp during cluster creation (0→1 workers)",
-			obj:  makeClusterObj(1, -1, -1, -1),
+			obj:  makeClusterObj(1, -1, -1, -1, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", "* WorkersAvailable: waiting"),
 				NewCondition("ScalingUp", "True", "ScalingUp", "* MachineDeployment md: Scaling up from 0 to 1 replicas"),
@@ -277,7 +314,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "ScalingUp from zero readyReplicas during creation",
-			obj:  makeClusterObj(1, 0, 0, 0),
+			obj:  makeClusterObj(1, 0, 0, 0, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", "not available"),
 				NewCondition("ScalingUp", "True", "ScalingUp", "* MachineDeployment md: Scaling up from 0 to 1 replicas"),
@@ -290,11 +327,27 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 			expectedError:    false,
 			expectedMessages: []string{"Scaling up from 0 to 1 machines"},
 		},
+		{
+			name: "Desired workers exceed ready workers — reports scalingup before Available=False",
+			obj:  makeClusterObj(3, 3, 2, 2, 3),
+			conditions: []Condition{
+				NewCondition("Available", "False", "NotAvailable", "* MachineDeployment md: 2 available, 3 required"),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+				NewCondition("ScalingDown", "False", "NotScalingDown", ""),
+				NewCondition("RollingOut", "False", "NotRollingOut", ""),
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+			},
+			expectedState:    "updating",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"Scaling up from 2 to 3 machines"},
+		},
 
-		// --- Priority 5: Available=False ---
+		// --- Priority 6: Available=False ---
 		{
 			name: "Available=False without any scaling → updating",
-			obj:  makeClusterObj(2, 2, 2, 2),
+			obj:  makeClusterObj(2, 2, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", "* RemoteConnectionProbe: Remote connection not established yet"),
 				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
@@ -309,7 +362,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "Available=False with empty message → updating with no messages",
-			obj:  makeClusterObj(1, 1, 1, 1),
+			obj:  makeClusterObj(1, 1, 1, 1, -1),
 			conditions: []Condition{
 				NewCondition("Available", "False", "NotAvailable", ""),
 				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
@@ -321,11 +374,66 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 			expectedTransit: true,
 			expectedError:   false,
 		},
+		{
+			name: "Deleting=True takes priority over RollingOut=True on Cluster",
+			obj:  makeClusterObj(4, 5, 5, 5, 3),
+			conditions: []Condition{
+				NewCondition("Deleting", "True", "WaitingForWorkersDeletion", "cleanup"),
+				NewCondition("RollingOut", "True", "RollingOut", "* MachineDeployment md:\n  * Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "True", "ScalingDown", "scaling down"),
+			},
+			expectedState:    "deleting",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"cleanup"},
+		},
+		{
+			name: "Paused=True takes priority over RollingOut=True on Cluster",
+			obj:  makeClusterObj(4, 5, 5, 5, 3),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "True", "Paused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "* MachineDeployment md:\n  * Rolling out 2 not up-to-date replicas"),
+			},
+			expectedState:   "paused",
+			expectedTransit: true,
+			expectedError:   false,
+		},
+		{
+			name: "RollingOut=False does not trigger rollingout — falls through to ScalingDown",
+			obj:  makeClusterObj(3, 4, 4, 4, -1),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "False", "NotRollingOut", ""),
+				NewCondition("ScalingDown", "True", "ScalingDown", "scaling down"),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+				NewCondition("Available", "True", "Available", ""),
+			},
+			expectedState:    "updating",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"Scaling down from 4 to 3 machines"},
+		},
+		{
+			name: "RollingOut=True on Cluster with missing upToDateReplicas — no message",
+			obj:  makeClusterObj(4, 5, 5, 5, -1),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "* MachineDeployment md:\n  * Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "True", "ScalingDown", "scaling down"),
+			},
+			expectedState:    "rollingout",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: nil,
+		},
 
-		// --- Priority 6: Steady state / pass through ---
+		// --- Priority 7: Steady state / pass through ---
 		{
 			name: "Steady state — all healthy → pass through",
-			obj:  makeClusterObj(2, 2, 2, 2),
+			obj:  makeClusterObj(2, 2, 2, 2, -1),
 			conditions: []Condition{
 				NewCondition("Available", "True", "Available", ""),
 				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
@@ -345,7 +453,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		// --- Edge cases ---
 		{
 			name:            "No conditions → pass through",
-			obj:             makeClusterObj(1, 1, 1, 1),
+			obj:             makeClusterObj(1, 1, 1, 1, -1),
 			conditions:      []Condition{},
 			expectedState:   "",
 			expectedTransit: false,
@@ -404,7 +512,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "Deleting=True takes priority over active scale-down",
-			obj:  makeClusterObj(1, 1, 1, 1),
+			obj:  makeClusterObj(1, 1, 1, 1, -1),
 			conditions: []Condition{
 				NewCondition("Deleting", "True", "WaitingForWorkersDeletion", "cleanup in progress"),
 				NewCondition("Paused", "False", "NotPaused", ""),
@@ -418,7 +526,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 		},
 		{
 			name: "Paused=True takes priority over scale-up detected by replicas",
-			obj:  makeClusterObj(3, 1, 1, 1),
+			obj:  makeClusterObj(3, 1, 1, 1, -1),
 			conditions: []Condition{
 				NewCondition("Deleting", "False", "NotDeleting", ""),
 				NewCondition("Paused", "True", "Paused", ""),
@@ -452,7 +560,7 @@ func TestCheckCAPIClusterTransitioning(t *testing.T) {
 func TestCheckTransitioning_CAPIClusterDispatch(t *testing.T) {
 	// A CAPI Cluster with ScalingUp=True should get "updating" from the
 	// CAPI Cluster path.
-	capiObj := makeClusterObj(2, 1, 1, 1)
+	capiObj := makeClusterObj(2, 1, 1, 1, -1)
 	conditions := []Condition{
 		NewCondition("ScalingUp", "True", "ScalingUp", "* MachineDeployment md: Scaling up from 1 to 2 replicas"),
 		NewCondition("ScalingDown", "False", "NotScalingDown", ""),
@@ -463,6 +571,22 @@ func TestCheckTransitioning_CAPIClusterDispatch(t *testing.T) {
 	result := checkTransitioning(capiObj, conditions, Summary{})
 	assert.Equal(t, "updating", result.State)
 	assert.True(t, result.Transitioning)
+
+	// A CAPI Cluster with RollingOut=True during a rolling upgrade should
+	// get state="rollingout" instead of "updating" (from ScalingDown).
+	rollingClusterObj := makeClusterObj(4, 5, 5, 5, 3)
+	rollingConditions := []Condition{
+		NewCondition("Deleting", "False", "NotDeleting", ""),
+		NewCondition("Paused", "False", "NotPaused", ""),
+		NewCondition("RollingOut", "True", "RollingOut", "* MachineDeployment md:\n  * Rolling out 2 not up-to-date replicas"),
+		NewCondition("ScalingDown", "True", "ScalingDown", "* MachineDeployment md: Scaling down from 4 to 3 replicas"),
+		NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+		NewCondition("Available", "True", "Available", ""),
+	}
+	rollingResult := checkTransitioning(rollingClusterObj, rollingConditions, Summary{})
+	assert.Equal(t, "rollingout", rollingResult.State, "rolling upgrade should produce state=rollingout")
+	assert.True(t, rollingResult.Transitioning)
+	assert.Equal(t, []string{"rolling out 2 not up-to-date replicas"}, rollingResult.Message)
 
 	// A non-CAPI Cluster (e.g. management.cattle.io) should use the generic path.
 	genericObj := data.Object{

@@ -88,6 +88,30 @@ func makeMachineSetObj(specReplicas, statusReplicas, readyReplicas int64) data.O
 	return obj
 }
 
+// makeMachineDeploymentObj builds a minimal CAPI MachineDeployment data.Object
+// with the given replica fields. Use -1 to omit a field.
+func makeMachineDeploymentObj(specReplicas, statusReplicas, readyReplicas, upToDateReplicas int64) data.Object {
+	obj := data.Object{
+		"apiVersion": "cluster.x-k8s.io/v1beta2",
+		"kind":       "MachineDeployment",
+		"spec":       map[string]interface{}{},
+		"status":     map[string]interface{}{},
+	}
+	if specReplicas >= 0 {
+		obj["spec"].(map[string]interface{})["replicas"] = specReplicas
+	}
+	if statusReplicas >= 0 {
+		obj["status"].(map[string]interface{})["replicas"] = statusReplicas
+	}
+	if readyReplicas >= 0 {
+		obj["status"].(map[string]interface{})["readyReplicas"] = readyReplicas
+	}
+	if upToDateReplicas >= 0 {
+		obj["status"].(map[string]interface{})["upToDateReplicas"] = upToDateReplicas
+	}
+	return obj
+}
+
 func TestCheckCAPIMachineSetAndDeploymentTransitioning(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -166,7 +190,40 @@ func TestCheckCAPIMachineSetAndDeploymentTransitioning(t *testing.T) {
 			expectedError:   false,
 		},
 
-		// --- Priority 3: ScalingDown ---
+		// --- Priority 3: RollingOut ---
+		// RollingOut only applies to MachineDeployment, not MachineSet.
+		{
+			name: "RollingOut=True on MachineDeployment takes priority over ScalingDown",
+			obj:  makeMachineDeploymentObj(3, 4, 3, 2),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "Rolling out 2 not up-to-date replicas\n* DigitaloceanMachine is not up-to-date"),
+				NewCondition("ScalingDown", "True", "ScalingDown", "Scaling down from 4 to 3 replicas"),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+			},
+			expectedState:    "rollingout",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"rolling out 2 not up-to-date replicas"},
+		},
+		{
+			name: "RollingOut=True on MachineDeployment takes priority over ScalingUp by replicas",
+			obj:  makeMachineDeploymentObj(3, 3, 1, 1),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "False", "NotScalingDown", ""),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+			},
+			expectedState:    "rollingout",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"rolling out 2 not up-to-date replicas"},
+		},
+
+		// --- Priority 4: ScalingDown ---
 		{
 			name: "ScalingDown=True — message always constructed from replicas",
 			obj:  makeMachineSetObj(1, 2, 2),
@@ -239,7 +296,7 @@ func TestCheckCAPIMachineSetAndDeploymentTransitioning(t *testing.T) {
 			expectedMessages: []string{"Scaling down from 3 to 1 replicas, waiting for machines to be deleted"},
 		},
 
-		// --- Priority 4: ScalingUp ---
+		// --- Priority 5: ScalingUp ---
 		{
 			name: "ScalingUp=True — message always constructed from replicas",
 			obj:  makeMachineSetObj(2, 1, 1),
@@ -283,7 +340,7 @@ func TestCheckCAPIMachineSetAndDeploymentTransitioning(t *testing.T) {
 			expectedMessages: []string{"Scaling up from 1 to 2 replicas, waiting for machines to be ready"},
 		},
 		{
-			name: "ScalingUp detected by readyReplicas mismatch",
+			name: "Spec replicas exceed ready replicas — reports scalingup even when all machines exist",
 			obj:  makeMachineSetObj(2, 2, 1),
 			conditions: []Condition{
 				NewCondition("Deleting", "False", "NotDeleting", ""),
@@ -296,6 +353,78 @@ func TestCheckCAPIMachineSetAndDeploymentTransitioning(t *testing.T) {
 			expectedTransit:  true,
 			expectedError:    false,
 			expectedMessages: []string{"Scaling up from 1 to 2 replicas, waiting for machines to be ready"},
+		},
+		{
+			name: "MachineDeployment with ready replicas below spec — reports scalingup before other conditions",
+			obj:  makeMachineDeploymentObj(3, 3, 2, 3),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "False", "NotRollingOut", ""),
+				NewCondition("ScalingDown", "False", "NotScalingDown", ""),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+				NewCondition("Available", "False", "NotAvailable", "2 available replicas, at least 3 required"),
+				NewCondition("MachinesReady", "Unknown", "ReadyUnknown", "* Machine test-m:\n  * NodeHealthy: Kubelet stopped posting node status"),
+			},
+			expectedState:    "scalingup",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"Scaling up from 2 to 3 replicas, waiting for machines to be ready"},
+		},
+		{
+			name: "Deleting=True takes priority over RollingOut=True",
+			obj:  makeMachineDeploymentObj(3, 4, 3, 2),
+			conditions: []Condition{
+				NewCondition("Deleting", "True", "Deleting", "being deleted"),
+				NewCondition("RollingOut", "True", "RollingOut", "Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "True", "ScalingDown", "Scaling down from 4 to 3 replicas"),
+			},
+			expectedState:    "deleting",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"being deleted"},
+		},
+		{
+			name: "Paused=True takes priority over RollingOut=True",
+			obj:  makeMachineDeploymentObj(3, 4, 3, 2),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "True", "Paused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "True", "ScalingDown", "Scaling down from 4 to 3 replicas"),
+			},
+			expectedState:   "paused",
+			expectedTransit: true,
+			expectedError:   false,
+		},
+		{
+			name: "RollingOut=False does not trigger rollingout — falls through to ScalingDown",
+			obj:  makeMachineDeploymentObj(1, 2, 2, -1),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "False", "NotRollingOut", ""),
+				NewCondition("ScalingDown", "True", "ScalingDown", "Scaling down from 2 to 1 replicas"),
+				NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+			},
+			expectedState:    "scalingdown",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: []string{"Scaling down from 2 to 1 replicas, waiting for machines to be deleted"},
+		},
+		{
+			name: "RollingOut=True on MachineDeployment with missing upToDateReplicas — no message",
+			obj:  makeMachineDeploymentObj(3, 4, 3, -1),
+			conditions: []Condition{
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("RollingOut", "True", "RollingOut", "Rolling out 2 not up-to-date replicas"),
+				NewCondition("ScalingDown", "True", "ScalingDown", "Scaling down from 4 to 3 replicas"),
+			},
+			expectedState:    "rollingout",
+			expectedTransit:  true,
+			expectedError:    false,
+			expectedMessages: nil,
 		},
 
 		// --- Pass through (steady state) ---
@@ -509,9 +638,9 @@ func TestIsCAPIMachineDeployment(t *testing.T) {
 // checkCAPIMachineSetAndDeploymentTransitioning and that the replica-field
 // paths behave correctly for deployments (not just MachineSets).
 func TestCheckTransitioning_CAPIMachineDeploymentDispatch(t *testing.T) {
-	// A MachineDeployment scaling up: spec.replicas=3, status.readyReplicas=1.
+	// A MachineDeployment scaling up: spec.replicas=3, status.replicas=1.
 	// Even with ScalingUp=False (stale condition), the replica mismatch
-	// should be detected via the CAPI handler.
+	// (spec > status) should be detected via the CAPI handler.
 	scalingObj := data.Object{
 		"apiVersion": "cluster.x-k8s.io/v1beta2",
 		"kind":       "MachineDeployment",
@@ -519,7 +648,7 @@ func TestCheckTransitioning_CAPIMachineDeploymentDispatch(t *testing.T) {
 			"replicas": int64(3),
 		},
 		"status": map[string]interface{}{
-			"replicas":      int64(3),
+			"replicas":      int64(1),
 			"readyReplicas": int64(1),
 		},
 	}
@@ -557,4 +686,30 @@ func TestCheckTransitioning_CAPIMachineDeploymentDispatch(t *testing.T) {
 	assert.Empty(t, steadyResult.State, "steady-state MachineDeployment should pass through")
 	assert.False(t, steadyResult.Transitioning)
 	assert.False(t, steadyResult.Error)
+
+	// A MachineDeployment doing a rolling upgrade: RollingOut=True should
+	// take priority over the ScalingDown condition and replica mismatch.
+	rollingObj := data.Object{
+		"apiVersion": "cluster.x-k8s.io/v1beta2",
+		"kind":       "MachineDeployment",
+		"spec": map[string]interface{}{
+			"replicas": int64(3),
+		},
+		"status": map[string]interface{}{
+			"replicas":         int64(4),
+			"readyReplicas":    int64(3),
+			"upToDateReplicas": int64(2),
+		},
+	}
+	rollingConditions := []Condition{
+		NewCondition("Deleting", "False", "NotDeleting", ""),
+		NewCondition("Paused", "False", "NotPaused", ""),
+		NewCondition("RollingOut", "True", "RollingOut", "Rolling out 2 not up-to-date replicas"),
+		NewCondition("ScalingDown", "True", "ScalingDown", "Scaling down from 4 to 3 replicas"),
+		NewCondition("ScalingUp", "False", "NotScalingUp", ""),
+	}
+	rollingResult := checkTransitioning(rollingObj, rollingConditions, Summary{})
+	assert.Equal(t, "rollingout", rollingResult.State, "rolling upgrade should produce state=rollingout")
+	assert.True(t, rollingResult.Transitioning)
+	assert.Equal(t, []string{"rolling out 2 not up-to-date replicas"}, rollingResult.Message)
 }
