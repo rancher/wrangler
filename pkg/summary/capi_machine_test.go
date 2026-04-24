@@ -352,6 +352,20 @@ func TestCheckCAPIMachineTransitioning(t *testing.T) {
 			// Detail is suppressed — no messages expected.
 		},
 		{
+			name: "Ready=False, InfrastructureReady detail suppressed when matching 'X of Y completed' pattern",
+			conditions: []Condition{
+				NewCondition("Ready", "False", "NotReady",
+					"* InfrastructureReady: 2 of 3 completed\n"+
+						"* NodeHealthy: Last successful probe at 2026-04-24T10:00:22Z"),
+				NewCondition("Paused", "False", "NotPaused", ""),
+				NewCondition("Deleting", "False", "NotDeleting", ""),
+			},
+			expectedState:   "waitingfornoderef",
+			expectedTransit: true,
+			expectedError:   false,
+			// "2 of 3 completed" is suppressed — no messages expected.
+		},
+		{
 			name: "Ready=False with empty message → pass through",
 			conditions: []Condition{
 				NewCondition("Ready", "False", "NotReady", ""),

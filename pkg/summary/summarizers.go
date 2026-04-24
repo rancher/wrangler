@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -26,6 +27,10 @@ const (
 )
 
 var (
+	// stepCounterMessagePattern matches "X of Y completed" messages from CAPI infrastructure providers.
+	// These are from the deprecated v1beta1 conditions merge strategy and are not useful to end users.
+	stepCounterMessagePattern = regexp.MustCompile(`^\d+ of \d+ completed$`)
+
 	// True ==
 	// False == error
 	// Unknown == transitioning
@@ -464,6 +469,9 @@ func checkCAPIMachineTransitioning(conditions []Condition, summary Summary) Summ
 				summary.Transitioning = true
 				summary.State = "waitingfornoderef"
 				if strings.HasSuffix(detail, "status.initialization.provisioned is false") {
+					detail = ""
+				}
+				if stepCounterMessagePattern.MatchString(detail) {
 					detail = ""
 				}
 				if detail != "" {
