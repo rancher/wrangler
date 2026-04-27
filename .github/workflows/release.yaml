@@ -27,7 +27,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.]+)?$ ]]; then
             echo "::error::Version '$VERSION' must match v<major>.<minor>.<patch>[-prerelease]"
             exit 1
           fi
@@ -38,14 +38,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           table=$(gh api "repos/$GITHUB_REPOSITORY/contents/VERSION.md" --jq .content | base64 -d)
-          allowed=$(awk -F'|' -v b="$GITHUB_REF_NAME" '
-            /^\|[-: |]+\|?[[:space:]]*$/ { in_table = 1; next }
-            in_table && NF >= 4 {
-              gsub(/^ +| +$/, "", $2)
-              gsub(/^ +| +$/, "", $3)
-              if ($2 == b) { print $3; exit }
-            }
-          ' <<< "$table")
+          allowed=$(grep -F "| $GITHUB_REF_NAME |" <<< "$table" | cut -d'|' -f3 | tr -d ' ')
           if [ -z "$allowed" ]; then
             echo "::error::Branch '$GITHUB_REF_NAME' not found in default-branch VERSION.md"
             exit 1
