@@ -1,25 +1,138 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - v*
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. v3.1.0)'
+        required: true
+        type: string
+
+permissions: {}
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Version '$VERSION' must match v<major>.<minor>.<patch>[-prerelease]"
+            exit 1
+          fi
+
+      - name: Resolve allowed major from VERSION.md
+        id: minor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          table=$(gh api "repos/$GITHUB_REPOSITORY/contents/VERSION.md" --jq .content | base64 -d)
+          allowed=$(awk -F'|' -v b="$GITHUB_REF_NAME" '
+            /^\|[-: |]+\|?[[:space:]]*$/ { in_table = 1; next }
+            in_table && NF >= 4 {
+              gsub(/^ +| +$/, "", $2)
+              gsub(/^ +| +$/, "", $3)
+              if ($2 == b) { print $3; exit }
+            }
+          ' <<< "$table")
+          if [ -z "$allowed" ]; then
+            echo "::error::Branch '$GITHUB_REF_NAME' not found in default-branch VERSION.md"
+            exit 1
+          fi
+          echo "Branch '$GITHUB_REF_NAME' is allowed major '$allowed'"
+          echo "allowed=$allowed" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version matches branch's allowed major
+        env:
+          VERSION: ${{ inputs.version }}
+          ALLOWED: ${{ steps.minor.outputs.allowed }}
+        run: |
+          if [[ "$VERSION" != "${ALLOWED}."* ]]; then
+            echo "::error::Version $VERSION does not belong to branch $GITHUB_REF_NAME (allowed major: $ALLOWED)"
+            exit 1
+          fi
+
+      - name: Validate version is next-sequential
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          v_core="${VERSION%%-*}"
+          v_pre="${VERSION#*-}"
+          [[ "$VERSION" == "$v_core" ]] && v_pre=""
+
+          if [ -n "$v_pre" ]; then
+            if ! [[ "$v_pre" =~ ^rc\.([0-9]+)$ ]]; then
+              echo "::error::Prerelease suffix must be rc.<N> (got '$v_pre')"
+              exit 1
+            fi
+            rc_num="${BASH_REMATCH[1]}"
+            latest_rc=$(git tag -l "${v_core}-rc.*" \
+              | grep -E -- '-rc\.[0-9]+$' | sort -V | tail -n1 || true)
+            if [ -z "$latest_rc" ]; then
+              if [ "$rc_num" -ne 1 ]; then
+                echo "::error::First RC for ${v_core} must be rc.1 (got rc.${rc_num})"
+                exit 1
+              fi
+              echo "First RC for ${v_core}: OK"
+            else
+              prev_rc_num="${latest_rc##*.}"
+              expected_rc=$((prev_rc_num + 1))
+              if [ "$rc_num" -ne "$expected_rc" ]; then
+                echo "::error::Latest RC for ${v_core} is ${latest_rc}; next must be rc.${expected_rc} (got rc.${rc_num})"
+                exit 1
+              fi
+              echo "Next sequential RC after ${latest_rc}: OK"
+            fi
+          else
+            echo "Stable release ${VERSION}: OK"
+          fi
+
+      - name: Validate tag does not already exist
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag '$VERSION' already exists"
+            exit 1
+          fi
+
   release:
+    needs: validate
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name : Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Create release on Github
-        env:
-          GH_TOKEN:  ${{ github.token }}
+      - name: Configure git identity
         run: |
-          if [[ "${{ github.ref_name }}" == *-rc* ]]; then
-            gh --repo "${{ github.repository }}" release create ${{ github.ref_name }} --verify-tag --generate-notes --prerelease
-          else
-            gh --repo "${{ github.repository }}" release create ${{ github.ref_name }} --verify-tag --generate-notes
-          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          flags="--verify-tag --generate-notes"
+          [[ "$VERSION" == *-rc* ]] && flags="$flags --prerelease"
+          gh --repo "$GITHUB_REPOSITORY" release create "$VERSION" $flags
