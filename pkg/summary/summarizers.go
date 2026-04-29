@@ -792,6 +792,12 @@ func checkGenericTransitioning(_ data.Object, conditions []Condition, summary Su
 		if c.Type() == "Ready" && c.Status() == "False" {
 			ready = false
 			readyMessage = c.Message()
+
+			// ignore the message that is in the form of "x of y completed",
+			// seen on AWSMachine.infrastructure.cluster.x-k8s.io/v1beta2
+			if stepCounterMessagePattern.MatchString(c.Message()) {
+				readyMessage = ""
+			}
 			continue
 		}
 		newState, ok := TransitioningFalse[c.Type()]
