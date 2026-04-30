@@ -71,7 +71,7 @@ jobs:
             fi
             rc_num="${BASH_REMATCH[1]}"
             latest_rc=$(git tag -l "${v_core}-rc.*" \
-              | grep -E -- '-rc\.[0-9]+$' | sort -V | tail -n1 || true)
+              | grep -E -- '-rc\.[0-9]+$' | sort --version-sort | tail -n1 || true)
             if [ -z "$latest_rc" ]; then
               if [ "$rc_num" -ne 1 ]; then
                 echo "::error::First RC for ${v_core} must be rc.1 (got rc.${rc_num})"
