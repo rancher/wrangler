@@ -4,9 +4,15 @@
   ],
   "baseBranchPatterns": [
     "main",
+    "release/v3.3",
     "release/v2"
   ],
   "prHourlyLimit": 2,
+  "enabledManagers": [
+    "github-actions",
+    "custom.regex",
+    "gomod"
+  ],
   "packageRules": [
     {
       "enabled": false,
@@ -14,18 +20,58 @@
         "/k8s.io/*/",
         "/sigs.k8s.io/*/",
         "/go.opentelemetry.io/*/",
-        "/github.com/prometheus/*/"
+        "/github.com/prometheus/*/",
+        "/github.com/rancher/lasso/*/"
       ]
     },
     {
-      "matchUpdateTypes": [
-        "major",
-        "minor"
-      ],
-      "enabled": false,
+      "description": "Disable major updates on release branches",
+      "matchUpdateTypes": ["major"],
+      "matchBaseBranches": ["/^release\\//"],
+      "enabled": false
+    },
+    {
+      "description": "Do not bump golang.org/x/tools minor/major on release branches - it tracks Go language releases and bumping it forces a go directive minor bump",
+      "matchPackageNames": ["golang.org/x/tools"],
+      "matchUpdateTypes": ["major", "minor"],
+      "matchBaseBranches": ["/^release\\//"],
+      "enabled": false
+    },
+    {
+      "description": "Do not bump the Go minor/major version on release branches",
+      "matchDepNames": ["go"],
+      "matchUpdateTypes": ["major", "minor"],
+      "matchBaseBranches": ["/^release\\//"],
+      "enabled": false
+    },
+    {
+      "description": "Group all GitHub Actions updates into a single PR per branch",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "separateMajorMinor": false
+    },
+    {
+      "description": "Group Go dev tooling (Go version, golangci-lint) into a single PR per branch",
       "matchPackageNames": [
-        "/github.com/rancher/lasso/*/"
-      ]
+        "go",
+        "golangci/golangci-lint"
+      ],
+      "groupName": "Go dev tools",
+      "separateMajorMinor": false
+    },
+    {
+      "description": "Group golang.org/x/* packages into a single PR per branch",
+      "matchPackageNames": [
+        "/^golang\\.org\\/x\\//"
+      ],
+      "groupName": "golang.org/x packages"
+    },
+    {
+      "description": "Group SUSE BCI base image updates into a single PR per branch",
+      "matchPackageNames": [
+        "/^registry\\.suse\\.com\\/bci\\//"
+      ],
+      "groupName": "BCI base images"
     }
   ]
 }
