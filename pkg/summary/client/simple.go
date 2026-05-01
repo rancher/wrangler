@@ -112,7 +112,11 @@ func (c *summaryResourceClient) Watch(ctx context.Context, opts metav1.ListOptio
 			if _, ok := event.Object.(*metav1.Status); !ok {
 				event.Object = summary.SummarizedWithOptions(event.Object, generateSummarizeOpts(c.options.Schema))
 			}
-			eventChan <- event
+			select {
+			case eventChan <- event:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
