@@ -368,8 +368,9 @@ See [VERSION.md](VERSION.md).
 
 # Releasing
 
-Releases are cut by triggering the [Release workflow](.github/workflows/release.yaml)
+Releases are cut by triggering the [Cut release workflow](.github/workflows/cut-release.yaml)
 from the GitHub Actions tab. Select the appropriate release branch (e.g. `release/v3`)
 and provide the version (e.g. `v3.1.0` or `v3.1.0-rc.1`) as input. The workflow
 validates the version against [VERSION.md](VERSION.md), creates the annotated tag,
-and publishes the GitHub release.
+and dispatches the [On release workflow](.github/workflows/release.yaml) on the new
+tag, which creates the GitHub release.

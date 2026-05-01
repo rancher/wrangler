@@ -1,0 +1,130 @@
+name: Cut release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. v3.1.0)'
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Version '$VERSION' must match v<major>.<minor>.<patch>[-prerelease]"
+            exit 1
+          fi
+
+      - name: Resolve allowed major from VERSION.md
+        id: minor
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          table=$(gh api "repos/$GITHUB_REPOSITORY/contents/VERSION.md" --jq .content | base64 -d)
+          allowed=$(grep -F "| $GITHUB_REF_NAME |" <<< "$table" | cut -d'|' -f3 | tr -d ' ')
+          if [ -z "$allowed" ]; then
+            echo "::error::Branch '$GITHUB_REF_NAME' not found in default-branch VERSION.md"
+            exit 1
+          fi
+          echo "Branch '$GITHUB_REF_NAME' is allowed major '$allowed'"
+          echo "allowed=$allowed" >> "$GITHUB_OUTPUT"
+
+      - name: Validate version matches branch's allowed major
+        env:
+          VERSION: ${{ inputs.version }}
+          ALLOWED: ${{ steps.minor.outputs.allowed }}
+        run: |
+          if [[ "$VERSION" != "${ALLOWED}."* ]]; then
+            echo "::error::Version $VERSION does not belong to branch $GITHUB_REF_NAME (allowed major: $ALLOWED)"
+            exit 1
+          fi
+
+      - name: Validate version is next-sequential
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          v_core="${VERSION%%-*}"
+          v_pre="${VERSION#*-}"
+          [[ "$VERSION" == "$v_core" ]] && v_pre=""
+
+          if [ -n "$v_pre" ]; then
+            if ! [[ "$v_pre" =~ ^rc\.([0-9]+)$ ]]; then
+              echo "::error::Prerelease suffix must be rc.<N> (got '$v_pre')"
+              exit 1
+            fi
+            rc_num="${BASH_REMATCH[1]}"
+            latest_rc=$(git tag -l "${v_core}-rc.*" \
+              | grep -E -- '-rc\.[0-9]+$' | sort --version-sort | tail -n1 || true)
+            if [ -z "$latest_rc" ]; then
+              if [ "$rc_num" -ne 1 ]; then
+                echo "::error::First RC for ${v_core} must be rc.1 (got rc.${rc_num})"
+                exit 1
+              fi
+              echo "First RC for ${v_core}: OK"
+            else
+              prev_rc_num="${latest_rc##*.}"
+              expected_rc=$((prev_rc_num + 1))
+              if [ "$rc_num" -ne "$expected_rc" ]; then
+                echo "::error::Latest RC for ${v_core} is ${latest_rc}; next must be rc.${expected_rc} (got rc.${rc_num})"
+                exit 1
+              fi
+              echo "Next sequential RC after ${latest_rc}: OK"
+            fi
+          else
+            echo "Stable release ${VERSION}: OK"
+          fi
+
+      - name: Validate tag does not already exist
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag '$VERSION' already exists"
+            exit 1
+          fi
+
+  tag:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Configure git identity
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Trigger On release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh workflow run release.yaml --repo "$GITHUB_REPOSITORY" --ref "$VERSION"
