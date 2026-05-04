@@ -107,6 +107,7 @@ func (c *summaryResourceClient) Watch(ctx context.Context, opts metav1.ListOptio
 
 	go func() {
 		defer close(eventChan)
+		defer resp.Stop()
 		for event := range resp.ResultChan() {
 			// don't encode status objects
 			if _, ok := event.Object.(*metav1.Status); !ok {
