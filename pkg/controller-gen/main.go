@@ -219,7 +219,6 @@ func generateDeepcopy(groups map[string]bool, customArgs *cgargs.CustomArgs) err
 			continue
 		}
 		inputDirs = append(inputDirs, names[0].Package)
-		deepCopyArgs.BoundingDirs = append(deepCopyArgs.BoundingDirs, names[0].Package)
 	}
 
 	getTargets := func(context *generator.Context) []generator.Target {

@@ -17,7 +17,7 @@ jobs:
         - amd64
         - arm64
     runs-on: org-${{ github.repository_owner_id }}-${{ matrix.arch }}-k8s
-    container: registry.suse.com/bci/golang:1.25
+    container: registry.suse.com/bci/golang:1.26
     steps:
     - name : Checkout repository
       # https://github.com/actions/checkout/releases/tag/v4.1.1
@@ -30,8 +30,8 @@ jobs:
     name: golangci-lint
     runs-on: ubuntu-latest
     env:
-      SETUP_GO_VERSION: '^1.25'
-      GOLANG_CI_LINT_VERSION: v2.7.1
+      SETUP_GO_VERSION: '^1.26'
+      GOLANG_CI_LINT_VERSION: v2.12.1
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
