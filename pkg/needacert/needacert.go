@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"strings"
 	"time"
@@ -31,6 +32,24 @@ import (
 var (
 	SecretAnnotation = "need-a-cert.cattle.io/secret-name"
 	DNSAnnotation    = "need-a-cert.cattle.io/dns-name"
+	// CABundleModeAnnotation lets an individual Service opt its webhooks/CRD
+	// conversion config into CABundleModeCAOnly. Any other value (including
+	// absent, the default) keeps the historical CABundleModeFullChain behavior.
+	// Scoped per-Service so one consumer can opt in without affecting any other
+	// consumer sharing the same needacert controller.
+	CABundleModeAnnotation = "need-a-cert.cattle.io/ca-bundle-mode"
+)
+
+const (
+	// CABundleModeFullChain is the default: CABundle is set to the full contents
+	// of the TLS secret's tls.crt entry, which is the leaf certificate followed
+	// by the CA certificate that signed it.
+	CABundleModeFullChain = "full-chain"
+	// CABundleModeCAOnly sets CABundle to just the CA certificate, omitting the
+	// leaf certificate. The leaf certificate isn't needed to validate trust and
+	// dropping it roughly halves CABundle's size, which matters when many
+	// webhooks share it: see https://github.com/rancher/turtles/issues/2452.
+	CABundleModeCAOnly = "ca-only"
 )
 
 const (
@@ -107,6 +126,41 @@ type handler struct {
 	crds               apiextcontrollers.CustomResourceDefinitionController
 }
 
+// caBundleFor returns the bytes that should populate a webhook/CRD ClientConfig's
+// CABundle field for the given service/secret pair. Only a service's
+// CABundleModeAnnotation set to CABundleModeCAOnly changes the result; anything
+// else (including a nil service) keeps the default full-chain behavior, so one
+// consumer can opt in without affecting any other consumer sharing the same
+// needacert handler.
+func caBundleFor(service *corev1.Service, secret *corev1.Secret) ([]byte, error) {
+	fullChain := secret.Data[corev1.TLSCertKey]
+	if service == nil || service.Annotations[CABundleModeAnnotation] != CABundleModeCAOnly {
+		return fullChain, nil
+	}
+	return caOnly(fullChain)
+}
+
+// caOnly takes a PEM blob containing a leaf certificate followed by the CA
+// certificate that signed it (the format produced by
+// cert.GenerateSelfSignedCertKey) and returns just the CA certificate, PEM
+// encoded.
+func caOnly(fullChainPEM []byte) ([]byte, error) {
+	certs, err := cert.ParseCertsPEM(fullChainPEM)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse certificate chain: %w", err)
+	}
+	if len(certs) == 0 {
+		return nil, fmt.Errorf("no certificates found in chain")
+	}
+
+	caCert := certs[len(certs)-1]
+	var buf bytes.Buffer
+	if err := pem.Encode(&buf, &pem.Block{Type: cert.CertificateBlockType, Bytes: caCert.Raw}); err != nil {
+		return nil, fmt.Errorf("failed to encode CA certificate: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
 func validatingWebhookServices(obj *adminregv1.ValidatingWebhookConfiguration) (result []string, _ error) {
 	for _, webhook := range obj.Webhooks {
 		if webhook.ClientConfig.Service != nil {
@@ -165,9 +219,13 @@ func (h *handler) OnMutationWebhookChange(key string, webhook *adminregv1.Mutati
 			continue
 		}
 
-		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
+		caBundle, err := caBundleFor(service, secret)
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, caBundle) {
 			webhook = webhook.DeepCopy()
-			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
+			webhook.Webhooks[i].ClientConfig.CABundle = caBundle
 			needUpdate = true
 		}
 	}
@@ -209,9 +267,13 @@ func (h *handler) OnValidatingWebhookChange(key string, webhook *adminregv1.Vali
 			continue
 		}
 
-		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
+		caBundle, err := caBundleFor(service, secret)
+		if err != nil {
+			return nil, err
+		}
+		if !bytes.Equal(webhookConfig.ClientConfig.CABundle, caBundle) {
 			webhook = webhook.DeepCopy()
-			webhook.Webhooks[i].ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
+			webhook.Webhooks[i].ClientConfig.CABundle = caBundle
 			needUpdate = true
 		}
 	}
@@ -289,9 +351,13 @@ func (h *handler) OnCRDChange(key string, crd *apiextv1.CustomResourceDefinition
 		return crd, nil
 	}
 
-	if !bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, secret.Data[corev1.TLSCertKey]) {
+	caBundle, err := caBundleFor(service, secret)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(crd.Spec.Conversion.Webhook.ClientConfig.CABundle, caBundle) {
 		crd := crd.DeepCopy()
-		crd.Spec.Conversion.Webhook.ClientConfig.CABundle = secret.Data[corev1.TLSCertKey]
+		crd.Spec.Conversion.Webhook.ClientConfig.CABundle = caBundle
 		return h.crds.Update(crd)
 	}
 
