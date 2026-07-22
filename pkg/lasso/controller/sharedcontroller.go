@@ -5,11 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/lasso/cache"
 	"github.com/rancher/wrangler/v3/pkg/lasso/client"
 	"github.com/rancher/wrangler/v3/pkg/lasso/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	cachetools "k8s.io/client-go/tools/cache"
 )
 
@@ -34,9 +32,7 @@ type sharedController struct {
 	// this allows one to create a sharedcontroller but it will not actually be started
 	// unless some aspect of the controllers informer is accessed or needed to be used
 	deferredController func() (Controller, error)
-	sharedCacheFactory cache.SharedCacheFactory
 	controller         Controller
-	gvk                schema.GroupVersionKind
 	handler            *SharedHandler
 	startLock          sync.Mutex
 	started            bool
