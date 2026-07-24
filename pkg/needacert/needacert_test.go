@@ -2,6 +2,7 @@ package needacert
 
 import (
 	"bytes"
+	"encoding/pem"
 	"fmt"
 	"math"
 	"testing"
@@ -859,6 +860,22 @@ func TestCAOnly(t *testing.T) {
 	assert.Len(t, caOnlyCerts, 1)
 	assert.True(t, caOnlyCerts[0].IsCA)
 	assert.Equal(t, fullChainCerts[len(fullChainCerts)-1].Raw, caOnlyCerts[0].Raw)
+}
+
+func TestCAOnly_SingleCert(t *testing.T) {
+	fullChain, _, err := cert.GenerateSelfSignedCertKey("ns-mysecret", nil, []string{"svc.ns", "svc.ns.svc"})
+	assert.NoError(t, err)
+
+	// Strip the chain down to just the leaf cert, so caOnly sees a single-cert
+	// PEM blob (as if the CA had already been dropped, or a bundle was never
+	// chained in the first place).
+	leafBlock, _ := pem.Decode(fullChain)
+	assert.NotNil(t, leafBlock)
+	leafOnlyPEM := pem.EncodeToMemory(leafBlock)
+
+	result, err := caOnly(leafOnlyPEM)
+	assert.NoError(t, err)
+	assert.Equal(t, leafOnlyPEM, result, "single-cert chain should be returned unmodified, not re-encoded")
 }
 
 func TestCAOnly_InvalidPEM(t *testing.T) {

@@ -152,6 +152,11 @@ func caOnly(fullChainPEM []byte) ([]byte, error) {
 	if len(certs) == 0 {
 		return nil, fmt.Errorf("no certificates found in chain")
 	}
+	if len(certs) == 1 {
+		// Only one cert in the chain means it's already the CA (no leaf to
+		// strip), so return it unmodified instead of re-encoding.
+		return fullChainPEM, nil
+	}
 
 	caCert := certs[len(certs)-1]
 	var buf bytes.Buffer
