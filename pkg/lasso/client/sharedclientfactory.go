@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/lasso/mapper"
-	"github.com/rancher/wrangler/v3/pkg/lasso/scheme"
+	"github.com/rancher/wrangler/v3/pkg/schemes"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,7 +85,7 @@ func applyDefaults(config *rest.Config, opts *SharedClientFactoryOptions) (*Shar
 	}
 
 	if newOpts.Scheme == nil {
-		newOpts.Scheme = scheme.All
+		newOpts.Scheme = schemes.All
 	}
 
 	if newOpts.Mapper == nil {
