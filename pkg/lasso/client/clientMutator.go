@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/rancher/wrangler/v3/pkg/lasso/log"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 )
@@ -76,7 +76,7 @@ func (s *sharedClientFactoryWithMutation) ForResourceKind(gvr schema.GroupVersio
 
 	clientWithMutation, err := s.mutator(client)
 	if err != nil {
-		log.Debugf("%v", err)
+		logrus.Debugf("%v", err)
 	}
 	return clientWithMutation
 }

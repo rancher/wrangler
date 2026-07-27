@@ -6,9 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/lasso/log"
-	"github.com/sirupsen/logrus"
-
 	"github.com/rancher/wrangler/v3/pkg/lasso/cache"
 	"github.com/rancher/wrangler/v3/pkg/lasso/client"
 	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
@@ -17,11 +14,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 )
-
-func init() {
-	log.Infof = logrus.Infof
-	log.Errorf = logrus.Errorf
-}
 
 type Factory struct {
 	lock              sync.Mutex

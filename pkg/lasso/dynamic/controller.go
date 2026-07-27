@@ -9,8 +9,8 @@ import (
 	lcache "github.com/rancher/wrangler/v3/pkg/lasso/cache"
 	"github.com/rancher/wrangler/v3/pkg/lasso/client"
 	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
-	"github.com/rancher/wrangler/v3/pkg/lasso/log"
 	"github.com/rancher/wrangler/v3/pkg/lasso/metrics"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -163,7 +163,7 @@ outer:
 		informer, shared, err := c.getCache(timeoutCtx, gvk)
 		if err != nil {
 			errs = append(errs, err)
-			log.Errorf("Failed to get shared cache for %v: %v", gvk, err)
+			logrus.Errorf("Failed to get shared cache for %v: %v", gvk, err)
 			delete(gvks, gvk)
 			continue
 		}
@@ -177,7 +177,7 @@ outer:
 				})
 				if err != nil {
 					errs = append(errs, err)
-					log.Errorf("failed to add indexer %s to gvk %s: %v", indexer.name, gvk, err)
+					logrus.Errorf("failed to add indexer %s to gvk %s: %v", indexer.name, gvk, err)
 					delete(gvks, gvk)
 					continue outer
 				}
@@ -200,14 +200,14 @@ outer:
 		toWait = append(toWait, w)
 
 		if !shared {
-			log.Infof("Watching metadata for %s", w.gvk)
+			logrus.Infof("Watching metadata for %s", w.gvk)
 			go w.informer.Run(w.ctx.Done())
 		}
 	}
 
 	for gvk, w := range c.watchers {
 		if !gvks[gvk] {
-			log.Infof("Stopping metadata watch on %s", gvk)
+			logrus.Infof("Stopping metadata watch on %s", gvk)
 			w.cancel()
 			delete(c.watchers, gvk)
 		}
@@ -216,7 +216,7 @@ outer:
 	for _, w := range toWait {
 		if !cache.WaitForCacheSync(timeoutCtx.Done(), w.informer.HasSynced) {
 			errs = append(errs, fmt.Errorf("failed to sync cache for %v", w.gvk))
-			log.Errorf("failed to sync cache for %v", w.gvk)
+			logrus.Errorf("failed to sync cache for %v", w.gvk)
 			w.cancel()
 			delete(c.watchers, w.gvk)
 		}
@@ -225,7 +225,7 @@ outer:
 	for _, w := range toWait {
 		if err := w.controller.Start(w.ctx, 5); err != nil {
 			errs = append(errs, err)
-			log.Errorf("failed to start controller for %v: %v", w.gvk, err)
+			logrus.Errorf("failed to start controller for %v: %v", w.gvk, err)
 			w.cancel()
 			delete(c.watchers, w.gvk)
 		}

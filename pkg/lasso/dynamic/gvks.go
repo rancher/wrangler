@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
-	"k8s.io/klog/v2"
 )
 
 type gvksCallback func([]schema.GroupVersionKind) error
@@ -67,7 +67,7 @@ func (g *gvkWatcher) queueRefresh() {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 		if err := g.refreshAll(); err != nil {
-			klog.Errorf("failed to sync schemas: %v", err)
+			logrus.Errorf("failed to sync schemas: %v", err)
 			atomic.StoreInt32(&g.toSync, 1)
 		}
 	}()
@@ -77,7 +77,7 @@ func (g *gvkWatcher) getGVKs() (result []schema.GroupVersionKind, _ error) {
 	_, resources, err := g.client.ServerGroupsAndResources()
 	if err != nil {
 		if gd, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
-			klog.Warning("Failed to read API for groups: ", gd.Groups)
+			logrus.Warning("Failed to read API for groups: ", gd.Groups)
 		} else {
 			return nil, fmt.Errorf("getGVKs: %w", err)
 		}

@@ -2,7 +2,7 @@ package controller
 
 import (
 	"github.com/rancher/wrangler/v3/pkg/lasso/client"
-	"github.com/rancher/wrangler/v3/pkg/lasso/log"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -61,7 +61,7 @@ func (s *sharedControllerWithAgent) Client() *client.Client {
 	}
 	clientWithAgent, err := client.WithAgent(s.userAgent)
 	if err != nil {
-		log.Debugf("failed to get client with agent [%s]", s.userAgent)
+		logrus.Debugf("failed to get client with agent [%s]", s.userAgent)
 		return client
 	}
 	return clientWithAgent

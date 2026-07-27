@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/lasso/client"
-	"github.com/rancher/wrangler/v3/pkg/lasso/log"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -78,7 +78,7 @@ func getDefaultResyncInterval() time.Duration {
 	}
 	resyncDefaultFromEnv, err := strconv.Atoi(cattleResyncDefaultFromEnv)
 	if err != nil {
-		log.Errorf("Lasso: Unable to use resync interval value [%s] from CATTLE_RESYNC_DEFAULT environment variable. Using default [%d].", cattleResyncDefaultFromEnv, resyncDefault)
+		logrus.Errorf("Lasso: Unable to use resync interval value [%s] from CATTLE_RESYNC_DEFAULT environment variable. Using default [%d].", cattleResyncDefaultFromEnv, resyncDefault)
 		return resyncDefault * time.Minute
 	}
 	return time.Duration(resyncDefaultFromEnv) * time.Minute

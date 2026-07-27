@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/lasso/log"
 	"github.com/rancher/wrangler/v3/pkg/lasso/metrics"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -152,7 +152,7 @@ func (c *controller) run(workers int, stopCh <-chan struct{}) {
 	}()
 
 	// Start the informer factories to begin populating the informer caches
-	log.Infof("Starting %s controller", c.name)
+	logrus.Infof("Starting %s controller", c.name)
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
@@ -162,7 +162,7 @@ func (c *controller) run(workers int, stopCh <-chan struct{}) {
 	c.startLock.Lock()
 	defer c.startLock.Unlock()
 	c.started = false
-	log.Infof("Shutting down %s workers", c.name)
+	logrus.Infof("Shutting down %s workers", c.name)
 }
 
 func (c *controller) Start(ctx context.Context, workers int) error {
@@ -201,7 +201,7 @@ func (c *controller) processNextWorkItem() bool {
 
 	if err := c.processSingleItem(obj); err != nil {
 		if !strings.Contains(err.Error(), "please apply your changes to the latest version and try again") {
-			log.Errorf("%v", err)
+			logrus.Errorf("%v", err)
 		}
 		return true
 	}
@@ -219,7 +219,7 @@ func (c *controller) processSingleItem(obj interface{}) error {
 
 	if key, ok = obj.(string); !ok {
 		c.workqueue.Forget(obj)
-		log.Errorf("expected string in workqueue but got %#v", obj)
+		logrus.Errorf("expected string in workqueue but got %#v", obj)
 		return nil
 	}
 	if err := c.syncHandler(key); err != nil {
@@ -297,7 +297,7 @@ func (c *controller) enqueue(obj interface{}) {
 	var key string
 	var err error
 	if key, err = cache.MetaNamespaceKeyFunc(obj); err != nil {
-		log.Errorf("%v", err)
+		logrus.Errorf("%v", err)
 		return
 	}
 	c.startLock.Lock()
@@ -313,12 +313,12 @@ func (c *controller) handleObject(obj interface{}) {
 	if _, ok := obj.(metav1.Object); !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			log.Errorf("error decoding object, invalid type")
+			logrus.Errorf("error decoding object, invalid type")
 			return
 		}
 		newObj, ok := tombstone.Obj.(metav1.Object)
 		if !ok {
-			log.Errorf("error decoding object tombstone, invalid type")
+			logrus.Errorf("error decoding object tombstone, invalid type")
 			return
 		}
 		obj = newObj
