@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/rancher/wrangler/v3/pkg/gvk"
-	"github.com/rancher/wrangler/v3/pkg/stringset"
+	"github.com/rancher/wrangler/v4/pkg/gvk"
+	"github.com/rancher/wrangler/v4/pkg/stringset"
 
-	"github.com/rancher/wrangler/v3/pkg/merr"
+	"github.com/rancher/wrangler/v4/pkg/merr"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/lasso/client"
+	"github.com/rancher/wrangler/v4/pkg/lasso/client"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

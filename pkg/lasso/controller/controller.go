@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/lasso/metrics"
+	"github.com/rancher/wrangler/v4/pkg/lasso/metrics"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

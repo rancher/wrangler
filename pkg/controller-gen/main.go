@@ -13,8 +13,8 @@ import (
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 
-	cgargs "github.com/rancher/wrangler/v3/pkg/controller-gen/args"
-	"github.com/rancher/wrangler/v3/pkg/controller-gen/generators"
+	cgargs "github.com/rancher/wrangler/v4/pkg/controller-gen/args"
+	"github.com/rancher/wrangler/v4/pkg/controller-gen/generators"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/tools/imports"
 	"k8s.io/apimachinery/pkg/runtime/schema"

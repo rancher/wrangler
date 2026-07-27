@@ -12,7 +12,7 @@ package fake
 import (
 	reflect "reflect"
 
-	generic "github.com/rancher/wrangler/v3/pkg/generic"
+	generic "github.com/rancher/wrangler/v4/pkg/generic"
 	gomock "go.uber.org/mock/gomock"
 	labels "k8s.io/apimachinery/pkg/labels"
 	runtime "k8s.io/apimachinery/pkg/runtime"

@@ -1,4 +1,4 @@
-//go:generate mockgen --build_flags=--mod=mod -package cache -destination ./mocks_test.go github.com/rancher/wrangler/v3/pkg/lasso/client SharedClientFactory
+//go:generate mockgen --build_flags=--mod=mod -package cache -destination ./mocks_test.go github.com/rancher/wrangler/v4/pkg/lasso/client SharedClientFactory
 package cache
 
 import (
@@ -9,8 +9,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/rancher/wrangler/v3/pkg/lasso/client"
-	"github.com/rancher/wrangler/v3/pkg/lasso/metrics"
+	"github.com/rancher/wrangler/v4/pkg/lasso/client"
+	"github.com/rancher/wrangler/v4/pkg/lasso/metrics"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"

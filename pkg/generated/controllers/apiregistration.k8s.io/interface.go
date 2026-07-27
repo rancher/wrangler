@@ -19,8 +19,8 @@ limitations under the License.
 package apiregistration
 
 import (
-	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
-	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
+	v1 "github.com/rancher/wrangler/v4/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	"github.com/rancher/wrangler/v4/pkg/lasso/controller"
 )
 
 type Interface interface {

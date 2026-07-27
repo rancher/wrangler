@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/wrangler/v3/pkg/gvk"
+	"github.com/rancher/wrangler/v4/pkg/gvk"
 
-	"github.com/rancher/wrangler/v3/pkg/kv"
+	"github.com/rancher/wrangler/v4/pkg/kv"
 
-	namer "github.com/rancher/wrangler/v3/pkg/name"
+	namer "github.com/rancher/wrangler/v4/pkg/name"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

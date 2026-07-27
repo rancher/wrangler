@@ -19,8 +19,8 @@ limitations under the License.
 package core
 
 import (
-	"github.com/rancher/wrangler/v3/pkg/generic"
-	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
+	"github.com/rancher/wrangler/v4/pkg/generic"
+	"github.com/rancher/wrangler/v4/pkg/lasso/controller"
 	"k8s.io/client-go/rest"
 )
 
