@@ -6,12 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/lasso/pkg/log"
+	"github.com/rancher/wrangler/v3/pkg/lasso/log"
 	"github.com/sirupsen/logrus"
 
-	"github.com/rancher/lasso/pkg/cache"
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/v3/pkg/lasso/cache"
+	"github.com/rancher/wrangler/v3/pkg/lasso/client"
+	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
 	"github.com/rancher/wrangler/v3/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

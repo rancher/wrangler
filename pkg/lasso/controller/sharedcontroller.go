@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/lasso/pkg/cache"
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/metrics"
+	"github.com/rancher/wrangler/v3/pkg/lasso/cache"
+	"github.com/rancher/wrangler/v3/pkg/lasso/client"
+	"github.com/rancher/wrangler/v3/pkg/lasso/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	cachetools "k8s.io/client-go/tools/cache"

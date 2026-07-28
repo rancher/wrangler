@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/wrangler/v3/pkg/lasso/client"
 )
 
 const (

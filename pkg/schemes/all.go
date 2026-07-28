@@ -1,7 +1,7 @@
 package schemes
 
 import (
-	"github.com/rancher/lasso/pkg/scheme"
+	"github.com/rancher/wrangler/v3/pkg/lasso/scheme"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 

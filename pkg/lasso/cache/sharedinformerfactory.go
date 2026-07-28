@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/lasso/pkg/client"
-	"github.com/rancher/lasso/pkg/metrics"
+	"github.com/rancher/wrangler/v3/pkg/lasso/client"
+	"github.com/rancher/wrangler/v3/pkg/lasso/metrics"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

@@ -19,8 +19,8 @@ limitations under the License.
 package apiextensions
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
+	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
 )
 
 type Interface interface {

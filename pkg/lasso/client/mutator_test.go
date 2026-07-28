@@ -1,5 +1,5 @@
 // Mocks for this test are generated with the following command.
-//go:generate mockgen --build_flags=--mod=mod -package client -destination ./mocks_test.go github.com/rancher/lasso/pkg/client SharedClientFactory
+//go:generate mockgen --build_flags=--mod=mod -package client -destination ./mocks_test.go github.com/rancher/wrangler/v3/pkg/lasso/client SharedClientFactory
 
 package client
 

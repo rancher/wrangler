@@ -49,7 +49,7 @@ additionally generate a controller per resource type.  The interface to the cont
 
 <br>
 
-The controller interface along with other helpful structs, interfaces, and functions are provided by another project [lasso](https://github.com/rancher/lasso). Lasso ties together the aforementioned tools while wrangler leverages them in a user friendly way.
+The controller interface along with other helpful structs, interfaces, and functions are provided by [lasso](pkg/lasso/README.md), which lives in this repository under `pkg/lasso`. Lasso ties together the aforementioned tools while wrangler leverages them in a user friendly way.
 
 To use the controller to run custom code for Kubernetes resource types all one needs to do is register OnChange handlers and run the controller.  Also using the controller interface one can access the client and caches through a simple flat API.
 
@@ -62,7 +62,7 @@ A typical, non-wrangler Kubernetes application would most likely use an informer
 	<dt>factory</dt>
 	<dd>Factories manage controllers. Wrangler generates factories for each API group. Wrangler factories use lasso shared factories for caches and controllers underneath.
 	The lasso factories do most of the heavy lifting but are more resource type agnostic. Wrangler wraps lasso's factories to provide resource type specific clients and controllers.
-	When accessing a wrangler generated controller, a controller for that resource type is requested from a lasso factory. If the controller exists it will be returned. Otherwise, the lasso factory will create it, persist it, and return it. You can consult the [lasso](https://github.com/rancher/lasso) repository for more details on factories.</dd>
+	When accessing a wrangler generated controller, a controller for that resource type is requested from a lasso factory. If the controller exists it will be returned. Otherwise, the lasso factory will create it, persist it, and return it. You can consult the [lasso docs](pkg/lasso/README.md) for more details on factories.</dd>
 	<dt>informers</dt>
 	<dd>Broadcasts events for a given resource type and can register handlers for those events.</dd>
 	<dt>listers</dt>

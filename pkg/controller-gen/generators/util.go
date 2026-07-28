@@ -15,7 +15,7 @@ var (
 		"time",
 		"k8s.io/client-go/rest",
 		"github.com/rancher/wrangler/v3/pkg/apply",
-		"github.com/rancher/lasso/pkg/controller",
+		"github.com/rancher/wrangler/v3/pkg/lasso/controller",
 		"github.com/rancher/wrangler/v3/pkg/condition",
 		"github.com/rancher/wrangler/v3/pkg/schemes",
 		"github.com/rancher/wrangler/v3/pkg/generic",

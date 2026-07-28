@@ -19,8 +19,8 @@ limitations under the License.
 package admissionregistration
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
 	"k8s.io/client-go/rest"
 )
 

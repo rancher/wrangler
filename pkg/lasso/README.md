@@ -1,6 +1,13 @@
 Lasso
 =====
 
+_Lasso was developed as the standalone [rancher/lasso](https://github.com/rancher/lasso)
+repository and was merged into wrangler under `pkg/lasso`. The packages are unchanged
+apart from their import paths, which are now
+`github.com/rancher/wrangler/v3/pkg/lasso/...`. Lasso's own commit history came across
+with the merge; `git blame` works, but `git log` needs `--full-history` and the old
+`pkg/<package>/` path as well as the new one._
+
 # Contents
 - [Lasso](#lasso)
 - [Contents](#contents)
@@ -137,7 +144,7 @@ package main
 import (
 	"context"
 
-	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -205,4 +212,4 @@ The following resources were helpful in writing these docs. They are highly reco
 
 
 # Versioning
-See [VERSION.md](VERSION.md).
+See [VERSION.md](../../VERSION.md).

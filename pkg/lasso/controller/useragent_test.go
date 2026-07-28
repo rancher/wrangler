@@ -1,12 +1,12 @@
 package controller
 
-//go:generate mockgen --build_flags=--mod=mod -package controller -destination ./mocks_test.go github.com/rancher/lasso/pkg/controller SharedController
+//go:generate mockgen --build_flags=--mod=mod -package controller -destination ./mocks_test.go github.com/rancher/wrangler/v3/pkg/lasso/controller SharedController
 
 import (
 	"net/http"
 	"testing"
 
-	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/wrangler/v3/pkg/lasso/client"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/runtime/serializer"

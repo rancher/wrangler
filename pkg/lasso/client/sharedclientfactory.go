@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rancher/lasso/pkg/mapper"
-	"github.com/rancher/lasso/pkg/scheme"
+	"github.com/rancher/wrangler/v3/pkg/lasso/mapper"
+	"github.com/rancher/wrangler/v3/pkg/lasso/scheme"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

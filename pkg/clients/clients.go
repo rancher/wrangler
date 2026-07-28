@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/rancher/lasso/pkg/controller"
-	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	admissionreg "github.com/rancher/wrangler/v3/pkg/generated/controllers/admissionregistration.k8s.io"
 	admissionregcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/admissionregistration.k8s.io/v1"
@@ -22,6 +20,8 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac"
 	rbaccontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v3/pkg/lasso/controller"
+	"github.com/rancher/wrangler/v3/pkg/lasso/dynamic"
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"

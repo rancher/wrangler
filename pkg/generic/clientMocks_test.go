@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	client "github.com/rancher/lasso/pkg/client"
+	client "github.com/rancher/wrangler/v3/pkg/lasso/client"
 	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
