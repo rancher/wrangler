@@ -374,6 +374,9 @@ func checkTransitioning(obj data.Object, conditions []Condition, summary Summary
 	if isCAPICluster(obj) {
 		return checkCAPIClusterTransitioning(obj, conditions, summary)
 	}
+	if isOperation(obj) {
+		return checkOperationTransitioning(conditions, summary)
+	}
 	return checkGenericTransitioning(obj, conditions, summary)
 }
 
