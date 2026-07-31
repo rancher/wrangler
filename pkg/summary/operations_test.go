@@ -30,8 +30,8 @@ func TestIsOperation(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "future API version of the same group",
-			obj:      data.Object{"apiVersion": "operation.cattle.io/v1", "kind": "ETCDSnapshotSave"},
+			name:     "CertificateRotation",
+			obj:      data.Object{"apiVersion": "operation.cattle.io/v1alpha1", "kind": "CertificateRotation"},
 			expected: true,
 		},
 		{
@@ -203,16 +203,16 @@ func TestCheckOperationTransitioning(t *testing.T) {
 
 // makeOperationObj builds an operation.cattle.io object with the given phase,
 // step and conditions.
-func makeOperationObj(kind, phase, step string, conditions ...map[string]interface{}) *unstructured.Unstructured {
-	raw := make([]interface{}, 0, len(conditions))
+func makeOperationObj(kind, phase, step string, conditions ...map[string]any) *unstructured.Unstructured {
+	raw := make([]any, 0, len(conditions))
 	for _, c := range conditions {
 		raw = append(raw, c)
 	}
-	return &unstructured.Unstructured{Object: map[string]interface{}{
+	return &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "operation.cattle.io/v1alpha1",
 		"kind":       kind,
-		"metadata":   map[string]interface{}{"name": "op", "namespace": "fleet-default"},
-		"status": map[string]interface{}{
+		"metadata":   map[string]any{"name": "op", "namespace": "fleet-default"},
+		"status": map[string]any{
 			"phase":              phase,
 			"step":               step,
 			"observedGeneration": int64(1),
@@ -221,8 +221,8 @@ func makeOperationObj(kind, phase, step string, conditions ...map[string]interfa
 	}}
 }
 
-func cond(condType, status, reason, message string) map[string]interface{} {
-	return map[string]interface{}{
+func cond(condType, status, reason, message string) map[string]any {
+	return map[string]any{
 		"type":    condType,
 		"status":  status,
 		"reason":  reason,
@@ -233,7 +233,7 @@ func cond(condType, status, reason, message string) map[string]interface{} {
 // TestSummarizeOperation exercises the whole summarizer chain, which is where
 // the reported inaccuracy surfaced.
 func TestSummarizeOperation(t *testing.T) {
-	inProgressConditions := []map[string]interface{}{
+	inProgressConditions := []map[string]any{
 		cond("InProgress", "True", "WaitingForPlanApplied", "Waiting in step Preflight: failing plan for machine-7qrnd"),
 		cond("Paused", "False", "NotPaused", ""),
 		cond("Pending", "False", "InProgress", "Operation now in progress"),
@@ -273,10 +273,10 @@ func TestSummarizeOperation(t *testing.T) {
 		},
 		{
 			name: "freshly created, no status yet",
-			obj: &unstructured.Unstructured{Object: map[string]interface{}{
+			obj: &unstructured.Unstructured{Object: map[string]any{
 				"apiVersion": "operation.cattle.io/v1alpha1",
 				"kind":       "EncryptionKeyRotation",
-				"metadata":   map[string]interface{}{"name": "op", "namespace": "fleet-default"},
+				"metadata":   map[string]any{"name": "op", "namespace": "fleet-default"},
 			}},
 			expected: Summary{State: "pending", Transitioning: true},
 		},

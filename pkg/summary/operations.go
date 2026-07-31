@@ -12,10 +12,11 @@ var operationKinds = map[string]bool{
 	"EncryptionKeyRotation": true,
 	"ETCDSnapshotRestore":   true,
 	"ETCDSnapshotSave":      true,
+	"CertificateRotation":   true,
 }
 
 // isOperation returns true if the object is a Rancher operation
-// (operation.cattle.io/*/{EncryptionKeyRotation,ETCDSnapshotRestore,ETCDSnapshotSave}).
+// (operation.cattle.io/*/{EncryptionKeyRotation,ETCDSnapshotRestore,ETCDSnapshotSave,CertificateRotation}).
 func isOperation(obj data.Object) bool {
 	return strings.HasPrefix(obj.String("apiVersion"), "operation.cattle.io/") &&
 		operationKinds[obj.String("kind")]
