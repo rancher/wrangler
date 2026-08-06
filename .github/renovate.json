@@ -16,10 +16,31 @@
   ],
   "packageRules": [
     {
+      "matchBaseBranches": ["main"],
+      "extends": ["github>rancher/renovate-config:rancher-main#main"]
+    },
+    {
+      "description": "release/v3.6 is only consumed by rancher release/v2.14",
+      "matchBaseBranches": ["release/v3.6"],
+      "extends": ["github>rancher/renovate-config:rancher-2.14#main"]
+    },
+    {
+      "description": "release/v3.3 is shared by rancher release/v2.12 and release/v2.13; use the older/tighter of the two ceilings",
+      "matchBaseBranches": ["release/v3.3"],
+      "extends": ["github>rancher/renovate-config:rancher-2.12#main"]
+    },
+    {
+      "description": "release/v2 predates every per-release-line preset and has no active consumer; keep it fully disabled for k8s.io/sigs.k8s.io rather than adopting a ceiling that doesn't apply to it",
       "enabled": false,
+      "matchBaseBranches": ["release/v2"],
       "matchPackageNames": [
         "/k8s.io/*/",
-        "/sigs.k8s.io/*/",
+        "/sigs.k8s.io/*/"
+      ]
+    },
+    {
+      "enabled": false,
+      "matchPackageNames": [
         "/go.opentelemetry.io/*/",
         "/github.com/prometheus/*/",
         "/github.com/rancher/lasso/*/"
