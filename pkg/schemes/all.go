@@ -1,12 +1,15 @@
 package schemes
 
 import (
-	"github.com/rancher/lasso/pkg/scheme"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	All                = scheme.All
+	// All is the scheme shared by every wrangler client and cache. Generated
+	// packages register their types into it from their init functions, and it is
+	// the scheme the lasso shared client factory falls back to when a caller
+	// does not supply one of its own.
+	All                = runtime.NewScheme()
 	localSchemeBuilder = runtime.NewSchemeBuilder()
 )
 

@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/v4/pkg/lasso/controller"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"

@@ -11,8 +11,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/rancher/wrangler/v3/pkg/data/convert"
-	"github.com/rancher/wrangler/v3/pkg/gvk"
+	"github.com/rancher/wrangler/v4/pkg/data/convert"
+	"github.com/rancher/wrangler/v4/pkg/gvk"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	yamlDecoder "k8s.io/apimachinery/pkg/util/yaml"

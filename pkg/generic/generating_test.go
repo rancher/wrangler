@@ -4,17 +4,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rancher/wrangler/v3/pkg/generic"
+	"github.com/rancher/wrangler/v4/pkg/generic"
 	"go.uber.org/mock/gomock"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/rancher/wrangler/v3/pkg/apply"
-	fakeapply "github.com/rancher/wrangler/v3/pkg/apply/fake"
-	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	fake2 "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v4/pkg/apply"
+	fakeapply "github.com/rancher/wrangler/v4/pkg/apply/fake"
+	v1 "github.com/rancher/wrangler/v4/pkg/generated/controllers/core/v1"
+	fake2 "github.com/rancher/wrangler/v4/pkg/generic/fake"
 )
 
 func TestUniqueApplyForResourceVersion(t *testing.T) {

@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
-	generic "github.com/rancher/wrangler/v3/pkg/generic"
+	generic "github.com/rancher/wrangler/v4/pkg/generic"
 	gomock "go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"

@@ -3,7 +3,7 @@ package generic
 import (
 	"context"
 
-	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/wrangler/v4/pkg/lasso/client"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"

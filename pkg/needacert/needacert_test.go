@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/rancher/wrangler/v4/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/assert"

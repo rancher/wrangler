@@ -19,9 +19,9 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
-	"github.com/rancher/wrangler/v3/pkg/generic"
-	"github.com/rancher/wrangler/v3/pkg/schemes"
+	"github.com/rancher/wrangler/v4/pkg/generic"
+	"github.com/rancher/wrangler/v4/pkg/lasso/controller"
+	"github.com/rancher/wrangler/v4/pkg/schemes"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
