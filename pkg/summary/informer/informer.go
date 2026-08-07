@@ -18,6 +18,7 @@ package informer
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -166,13 +167,17 @@ func NewFilteredSummaryInformer(client client.Interface, gvr schema.GroupVersion
 			return client.Resource(gvr).Namespace(namespace).Watch(context.TODO(), options)
 		},
 	}
+	exampleObject := new(summary.SummarizedObject)
 	return &summaryInformer{
 		gvr: gvr,
-		informer: cache.NewSharedIndexInformer(
+		informer: cache.NewSharedIndexInformerWithOptions(
 			toListWatcherWithWatchListSemantics(lw, client),
-			&summary.SummarizedObject{},
-			resyncPeriod,
-			indexers,
+			exampleObject,
+			cache.SharedIndexInformerOptions{
+				ResyncPeriod:      resyncPeriod,
+				Indexers:          indexers,
+				ObjectDescription: fmt.Sprintf("%T(%s)", exampleObject, gvr),
+			},
 		),
 	}
 }
