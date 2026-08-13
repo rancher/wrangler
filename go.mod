@@ -18,7 +18,7 @@ require (
 	k8s.io/client-go v0.36.0
 	k8s.io/code-generator v0.36.0
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511
-	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b
+	k8s.io/gengo/v2 v2.0.0-20260408192533-25e2208e0dc3
 	k8s.io/kube-aggregator v0.36.0
 	k8s.io/kube-openapi v0.0.0-20260317180543-43fb72c5454a
 	sigs.k8s.io/cli-utils v0.37.2
@@ -58,7 +58,7 @@ require (
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
-	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
