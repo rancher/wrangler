@@ -25,9 +25,9 @@
       "extends": ["github>rancher/renovate-config:rancher-2.14#main"]
     },
     {
-      "description": "release/v3.3 is shared by rancher release/v2.12 and release/v2.13; use the older/tighter of the two ceilings",
+      "description": "release/v3.3 is shared by rancher release/v2.11, release/v2.12, and release/v2.13; use the oldest/tightest of the three ceilings",
       "matchBaseBranches": ["release/v3.3"],
-      "extends": ["github>rancher/renovate-config:rancher-2.12#main"]
+      "extends": ["github>rancher/renovate-config:rancher-2.11#main"]
     },
     {
       "description": "release/v2 predates every per-release-line preset and has no active consumer; keep it fully disabled for k8s.io/sigs.k8s.io rather than adopting a ceiling that doesn't apply to it",
