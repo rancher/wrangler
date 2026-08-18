@@ -114,6 +114,7 @@ type Field struct {
 	InvalidChars string      `json:"invalidChars,omitempty"`
 	Description  string      `json:"description,omitempty"`
 	CodeName     string      `json:"-"`
+	AgentRestart bool        `json:"agentRestart,omitempty"`
 }
 
 type Action struct {
