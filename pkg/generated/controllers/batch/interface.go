@@ -19,8 +19,8 @@ limitations under the License.
 package batch
 
 import (
-	"github.com/rancher/lasso/pkg/controller"
-	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/batch/v1"
+	v1 "github.com/rancher/wrangler/v4/pkg/generated/controllers/batch/v1"
+	"github.com/rancher/wrangler/v4/pkg/lasso/controller"
 )
 
 type Interface interface {

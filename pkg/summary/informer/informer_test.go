@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/wrangler/v3/pkg/summary"
-	"github.com/rancher/wrangler/v3/pkg/summary/client"
+	"github.com/rancher/wrangler/v4/pkg/summary"
+	"github.com/rancher/wrangler/v4/pkg/summary/client"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"

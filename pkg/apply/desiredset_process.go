@@ -7,9 +7,9 @@ import (
 	"sort"
 	"sync"
 
-	gvk2 "github.com/rancher/wrangler/v3/pkg/gvk"
-	"github.com/rancher/wrangler/v3/pkg/merr"
-	"github.com/rancher/wrangler/v3/pkg/objectset"
+	gvk2 "github.com/rancher/wrangler/v4/pkg/gvk"
+	"github.com/rancher/wrangler/v4/pkg/merr"
+	"github.com/rancher/wrangler/v4/pkg/objectset"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	errors2 "k8s.io/apimachinery/pkg/api/errors"

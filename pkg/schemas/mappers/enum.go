@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/wrangler/v3/pkg/data"
-	"github.com/rancher/wrangler/v3/pkg/data/convert"
-	"github.com/rancher/wrangler/v3/pkg/kv"
-	"github.com/rancher/wrangler/v3/pkg/schemas"
+	"github.com/rancher/wrangler/v4/pkg/data"
+	"github.com/rancher/wrangler/v4/pkg/data/convert"
+	"github.com/rancher/wrangler/v4/pkg/kv"
+	"github.com/rancher/wrangler/v4/pkg/schemas"
 )
 
 type Enum struct {

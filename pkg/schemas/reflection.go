@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rancher/wrangler/v3/pkg/data/convert"
-	"github.com/rancher/wrangler/v3/pkg/slice"
+	"github.com/rancher/wrangler/v4/pkg/data/convert"
+	"github.com/rancher/wrangler/v4/pkg/slice"
 	"github.com/sirupsen/logrus"
 )
 

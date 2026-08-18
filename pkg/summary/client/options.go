@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/rancher/wrangler/v3/pkg/schemas"
+	"github.com/rancher/wrangler/v4/pkg/schemas"
 )
 
 type Options struct {

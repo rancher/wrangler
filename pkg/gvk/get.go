@@ -3,7 +3,7 @@ package gvk
 import (
 	"fmt"
 
-	"github.com/rancher/wrangler/v3/pkg/schemes"
+	"github.com/rancher/wrangler/v4/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )

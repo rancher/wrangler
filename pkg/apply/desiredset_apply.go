@@ -10,10 +10,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	gvk2 "github.com/rancher/wrangler/v3/pkg/gvk"
+	gvk2 "github.com/rancher/wrangler/v4/pkg/gvk"
 
-	"github.com/rancher/wrangler/v3/pkg/apply/injectors"
-	"github.com/rancher/wrangler/v3/pkg/objectset"
+	"github.com/rancher/wrangler/v4/pkg/apply/injectors"
+	"github.com/rancher/wrangler/v4/pkg/objectset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

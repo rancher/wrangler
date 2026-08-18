@@ -3,7 +3,7 @@ package summary
 import (
 	"testing"
 
-	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v4/pkg/data"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
