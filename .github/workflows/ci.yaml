@@ -30,7 +30,7 @@ jobs:
     name: golangci-lint
     runs-on: ubuntu-latest
     env:
-      SETUP_GO_VERSION: '^1.25'
+      SETUP_GO_VERSION: '1.25'
       GOLANG_CI_LINT_VERSION: v2.7.1
     steps:
       - name: Checkout
