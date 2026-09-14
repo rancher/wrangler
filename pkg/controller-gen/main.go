@@ -1,9 +1,11 @@
 package controllergen
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,8 +20,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/tools/imports"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	acargs "k8s.io/code-generator/cmd/applyconfiguration-gen/args"
+	ac "k8s.io/code-generator/cmd/applyconfiguration-gen/generators"
 	csargs "k8s.io/code-generator/cmd/client-gen/args"
-
 	cs "k8s.io/code-generator/cmd/client-gen/generators"
 	types2 "k8s.io/code-generator/cmd/client-gen/types"
 	dpargs "k8s.io/code-generator/cmd/deepcopy-gen/args"
@@ -28,7 +31,6 @@ import (
 	inf "k8s.io/code-generator/cmd/informer-gen/generators"
 	lsargs "k8s.io/code-generator/cmd/lister-gen/args"
 	ls "k8s.io/code-generator/cmd/lister-gen/generators"
-	oaargs "k8s.io/kube-openapi/cmd/openapi-gen/args"
 	oa "k8s.io/kube-openapi/pkg/generators"
 )
 
@@ -136,6 +138,10 @@ func Run(opts cgargs.Options) {
 		logrus.Fatalf("openapi failed: %v", err)
 	}
 
+	if err := generateApplyConfiguration(groups, customArgs); err != nil {
+		logrus.Fatalf("applyconfiguration failed: %v", err)
+	}
+
 	if err := copyGoPathToModules(customArgs); err != nil {
 		logrus.Fatalf("go modules copy failed: %v", err)
 	}
@@ -235,6 +241,65 @@ func generateDeepcopy(groups map[string]bool, customArgs *cgargs.CustomArgs) err
 	)
 }
 
+func generateApplyConfiguration(groups map[string]bool, customArgs *cgargs.CustomArgs) error {
+	if len(groups) == 0 {
+		return nil
+	}
+	applyconfigurationArgs := acargs.New()
+	applyconfigurationArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Package, "applyconfiguration")
+	applyconfigurationArgs.OutputPkg = filepath.Join(customArgs.Package, "applyconfiguration")
+	applyconfigurationArgs.GoHeaderFile = customArgs.Options.Boilerplate
+
+	if path, err := generateOpenAPISchemaFile(customArgs); err != nil {
+		logrus.Warnf("%v: fake ClientSet will not be usable - see https://github.com/kubernetes/kubernetes/issues/126850", err)
+	} else {
+		applyconfigurationArgs.OpenAPISchemaFilePath = path
+	}
+
+	inputDirs := []string{}
+	for gv, names := range customArgs.TypesByGroup {
+		if !groups[gv.Group] {
+			continue
+		}
+		inputDirs = append(inputDirs, names[0].Package)
+	}
+
+	getTargets := func(context *generator.Context) []generator.Target {
+		return ac.GetTargets(context, applyconfigurationArgs)
+	}
+
+	return gengo.Execute(
+		ac.NameSystems(),
+		ac.DefaultNameSystem(),
+		getTargets,
+		gengo.StdBuildTag,
+		inputDirs,
+	)
+}
+
+func generateOpenAPISchemaFile(customArgs *cgargs.CustomArgs) (string, error) {
+	modelsSchemaGo := filepath.Join(customArgs.OutputBase, customArgs.Options.OutputPackage, "openapi", "cmd", "models-schema", "main.go")
+	if _, err := os.Stat(modelsSchemaGo); err != nil {
+		return "", errors.New("OpenAPI models-schema command not found; please enable GenerateOpenAPI for one or groups")
+	}
+
+	cmd := exec.Command("go", "run", modelsSchemaGo)
+	cmd.Dir = strings.TrimSuffix(filepath.Join(customArgs.OutputBase, customArgs.Options.OutputPackage), "pkg/generated")
+	cmd.Stderr = os.Stderr
+
+	for _, file := range []string{"go.mod", "go.sum"} {
+		copyFile(file, filepath.Join(cmd.Dir, file))
+	}
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to run models-schema command: %w", err)
+	}
+
+	schemaFilePath := filepath.Join(customArgs.OutputBase, "schemas.json")
+	return schemaFilePath, os.WriteFile(schemaFilePath, output, 0644)
+}
+
 func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) error {
 	if len(groups) == 0 {
 		return nil
@@ -244,6 +309,7 @@ func generateClientset(groups map[string]bool, customArgs *cgargs.CustomArgs) er
 	clientSetArgs.ClientsetName = "versioned"
 	clientSetArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Package, "clientset")
 	clientSetArgs.OutputPkg = filepath.Join(customArgs.Package, "clientset")
+	clientSetArgs.ApplyConfigurationPackage = filepath.Join(customArgs.Package, "applyconfiguration")
 	clientSetArgs.GoHeaderFile = customArgs.Options.Boilerplate
 
 	var order []schema.GroupVersion
@@ -294,16 +360,6 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		return nil
 	}
 
-	openAPIArgs := oaargs.New()
-	openAPIArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Options.OutputPackage, "openapi")
-	openAPIArgs.OutputFile = "zz_generated_openapi.go"
-	openAPIArgs.OutputPkg = customArgs.Options.OutputPackage + "/openapi"
-	openAPIArgs.GoHeaderFile = customArgs.Options.Boilerplate
-
-	if err := openAPIArgs.Validate(); err != nil {
-		return err
-	}
-
 	inputDirsMap := map[string]bool{}
 	inputDirs := []string{}
 	for gv, names := range customArgs.TypesByGroup {
@@ -325,8 +381,10 @@ func generateOpenAPI(groups map[string]bool, customArgs *cgargs.CustomArgs) erro
 		}
 	}
 
+	openAPIGen := generators.NewOpenAPIGenerator()
+
 	getTargets := func(context *generator.Context) []generator.Target {
-		return oa.GetTargets(context, openAPIArgs)
+		return openAPIGen.GetTargets(context, customArgs)
 	}
 
 	return gengo.Execute(
