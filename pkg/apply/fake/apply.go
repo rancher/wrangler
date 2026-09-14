@@ -65,6 +65,10 @@ func (f *FakeApply) WithReconciler(gvk schema.GroupVersionKind, reconciler apply
 	return f
 }
 
+func (f *FakeApply) WithNullSafePatch(gvks ...schema.GroupVersionKind) apply.Apply {
+	return f
+}
+
 func (f *FakeApply) WithStrictCaching() apply.Apply {
 	return f
 }

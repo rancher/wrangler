@@ -131,6 +131,13 @@ func emptyMaps(data map[string]interface{}, keys ...string) bool {
 }
 
 func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error) {
+	if patch2.IsJSONPatch(patch) {
+		if !removeObjectSetAnnotation {
+			return patch, nil
+		}
+		return dropObjectSetOps(patch)
+	}
+
 	mod := false
 	data := map[string]interface{}{}
 	err := json.Unmarshal(patch, &data)
@@ -185,7 +192,31 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal bool, oldObject, newObject runtime.Object, diffPatches [][]byte) (bool, error) {
+// objectSetOpPrefix is the JSON Pointer prefix of the operations that carry
+// apply's own bookkeeping annotations.
+var objectSetOpPrefix = "/metadata/annotations/" + patch2.EscapePointerToken(LabelPrefix)
+
+func dropObjectSetOps(patch []byte) ([]byte, error) {
+	var ops []patch2.Operation
+	if err := json.Unmarshal(patch, &ops); err != nil {
+		return nil, err
+	}
+
+	kept := make([]patch2.Operation, 0, len(ops))
+	for _, op := range ops {
+		if !strings.HasPrefix(op.Path, objectSetOpPrefix) {
+			kept = append(kept, op)
+		}
+	}
+
+	if len(kept) == 0 {
+		return []byte("[]"), nil
+	}
+
+	return json.Marshal(kept)
+}
+
+func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal, nullSafe bool, oldObject, newObject runtime.Object, diffPatches [][]byte) (bool, error) {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
 		return false, err
@@ -221,6 +252,25 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 
 	if string(patch) == "{}" {
 		return false, nil
+	}
+
+	if nullSafe && patchType == types.MergePatchType {
+		// doPatch generates the merge patch from the ignore-stripped documents,
+		// so the translation has to resolve nulls against those same ones or a
+		// wholesale subtree reinstates a field an ignore patch took out.
+		_, strippedModified, strippedCurrent, err := stripIgnores(nil, modified, current, diffPatches)
+		if err != nil {
+			return false, err
+		}
+
+		patch, err = patch2.CreateJSONPatchFromMergePatch(patch, strippedModified, strippedCurrent)
+		if err != nil {
+			return false, fmt.Errorf("json patch generation: %w", err)
+		}
+		patchType = types.JSONPatchType
+		if string(patch) == "[]" {
+			return false, nil
+		}
 	}
 
 	logrus.Debugf("DesiredSet - Patch %s %s/%s for %s -- [PATCH:%s, ORIGINAL:%s, MODIFIED:%s, CURRENT:%s]", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID, patch, original, modified, current)
@@ -272,7 +322,9 @@ func (o *desiredSet) compareObjects(gvk schema.GroupVersionKind, reconciler Reco
 		GroupVersionKind: gvk,
 	}]...)
 
-	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, oldObject, newObject, diffPatches); err != nil {
+	_, nullSafe := o.nullSafePatch[gvk]
+
+	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, nullSafe, oldObject, newObject, diffPatches); err != nil {
 		return err
 	} else if !ran {
 		logrus.Debugf("DesiredSet - No change(2) %s %s/%s for %s", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID)
