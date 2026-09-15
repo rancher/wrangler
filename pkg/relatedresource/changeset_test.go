@@ -3,6 +3,8 @@ package relatedresource
 import (
 	"context"
 	"fmt"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,7 +36,9 @@ func Test_addResourceEventHandler(t *testing.T) {
 
 	// Close enqueuer context and wait for unregistering goroutine
 	cancel()
-	informer.waitUntilDeleted(handler, 1*time.Second)
+	if !informer.waitUntilDeleted(handler, 1*time.Second) {
+		t.Fatal("timed out waiting for resource event handler removal")
+	}
 
 	// New informer calls should not trigger our handler
 	informer.add(nil)
@@ -54,12 +58,16 @@ func (h handlerRegistration) HasSynced() bool { return true }
 
 // fakeInformer implements a subset of cache.SharedIndexInformer, only those methods used by addResourceEventHandler
 type fakeInformer struct {
+	mu         sync.Mutex
 	handlers   []cache.ResourceEventHandler
 	reg        []cache.ResourceEventHandlerRegistration
 	deleteChan []chan struct{}
 }
 
 func (informer *fakeInformer) AddEventHandler(handler cache.ResourceEventHandler) (cache.ResourceEventHandlerRegistration, error) {
+	informer.mu.Lock()
+	defer informer.mu.Unlock()
+
 	handlerReg := handlerRegistration{}
 	informer.handlers = append(informer.handlers, handler)
 	informer.reg = append(informer.reg, handlerReg)
@@ -68,33 +76,47 @@ func (informer *fakeInformer) AddEventHandler(handler cache.ResourceEventHandler
 }
 
 func (informer *fakeInformer) RemoveEventHandler(handlerReg cache.ResourceEventHandlerRegistration) error {
+	informer.mu.Lock()
+	defer informer.mu.Unlock()
+
 	x := slicesIndex(informer.reg, handlerReg)
 	if x < 0 {
 		return fmt.Errorf("handler not found")
 	}
 
-	close(informer.deleteChan[x])
+	deleted := informer.deleteChan[x]
 	informer.reg = deleteIndex(informer.reg, x)
 	informer.handlers = deleteIndex(informer.handlers, x)
 	informer.deleteChan = deleteIndex(informer.deleteChan, x)
+	close(deleted)
 	return nil
 }
 
 func (informer *fakeInformer) add(obj runtime.Object) {
-	for _, handler := range informer.handlers {
+	informer.mu.Lock()
+	handlers := slices.Clone(informer.handlers)
+	informer.mu.Unlock()
+
+	for _, handler := range handlers {
 		handler.OnAdd(obj, false)
 	}
 }
 
-func (informer *fakeInformer) waitUntilDeleted(handler cache.ResourceEventHandler, timeout time.Duration) {
+func (informer *fakeInformer) waitUntilDeleted(handler cache.ResourceEventHandler, timeout time.Duration) bool {
+	informer.mu.Lock()
 	x := slicesIndex(informer.handlers, handler)
 	if x < 0 {
-		return
+		informer.mu.Unlock()
+		return true
 	}
+	deleted := informer.deleteChan[x]
+	informer.mu.Unlock()
 
 	select {
-	case <-informer.deleteChan[x]:
+	case <-deleted:
+		return true
 	case <-time.After(timeout):
+		return false
 	}
 }
 
