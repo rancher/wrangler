@@ -153,23 +153,32 @@ func TestApplyPatchNullSafe(t *testing.T) {
 		assert.Equal(t, "1", values["a"])
 	})
 
-	t.Run("null safe patch is equivalent when no null is involved", func(t *testing.T) {
+	t.Run("the merge patch is kept when no null is involved", func(t *testing.T) {
+		// Enabling null safety must not change what is sent for ordinary writes.
+		// RFC 6902 is stricter -- a remove of a path another writer has already
+		// deleted fails the whole request -- so the translation is only worth
+		// taking on when a null actually has to be expressed.
 		desired := chartValues(nullSafeGVK, map[string]interface{}{"a": "2", "b": "2"})
 
 		mergeType, mergePatch, ran := capturePatch(t, nullSafeGVK, false, current, desired)
 		require.True(t, ran)
 		require.Equal(t, types.MergePatchType, mergeType)
 
-		jsonType, jsonPatch, ran := capturePatch(t, nullSafeGVK, true, current, desired)
+		nullSafeType, nullSafePatch, ran := capturePatch(t, nullSafeGVK, true, current, desired)
 		require.True(t, ran)
-		require.Equal(t, types.JSONPatchType, jsonType)
+		assert.Equal(t, types.MergePatchType, nullSafeType)
+		assert.Equal(t, string(mergePatch), string(nullSafePatch), "byte-identical to today")
+	})
 
-		merged, err := patch2.Apply(mustMarshal(t, current), mergePatch)
-		require.NoError(t, err)
-		patched, err := patch2.Apply(mustMarshal(t, current), jsonPatch)
-		require.NoError(t, err)
+	t.Run("a removal alone does not switch format", func(t *testing.T) {
+		// A merge patch treats a removal of an already-absent path as a no-op,
+		// where RFC 6902 fails the request. Keeping removals on the merge path
+		// leaves that race where it was.
+		desired := chartValues(nullSafeGVK, map[string]interface{}{"a": "1"})
 
-		assert.JSONEq(t, string(merged), string(patched))
+		patchType, _, ran := capturePatch(t, nullSafeGVK, true, current, desired)
+		require.True(t, ran)
+		assert.Equal(t, types.MergePatchType, patchType)
 	})
 
 	t.Run("no change sends nothing", func(t *testing.T) {
@@ -252,13 +261,29 @@ func TestSanitizePatchJSONPatch(t *testing.T) {
 			expected:                  `[]`,
 		},
 		{
-			name: "a whole annotations map is left alone",
-			// Only reachable when apply adopts an object that has no
-			// annotations at all, where a plan naming the annotation is a
-			// cosmetic wart rather than a wrong plan.
+			name: "an operation carrying only the applied annotation wholesale is dropped",
+			// Reachable when the live object has no annotations at all: there is
+			// nothing to recurse into, so the translation sets the whole map and
+			// the bookkeeping annotation rides inside the value where a path
+			// prefix cannot see it.
 			patch:                     `[{"op":"add","path":"/metadata/annotations","value":{"objectset.rio.cattle.io/applied":"x"}}]`,
 			removeObjectSetAnnotation: true,
-			expected:                  `[{"op":"add","path":"/metadata/annotations","value":{"objectset.rio.cattle.io/applied":"x"}}]`,
+			expected:                  `[]`,
+		},
+		{
+			name:                      "a wholesale annotations map keeps its unrelated entries",
+			patch:                     `[{"op":"add","path":"/metadata/annotations","value":{"objectset.rio.cattle.io/applied":"x","other.io/thing":"y"}}]`,
+			removeObjectSetAnnotation: true,
+			expected:                  `[{"op":"add","path":"/metadata/annotations","value":{"other.io/thing":"y"}}]`,
+		},
+		{
+			name: "an explicit null survives the filtering",
+			// The regression this guards: decoding into a *json.RawMessage turned
+			// a present null into a nil pointer, which omitempty then dropped,
+			// leaving an "add" with no value -- invalid under RFC 6902.
+			patch:                     `[{"op":"add","path":"/metadata/annotations/objectset.rio.cattle.io~1applied","value":"x"},{"op":"add","path":"/spec/chartValues/b","value":null}]`,
+			removeObjectSetAnnotation: true,
+			expected:                  `[{"op":"add","path":"/spec/chartValues/b","value":null}]`,
 		},
 		{
 			name:                      "a removal of the applied annotation is dropped",

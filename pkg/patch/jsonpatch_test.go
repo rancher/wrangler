@@ -49,14 +49,19 @@ func TestCreateJSONPatchFromMergePatch(t *testing.T) {
 		// patched is current with expected applied, and is what the caller
 		// actually asked for.
 		patched string
+		// nullAssigned is whether the patch has to be sent as RFC 6902 at all.
+		// False means the merge patch expresses the same thing and the caller
+		// should keep it.
+		nullAssigned bool
 	}{
 		{
-			name:       "explicit null is assigned rather than removed",
-			mergePatch: `{"spec":{"chartValues":{"b":null}}}`,
-			modified:   `{"spec":{"chartValues":{"a":"1","b":null}}}`,
-			current:    `{"spec":{"chartValues":{"a":"1","b":"2"}}}`,
-			expected:   `[{"op":"add","path":"/spec/chartValues/b","value":null}]`,
-			patched:    `{"spec":{"chartValues":{"a":"1","b":null}}}`,
+			name:         "explicit null is assigned rather than removed",
+			mergePatch:   `{"spec":{"chartValues":{"b":null}}}`,
+			modified:     `{"spec":{"chartValues":{"a":"1","b":null}}}`,
+			current:      `{"spec":{"chartValues":{"a":"1","b":"2"}}}`,
+			expected:     `[{"op":"add","path":"/spec/chartValues/b","value":null}]`,
+			patched:      `{"spec":{"chartValues":{"a":"1","b":null}}}`,
+			nullAssigned: true,
 		},
 		{
 			name:       "null for a key absent from modified is a removal",
@@ -85,12 +90,13 @@ func TestCreateJSONPatchFromMergePatch(t *testing.T) {
 			patched:    `{"spec":{"chartValues":{"a":"1"}}}`,
 		},
 		{
-			name:       "pointer tokens are escaped",
-			mergePatch: `{"metadata":{"annotations":{"a/b":"x","c~d":null}}}`,
-			modified:   `{"metadata":{"annotations":{"a/b":"x","c~d":null}}}`,
-			current:    `{"metadata":{"annotations":{"a/b":"1","c~d":"2"}}}`,
-			expected:   `[{"op":"add","path":"/metadata/annotations/a~1b","value":"x"},{"op":"add","path":"/metadata/annotations/c~0d","value":null}]`,
-			patched:    `{"metadata":{"annotations":{"a/b":"x","c~d":null}}}`,
+			name:         "pointer tokens are escaped",
+			mergePatch:   `{"metadata":{"annotations":{"a/b":"x","c~d":null}}}`,
+			modified:     `{"metadata":{"annotations":{"a/b":"x","c~d":null}}}`,
+			current:      `{"metadata":{"annotations":{"a/b":"1","c~d":"2"}}}`,
+			expected:     `[{"op":"add","path":"/metadata/annotations/a~1b","value":"x"},{"op":"add","path":"/metadata/annotations/c~0d","value":null}]`,
+			patched:      `{"metadata":{"annotations":{"a/b":"x","c~d":null}}}`,
+			nullAssigned: true,
 		},
 		{
 			name:       "arrays are replaced wholesale",
@@ -104,11 +110,12 @@ func TestCreateJSONPatchFromMergePatch(t *testing.T) {
 			name: "subtree missing from current is added wholesale with its nulls",
 			// The parent of every emitted path has to exist, so the walk stops
 			// at the deepest object current holds.
-			mergePatch: `{"spec":{"chartValues":{"a":null}}}`,
-			modified:   `{"spec":{"chartValues":{"a":null}}}`,
-			current:    `{"spec":{}}`,
-			expected:   `[{"op":"add","path":"/spec/chartValues","value":{"a":null}}]`,
-			patched:    `{"spec":{"chartValues":{"a":null}}}`,
+			mergePatch:   `{"spec":{"chartValues":{"a":null}}}`,
+			modified:     `{"spec":{"chartValues":{"a":null}}}`,
+			current:      `{"spec":{}}`,
+			expected:     `[{"op":"add","path":"/spec/chartValues","value":{"a":null}}]`,
+			patched:      `{"spec":{"chartValues":{"a":null}}}`,
+			nullAssigned: true,
 		},
 		{
 			name: "stale removal inside a new subtree is dropped",
@@ -130,6 +137,36 @@ func TestCreateJSONPatchFromMergePatch(t *testing.T) {
 			patched:    `{"spec":{"x":{"y":1}}}`,
 		},
 		{
+			name: "large integers are not rewritten",
+			// Decoding into float64 would round this to ...992, silently
+			// corrupting any int64 field above 2^53.
+			mergePatch: `{"spec":{"n":9007199254740993}}`,
+			modified:   `{"spec":{"n":9007199254740993}}`,
+			current:    `{"spec":{"n":1}}`,
+			expected:   `[{"op":"add","path":"/spec/n","value":9007199254740993}]`,
+			patched:    `{"spec":{"n":9007199254740993}}`,
+		},
+		{
+			name: "a null inside an array is not an assignment",
+			// RFC 7386 replaces an array wholesale instead of merging into it, so
+			// the merge patch already carries this null verbatim and there is
+			// nothing to translate. Verified against CreateThreeWayJSONMergePatch.
+			mergePatch: `{"spec":{"list":[1,null]}}`,
+			modified:   `{"spec":{"list":[1,null]}}`,
+			current:    `{"spec":{"list":[1,2]}}`,
+			expected:   `[{"op":"add","path":"/spec/list","value":[1,null]}]`,
+			patched:    `{"spec":{"list":[1,null]}}`,
+		},
+		{
+			name: "a null in an object inside an array is not an assignment either",
+			// Same reason: the merge patch never descends past the array.
+			mergePatch: `{"spec":{"list":[{"a":null}]}}`,
+			modified:   `{"spec":{"list":[{"a":null}]}}`,
+			current:    `{"spec":{"list":[1,2]}}`,
+			expected:   `[{"op":"add","path":"/spec/list","value":[{"a":null}]}]`,
+			patched:    `{"spec":{"list":[{"a":null}]}}`,
+		},
+		{
 			name:       "operations are emitted in a stable order",
 			mergePatch: `{"spec":{"c":"3","a":"1","b":null},"metadata":{"name":"n"}}`,
 			modified:   `{"metadata":{"name":"n"},"spec":{"a":"1","b":null,"c":"3"}}`,
@@ -138,15 +175,18 @@ func TestCreateJSONPatchFromMergePatch(t *testing.T) {
 				`{"op":"add","path":"/spec/a","value":"1"},` +
 				`{"op":"add","path":"/spec/b","value":null},` +
 				`{"op":"add","path":"/spec/c","value":"3"}]`,
-			patched: `{"metadata":{"name":"n"},"spec":{"a":"1","b":null,"c":"3"}}`,
+			patched:      `{"metadata":{"name":"n"},"spec":{"a":"1","b":null,"c":"3"}}`,
+			nullAssigned: true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := CreateJSONPatchFromMergePatch([]byte(test.mergePatch), []byte(test.modified), []byte(test.current))
+			got, nullAssigned, err := CreateJSONPatchFromMergePatch([]byte(test.mergePatch), []byte(test.modified), []byte(test.current))
 			require.NoError(t, err)
 			assert.Equal(t, test.expected, string(got))
+			assert.Equal(t, test.nullAssigned, nullAssigned,
+				"nullAssigned decides whether the merge patch is replaced at all")
 
 			if string(got) == "[]" {
 				// An empty patch is never sent, and evanphx rejects it.
@@ -171,13 +211,13 @@ func TestCreateJSONPatchFromMergePatch(t *testing.T) {
 func TestCreateJSONPatchFromMergePatchInvalidInput(t *testing.T) {
 	valid := []byte(`{"spec":{}}`)
 
-	_, err := CreateJSONPatchFromMergePatch([]byte(`not json`), valid, valid)
+	_, _, err := CreateJSONPatchFromMergePatch([]byte(`not json`), valid, valid)
 	assert.ErrorContains(t, err, "unmarshalling merge patch")
 
-	_, err = CreateJSONPatchFromMergePatch(valid, []byte(`not json`), valid)
+	_, _, err = CreateJSONPatchFromMergePatch(valid, []byte(`not json`), valid)
 	assert.ErrorContains(t, err, "unmarshalling modified")
 
-	_, err = CreateJSONPatchFromMergePatch(valid, valid, []byte(`not json`))
+	_, _, err = CreateJSONPatchFromMergePatch(valid, valid, []byte(`not json`))
 	assert.ErrorContains(t, err, "unmarshalling current")
 }
 

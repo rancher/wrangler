@@ -1,11 +1,45 @@
 package patch
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 )
+
+// decodeObject unmarshals a JSON object preserving numeric literals verbatim.
+//
+// The default decoder turns every JSON number into a float64, which silently
+// rewrites integers outside the exact range of an IEEE-754 double -- an int64
+// above 2^53 comes back changed -- and those values are marshalled again into
+// the generated patch. UseNumber keeps them as json.Number, which round-trips
+// byte for byte.
+func decodeObject(data []byte, out *map[string]interface{}) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	return dec.Decode(out)
+}
+
+// containsObjectNull reports whether v holds a null as an object member at any
+// depth, descending through objects only.
+//
+// A subtree set wholesale carries its nulls with it, and those a merge patch
+// would have descended into are the ambiguous ones. It stops at arrays because
+// RFC 7386 replaces an array wholesale rather than merging into it, so a null
+// element is already preserved verbatim and needs no translation.
+func containsObjectNull(v interface{}) bool {
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	for _, child := range m {
+		if child == nil || containsObjectNull(child) {
+			return true
+		}
+	}
+	return false
+}
 
 // pointerEscaper implements RFC 6901 JSON Pointer token escaping. "~" is listed
 // first so that the "0" it introduces is not itself rewritten.
@@ -24,12 +58,17 @@ func IsJSONPatch(patch []byte) bool {
 
 // Operation is a single RFC 6902 JSON Patch operation.
 //
-// Value is a pointer so that a literal null can be distinguished from an absent
-// value: "remove" carries no value member, while assigning null requires one.
+// Value is a json.RawMessage rather than a *json.RawMessage so that the type
+// survives a decode/encode round trip. A literal null must stay distinguishable
+// from an absent value -- "remove" carries no value member, while assigning null
+// requires one -- and a pointer cannot do that: encoding/json sets a pointer
+// field to nil for a JSON null, which omitempty then drops, silently turning a
+// null assignment into an "add" with no value, an operation RFC 6902 rejects.
+// A RawMessage instead holds the four bytes "null", which omitempty keeps.
 type Operation struct {
-	Op    string           `json:"op"`
-	Path  string           `json:"path"`
-	Value *json.RawMessage `json:"value,omitempty"`
+	Op    string          `json:"op"`
+	Path  string          `json:"path"`
+	Value json.RawMessage `json:"value,omitempty"`
 }
 
 func addOp(path string, v interface{}) (Operation, error) {
@@ -37,11 +76,10 @@ func addOp(path string, v interface{}) (Operation, error) {
 	if err != nil {
 		return Operation{}, fmt.Errorf("marshalling value for %s: %w", path, err)
 	}
-	raw := json.RawMessage(b)
 	// RFC 6902 "add" on an object member creates the member or replaces its
 	// value, so it is correct whether or not the key already exists. "replace"
 	// would fail on a missing target.
-	return Operation{Op: "add", Path: path, Value: &raw}, nil
+	return Operation{Op: "add", Path: path, Value: json.RawMessage(b)}, nil
 }
 
 // CreateJSONPatchFromMergePatch translates an RFC 7386 JSON merge patch into an
@@ -66,19 +104,28 @@ func addOp(path string, v interface{}) (Operation, error) {
 // opaque leaves and replaced wholesale, matching merge patch semantics and
 // keeping positional index operations -- and the races that come with them --
 // out of the result.
-func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte, error) {
+//
+// The second return value reports whether the patch assigns a null anywhere. It
+// is false for the overwhelmingly common case of a patch that only adds, changes
+// and removes keys, where the translation buys nothing and the caller should
+// prefer the merge patch it already has: RFC 6902 "remove" fails the whole
+// request if the path has since been deleted by another writer, whereas a merge
+// patch treats that as a no-op. Converting only when a null actually has to be
+// expressed keeps that stricter failure mode off the common path.
+func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte, bool, error) {
 	var mp, mod, cur map[string]interface{}
-	if err := json.Unmarshal(mergePatch, &mp); err != nil {
-		return nil, fmt.Errorf("unmarshalling merge patch: %w", err)
+	if err := decodeObject(mergePatch, &mp); err != nil {
+		return nil, false, fmt.Errorf("unmarshalling merge patch: %w", err)
 	}
-	if err := json.Unmarshal(modified, &mod); err != nil {
-		return nil, fmt.Errorf("unmarshalling modified: %w", err)
+	if err := decodeObject(modified, &mod); err != nil {
+		return nil, false, fmt.Errorf("unmarshalling modified: %w", err)
 	}
-	if err := json.Unmarshal(current, &cur); err != nil {
-		return nil, fmt.Errorf("unmarshalling current: %w", err)
+	if err := decodeObject(current, &cur); err != nil {
+		return nil, false, fmt.Errorf("unmarshalling current: %w", err)
 	}
 
 	ops := []Operation{}
+	nullAssigned := false
 
 	var walk func(patch, modNode, curNode map[string]interface{}, path string) error
 	walk = func(patch, modNode, curNode map[string]interface{}, path string) error {
@@ -108,6 +155,7 @@ func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte
 						return err
 					}
 					ops = append(ops, op)
+					nullAssigned = true
 				case curHas:
 					ops = append(ops, Operation{Op: "remove", Path: p})
 				}
@@ -142,6 +190,9 @@ func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte
 					return err
 				}
 				ops = append(ops, op)
+				if containsObjectNull(value) {
+					nullAssigned = true
+				}
 				continue
 			}
 
@@ -155,8 +206,12 @@ func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte
 	}
 
 	if err := walk(mp, mod, cur, ""); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return json.Marshal(ops)
+	out, err := json.Marshal(ops)
+	if err != nil {
+		return nil, false, err
+	}
+	return out, nullAssigned, nil
 }

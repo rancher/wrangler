@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	ejson "encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -192,9 +193,32 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-// objectSetOpPrefix is the JSON Pointer prefix of the operations that carry
-// apply's own bookkeeping annotations.
-var objectSetOpPrefix = "/metadata/annotations/" + patch2.EscapePointerToken(LabelPrefix)
+// annotationsPath is the JSON Pointer of the annotation map, and
+// objectSetOpPrefix the prefix of the operations that carry apply's own
+// bookkeeping annotations.
+const annotationsPath = "/metadata/annotations"
+
+var objectSetOpPrefix = annotationsPath + "/" + patch2.EscapePointerToken(LabelPrefix)
+
+func stripObjectSetAnnotations(value ejson.RawMessage) (ejson.RawMessage, bool, error) {
+	annotations := map[string]interface{}{}
+	if err := json.Unmarshal(value, &annotations); err != nil {
+		return nil, false, err
+	}
+
+	for k := range annotations {
+		if strings.HasPrefix(k, LabelPrefix) {
+			delete(annotations, k)
+		}
+	}
+
+	if len(annotations) == 0 {
+		return nil, false, nil
+	}
+
+	stripped, err := json.Marshal(annotations)
+	return stripped, true, err
+}
 
 func dropObjectSetOps(patch []byte) ([]byte, error) {
 	var ops []patch2.Operation
@@ -204,9 +228,22 @@ func dropObjectSetOps(patch []byte) ([]byte, error) {
 
 	kept := make([]patch2.Operation, 0, len(ops))
 	for _, op := range ops {
-		if !strings.HasPrefix(op.Path, objectSetOpPrefix) {
-			kept = append(kept, op)
+		if strings.HasPrefix(op.Path, objectSetOpPrefix) {
+			continue
 		}
+
+		if op.Path == annotationsPath && len(op.Value) > 0 {
+			stripped, keep, err := stripObjectSetAnnotations(op.Value)
+			if err != nil {
+				return nil, err
+			}
+			if !keep {
+				continue
+			}
+			op.Value = stripped
+		}
+
+		kept = append(kept, op)
 	}
 
 	if len(kept) == 0 {
@@ -263,13 +300,16 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 			return false, err
 		}
 
-		patch, err = patch2.CreateJSONPatchFromMergePatch(patch, strippedModified, strippedCurrent)
+		jsonPatch, nullAssigned, err := patch2.CreateJSONPatchFromMergePatch(patch, strippedModified, strippedCurrent)
 		if err != nil {
 			return false, fmt.Errorf("json patch generation: %w", err)
 		}
-		patchType = types.JSONPatchType
-		if string(patch) == "[]" {
-			return false, nil
+
+		if nullAssigned {
+			patch, patchType = jsonPatch, types.JSONPatchType
+			if string(patch) == "[]" {
+				return false, nil
+			}
 		}
 	}
 
