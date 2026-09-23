@@ -29,10 +29,13 @@ import (
 )
 
 const (
-	LabelApplied = "objectset.rio.cattle.io/applied"
+	LabelApplied    = "objectset.rio.cattle.io/applied"
+	annotationsPath = "/metadata/annotations"
 )
 
 var (
+	objectSetOpPrefix = annotationsPath + "/" + patch2.EscapePointerToken(LabelPrefix)
+
 	knownListKeys = map[string]bool{
 		"apiVersion":    true,
 		"containerPort": true,
@@ -193,15 +196,11 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-// annotationsPath is the JSON Pointer of the annotation map, and
-// objectSetOpPrefix the prefix of the operations that carry apply's own
-// bookkeeping annotations.
-const annotationsPath = "/metadata/annotations"
-
-var objectSetOpPrefix = annotationsPath + "/" + patch2.EscapePointerToken(LabelPrefix)
-
+// stripObjectSetAnnotations removes apply's bookkeeping annotations from the
+// value of an operation that sets the whole annotation map. It reports whether
+// anything is left worth sending.
 func stripObjectSetAnnotations(value ejson.RawMessage) (ejson.RawMessage, bool, error) {
-	annotations := map[string]interface{}{}
+	annotations := map[string]any{}
 	if err := json.Unmarshal(value, &annotations); err != nil {
 		return nil, false, err
 	}
@@ -220,6 +219,11 @@ func stripObjectSetAnnotations(value ejson.RawMessage) (ejson.RawMessage, bool, 
 	return stripped, true, err
 }
 
+// dropObjectSetOps is the JSON Patch counterpart of the annotation stripping
+// sanitizePatch does on a merge patch: it drops the operations that only carry
+// apply's own bookkeeping annotations, and prunes those annotations out of an
+// operation that sets the annotation map as a whole. An empty patch is returned
+// as "[]" so callers can recognise that nothing is left to send.
 func dropObjectSetOps(patch []byte) ([]byte, error) {
 	var ops []patch2.Operation
 	if err := json.Unmarshal(patch, &ops); err != nil {

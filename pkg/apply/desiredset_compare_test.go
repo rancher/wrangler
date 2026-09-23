@@ -58,13 +58,13 @@ var nullSafeGVK = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1",
 
 // spec builds an object of a kind absent from the client-go scheme, which is
 // what makes apply reach for a merge patch.
-func spec(gvk schema.GroupVersionKind, spec map[string]interface{}) *unstructured.Unstructured {
+func spec(gvk schema.GroupVersionKind, spec map[string]any) *unstructured.Unstructured {
 	apiVersion, kind := gvk.ToAPIVersionAndKind()
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": apiVersion,
 			"kind":       kind,
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "cluster",
 				"namespace": "fleet-default",
 			},
@@ -73,8 +73,8 @@ func spec(gvk schema.GroupVersionKind, spec map[string]interface{}) *unstructure
 	}
 }
 
-func chartValues(gvk schema.GroupVersionKind, values map[string]interface{}) *unstructured.Unstructured {
-	return spec(gvk, map[string]interface{}{"chartValues": values})
+func chartValues(gvk schema.GroupVersionKind, values map[string]any) *unstructured.Unstructured {
+	return spec(gvk, map[string]any{"chartValues": values})
 }
 
 // applied returns obj as the server would hold it after apply created it,
@@ -89,7 +89,7 @@ func applied(t *testing.T, gvk schema.GroupVersionKind, obj *unstructured.Unstru
 // patchedChartValues applies patch to current the way the apiserver would and
 // returns the resulting spec.chartValues, along with whether "b" is present at
 // all -- a removal and an assignment of null both decode to nil.
-func patchedChartValues(t *testing.T, current runtime.Object, patch []byte) (map[string]interface{}, bool) {
+func patchedChartValues(t *testing.T, current runtime.Object, patch []byte) (map[string]any, bool) {
 	t.Helper()
 
 	currentJSON, err := json.Marshal(current)
@@ -98,7 +98,7 @@ func patchedChartValues(t *testing.T, current runtime.Object, patch []byte) (map
 	result, err := patch2.Apply(currentJSON, patch)
 	require.NoError(t, err)
 
-	obj := map[string]interface{}{}
+	obj := map[string]any{}
 	require.NoError(t, json.Unmarshal(result, &obj))
 
 	values := convert.ToMapInterface(data2.GetValueN(obj, "spec", "chartValues"))
@@ -129,8 +129,8 @@ func capturePatch(t *testing.T, gvk schema.GroupVersionKind, nullSafe bool, curr
 func TestApplyPatchNullSafe(t *testing.T) {
 	// The desired state removes a chart default by setting it to null, which is
 	// the case a merge patch cannot express.
-	current := applied(t, nullSafeGVK, chartValues(nullSafeGVK, map[string]interface{}{"a": "1", "b": "2"}))
-	desired := chartValues(nullSafeGVK, map[string]interface{}{"a": "1", "b": nil})
+	current := applied(t, nullSafeGVK, chartValues(nullSafeGVK, map[string]any{"a": "1", "b": "2"}))
+	desired := chartValues(nullSafeGVK, map[string]any{"a": "1", "b": nil})
 
 	t.Run("merge patch drops the null", func(t *testing.T) {
 		patchType, patch, ran := capturePatch(t, nullSafeGVK, false, current, desired)
@@ -158,7 +158,7 @@ func TestApplyPatchNullSafe(t *testing.T) {
 		// RFC 6902 is stricter -- a remove of a path another writer has already
 		// deleted fails the whole request -- so the translation is only worth
 		// taking on when a null actually has to be expressed.
-		desired := chartValues(nullSafeGVK, map[string]interface{}{"a": "2", "b": "2"})
+		desired := chartValues(nullSafeGVK, map[string]any{"a": "2", "b": "2"})
 
 		mergeType, mergePatch, ran := capturePatch(t, nullSafeGVK, false, current, desired)
 		require.True(t, ran)
@@ -174,7 +174,7 @@ func TestApplyPatchNullSafe(t *testing.T) {
 		// A merge patch treats a removal of an already-absent path as a no-op,
 		// where RFC 6902 fails the request. Keeping removals on the merge path
 		// leaves that race where it was.
-		desired := chartValues(nullSafeGVK, map[string]interface{}{"a": "1"})
+		desired := chartValues(nullSafeGVK, map[string]any{"a": "1"})
 
 		patchType, _, ran := capturePatch(t, nullSafeGVK, true, current, desired)
 		require.True(t, ran)
@@ -182,7 +182,7 @@ func TestApplyPatchNullSafe(t *testing.T) {
 	})
 
 	t.Run("no change sends nothing", func(t *testing.T) {
-		_, _, ran := capturePatch(t, nullSafeGVK, true, current, chartValues(nullSafeGVK, map[string]interface{}{"a": "1", "b": "2"}))
+		_, _, ran := capturePatch(t, nullSafeGVK, true, current, chartValues(nullSafeGVK, map[string]any{"a": "1", "b": "2"}))
 		assert.False(t, ran)
 	})
 
@@ -190,23 +190,23 @@ func TestApplyPatchNullSafe(t *testing.T) {
 		// The subtree is missing from current, so it is set from modified in one
 		// operation -- which has to be the modified the merge patch was
 		// generated from, with the ignored field already taken out of it.
-		current := applied(t, nullSafeGVK, spec(nullSafeGVK, map[string]interface{}{}))
-		desired := chartValues(nullSafeGVK, map[string]interface{}{"a": "1", "ignored": "x"})
+		current := applied(t, nullSafeGVK, spec(nullSafeGVK, map[string]any{}))
+		desired := chartValues(nullSafeGVK, map[string]any{"a": "1", "ignored": "x"})
 		ignore := []byte(`[{"op":"remove","path":"/spec/chartValues/ignored"}]`)
 
 		_, patch, ran := capturePatch(t, nullSafeGVK, true, current, desired, ignore)
 		require.True(t, ran)
 
 		values, _ := patchedChartValues(t, current, patch)
-		assert.Equal(t, map[string]interface{}{"a": "1"}, values)
+		assert.Equal(t, map[string]any{"a": "1"}, values)
 	})
 
 	t.Run("strategic merge is left alone", func(t *testing.T) {
 		// Strategic merge has its own directives for a null assignment, and it
 		// is only reachable for types in the client-go scheme.
 		gvk := schema.GroupVersionKind{Version: "v1", Kind: "ConfigMap"}
-		current := applied(t, gvk, configMap(gvk, map[string]interface{}{"a": "1"}))
-		desired := configMap(gvk, map[string]interface{}{"a": "2"})
+		current := applied(t, gvk, configMap(gvk, map[string]any{"a": "1"}))
+		desired := configMap(gvk, map[string]any{"a": "2"})
 
 		patchType, _, ran := capturePatch(t, gvk, true, current, desired)
 		require.True(t, ran)
@@ -214,13 +214,13 @@ func TestApplyPatchNullSafe(t *testing.T) {
 	})
 }
 
-func configMap(gvk schema.GroupVersionKind, data map[string]interface{}) *unstructured.Unstructured {
+func configMap(gvk schema.GroupVersionKind, data map[string]any) *unstructured.Unstructured {
 	apiVersion, kind := gvk.ToAPIVersionAndKind()
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": apiVersion,
 			"kind":       kind,
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "config",
 				"namespace": "default",
 			},

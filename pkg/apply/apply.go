@@ -82,6 +82,13 @@ type Apply interface {
 	WithSetOwnerReference(controller, block bool) Apply
 	WithIgnorePreviousApplied() Apply
 	WithDiffPatch(gvk schema.GroupVersionKind, namespace, name string, patch []byte) Apply
+
+	// WithNullSafePatch opts the given GVKs into patching with an RFC 6902 JSON
+	// Patch whenever the update assigns a null, so that an explicit null in the
+	// desired object reaches the cluster as a null instead of being read as the
+	// removal instruction a merge patch would make of it. Updates that assign no
+	// null keep using the merge patch, which is the more forgiving of the two
+	// under concurrent writes.
 	WithNullSafePatch(gvks ...schema.GroupVersionKind) Apply
 
 	FindOwner(obj runtime.Object) (runtime.Object, error)

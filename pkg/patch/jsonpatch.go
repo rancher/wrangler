@@ -8,53 +8,9 @@ import (
 	"strings"
 )
 
-// decodeObject unmarshals a JSON object preserving numeric literals verbatim.
-//
-// The default decoder turns every JSON number into a float64, which silently
-// rewrites integers outside the exact range of an IEEE-754 double -- an int64
-// above 2^53 comes back changed -- and those values are marshalled again into
-// the generated patch. UseNumber keeps them as json.Number, which round-trips
-// byte for byte.
-func decodeObject(data []byte, out *map[string]interface{}) error {
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.UseNumber()
-	return dec.Decode(out)
-}
-
-// containsObjectNull reports whether v holds a null as an object member at any
-// depth, descending through objects only.
-//
-// A subtree set wholesale carries its nulls with it, and those a merge patch
-// would have descended into are the ambiguous ones. It stops at arrays because
-// RFC 7386 replaces an array wholesale rather than merging into it, so a null
-// element is already preserved verbatim and needs no translation.
-func containsObjectNull(v interface{}) bool {
-	m, ok := v.(map[string]interface{})
-	if !ok {
-		return false
-	}
-	for _, child := range m {
-		if child == nil || containsObjectNull(child) {
-			return true
-		}
-	}
-	return false
-}
-
 // pointerEscaper implements RFC 6901 JSON Pointer token escaping. "~" is listed
 // first so that the "0" it introduces is not itself rewritten.
 var pointerEscaper = strings.NewReplacer("~", "~0", "/", "~1")
-
-// EscapePointerToken escapes a single JSON Pointer reference token per RFC 6901.
-func EscapePointerToken(token string) string {
-	return pointerEscaper.Replace(token)
-}
-
-// IsJSONPatch reports whether the given bytes are an RFC 6902 JSON Patch, which
-// is a list, as opposed to a merge patch, which is an object.
-func IsJSONPatch(patch []byte) bool {
-	return isJSONPatch(patch)
-}
 
 // Operation is a single RFC 6902 JSON Patch operation.
 //
@@ -71,7 +27,53 @@ type Operation struct {
 	Value json.RawMessage `json:"value,omitempty"`
 }
 
-func addOp(path string, v interface{}) (Operation, error) {
+// decodeObject unmarshals a JSON object preserving numeric literals verbatim.
+//
+// The default decoder turns every JSON number into a float64, which silently
+// rewrites integers outside the exact range of an IEEE-754 double -- an int64
+// above 2^53 comes back changed -- and those values are marshalled again into
+// the generated patch. UseNumber keeps them as json.Number, which round-trips
+// byte for byte.
+func decodeObject(data []byte, out *map[string]any) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	return dec.Decode(out)
+}
+
+// containsObjectNull reports whether v holds a null as an object member at any
+// depth, descending through objects only.
+//
+// A subtree set wholesale carries its nulls with it, and those a merge patch
+// would have descended into are the ambiguous ones. It stops at arrays because
+// RFC 7386 replaces an array wholesale rather than merging into it, so a null
+// element is already preserved verbatim and needs no translation.
+func containsObjectNull(v any) bool {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, child := range m {
+		if child == nil || containsObjectNull(child) {
+			return true
+		}
+	}
+	return false
+}
+
+// EscapePointerToken escapes a single JSON Pointer reference token per RFC 6901.
+func EscapePointerToken(token string) string {
+	return pointerEscaper.Replace(token)
+}
+
+// IsJSONPatch reports whether the given bytes are an RFC 6902 JSON Patch, which
+// is a list, as opposed to a merge patch, which is an object.
+func IsJSONPatch(patch []byte) bool {
+	return isJSONPatch(patch)
+}
+
+// addOp builds the operation that sets path to v, marshalling the value so that
+// a nil becomes a literal null rather than an absent value member.
+func addOp(path string, v any) (Operation, error) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return Operation{}, fmt.Errorf("marshalling value for %s: %w", path, err)
@@ -113,7 +115,7 @@ func addOp(path string, v interface{}) (Operation, error) {
 // patch treats that as a no-op. Converting only when a null actually has to be
 // expressed keeps that stricter failure mode off the common path.
 func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte, bool, error) {
-	var mp, mod, cur map[string]interface{}
+	var mp, mod, cur map[string]any
 	if err := decodeObject(mergePatch, &mp); err != nil {
 		return nil, false, fmt.Errorf("unmarshalling merge patch: %w", err)
 	}
@@ -127,8 +129,8 @@ func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte
 	ops := []Operation{}
 	nullAssigned := false
 
-	var walk func(patch, modNode, curNode map[string]interface{}, path string) error
-	walk = func(patch, modNode, curNode map[string]interface{}, path string) error {
+	var walk func(patch, modNode, curNode map[string]any, path string) error
+	walk = func(patch, modNode, curNode map[string]any, path string) error {
 		// Sorted so that the generated patch is deterministic, which keeps debug
 		// logs and tests stable. Ordering is not required for correctness: an
 		// operation is emitted either for a node or for its descendants, never
@@ -164,9 +166,9 @@ func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte
 				continue
 			}
 
-			if patchChild, ok := v.(map[string]interface{}); ok {
-				curMap, curIsMap := curChild.(map[string]interface{})
-				modMap, modIsMap := modChild.(map[string]interface{})
+			if patchChild, ok := v.(map[string]any); ok {
+				curMap, curIsMap := curChild.(map[string]any)
+				modMap, modIsMap := modChild.(map[string]any)
 				if curHas && curIsMap && modIsMap {
 					// Recursing only where current already holds an object
 					// guarantees the parent of every emitted path exists, which
@@ -181,7 +183,7 @@ func CreateJSONPatchFromMergePatch(mergePatch, modified, current []byte) ([]byte
 				// The value is taken from modified rather than from the patch so
 				// that any nulls it carries are assignments, not stale removals
 				// against a path that does not exist.
-				value := interface{}(patchChild)
+				value := any(patchChild)
 				if modHas {
 					value = modChild
 				}

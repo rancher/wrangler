@@ -231,18 +231,18 @@ func assertSameNullKeys(t *testing.T, want, got string) {
 func nullPaths(t *testing.T, doc string) []string {
 	t.Helper()
 
-	var data map[string]interface{}
+	var data map[string]any
 	require.NoError(t, json.Unmarshal([]byte(doc), &data))
 
 	paths := []string{}
-	var walk func(node map[string]interface{}, path string)
-	walk = func(node map[string]interface{}, path string) {
+	var walk func(node map[string]any, path string)
+	walk = func(node map[string]any, path string) {
 		for k, v := range node {
 			p := path + "/" + k
 			switch child := v.(type) {
 			case nil:
 				paths = append(paths, p)
-			case map[string]interface{}:
+			case map[string]any:
 				walk(child, p)
 			}
 		}
