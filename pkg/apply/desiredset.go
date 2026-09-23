@@ -39,6 +39,7 @@ type desiredSet struct {
 	pruneTypes               map[schema.GroupVersionKind]cache.SharedIndexInformer
 	patchers                 map[schema.GroupVersionKind]Patcher
 	reconcilers              map[schema.GroupVersionKind]Reconciler
+	nullSafePatch            map[schema.GroupVersionKind]struct{}
 	diffPatches              map[patchKey][][]byte
 	informerFactory          InformerFactory
 	remove                   bool
@@ -218,6 +219,18 @@ func (o desiredSet) WithReconciler(gvk schema.GroupVersionKind, reconciler Recon
 	}
 	reconcilers[gvk] = reconciler
 	o.reconcilers = reconcilers
+	return o
+}
+
+func (o desiredSet) WithNullSafePatch(gvks ...schema.GroupVersionKind) Apply {
+	nullSafe := map[schema.GroupVersionKind]struct{}{}
+	for k, v := range o.nullSafePatch {
+		nullSafe[k] = v
+	}
+	for _, gvk := range gvks {
+		nullSafe[gvk] = struct{}{}
+	}
+	o.nullSafePatch = nullSafe
 	return o
 }
 

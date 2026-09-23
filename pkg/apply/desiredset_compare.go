@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	ejson "encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -28,10 +29,13 @@ import (
 )
 
 const (
-	LabelApplied = "objectset.rio.cattle.io/applied"
+	LabelApplied    = "objectset.rio.cattle.io/applied"
+	annotationsPath = "/metadata/annotations"
 )
 
 var (
+	objectSetOpPrefix = annotationsPath + "/" + patch2.EscapePointerToken(LabelPrefix)
+
 	knownListKeys = map[string]bool{
 		"apiVersion":    true,
 		"containerPort": true,
@@ -131,6 +135,13 @@ func emptyMaps(data map[string]interface{}, keys ...string) bool {
 }
 
 func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error) {
+	if patch2.IsJSONPatch(patch) {
+		if !removeObjectSetAnnotation {
+			return patch, nil
+		}
+		return dropObjectSetOps(patch)
+	}
+
 	mod := false
 	data := map[string]interface{}{}
 	err := json.Unmarshal(patch, &data)
@@ -185,7 +196,68 @@ func sanitizePatch(patch []byte, removeObjectSetAnnotation bool) ([]byte, error)
 	return json.Marshal(data)
 }
 
-func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal bool, oldObject, newObject runtime.Object, diffPatches [][]byte) (bool, error) {
+// stripObjectSetAnnotations removes apply's bookkeeping annotations from the
+// value of an operation that sets the whole annotation map. It reports whether
+// anything is left worth sending.
+func stripObjectSetAnnotations(value ejson.RawMessage) (ejson.RawMessage, bool, error) {
+	annotations := map[string]any{}
+	if err := json.Unmarshal(value, &annotations); err != nil {
+		return nil, false, err
+	}
+
+	for k := range annotations {
+		if strings.HasPrefix(k, LabelPrefix) {
+			delete(annotations, k)
+		}
+	}
+
+	if len(annotations) == 0 {
+		return nil, false, nil
+	}
+
+	stripped, err := json.Marshal(annotations)
+	return stripped, true, err
+}
+
+// dropObjectSetOps is the JSON Patch counterpart of the annotation stripping
+// sanitizePatch does on a merge patch: it drops the operations that only carry
+// apply's own bookkeeping annotations, and prunes those annotations out of an
+// operation that sets the annotation map as a whole. An empty patch is returned
+// as "[]" so callers can recognise that nothing is left to send.
+func dropObjectSetOps(patch []byte) ([]byte, error) {
+	var ops []patch2.Operation
+	if err := json.Unmarshal(patch, &ops); err != nil {
+		return nil, err
+	}
+
+	kept := make([]patch2.Operation, 0, len(ops))
+	for _, op := range ops {
+		if strings.HasPrefix(op.Path, objectSetOpPrefix) {
+			continue
+		}
+
+		if op.Path == annotationsPath && len(op.Value) > 0 {
+			stripped, keep, err := stripObjectSetAnnotations(op.Value)
+			if err != nil {
+				return nil, err
+			}
+			if !keep {
+				continue
+			}
+			op.Value = stripped
+		}
+
+		kept = append(kept, op)
+	}
+
+	if len(kept) == 0 {
+		return []byte("[]"), nil
+	}
+
+	return json.Marshal(kept)
+}
+
+func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patcher, debugID string, ignoreOriginal, nullSafe bool, oldObject, newObject runtime.Object, diffPatches [][]byte) (bool, error) {
 	oldMetadata, err := meta.Accessor(oldObject)
 	if err != nil {
 		return false, err
@@ -221,6 +293,28 @@ func applyPatch(gvk schema.GroupVersionKind, reconciler Reconciler, patcher Patc
 
 	if string(patch) == "{}" {
 		return false, nil
+	}
+
+	if nullSafe && patchType == types.MergePatchType {
+		// doPatch generates the merge patch from the ignore-stripped documents,
+		// so the translation has to resolve nulls against those same ones or a
+		// wholesale subtree reinstates a field an ignore patch took out.
+		_, strippedModified, strippedCurrent, err := stripIgnores(nil, modified, current, diffPatches)
+		if err != nil {
+			return false, err
+		}
+
+		jsonPatch, nullAssigned, err := patch2.CreateJSONPatchFromMergePatch(patch, strippedModified, strippedCurrent)
+		if err != nil {
+			return false, fmt.Errorf("json patch generation: %w", err)
+		}
+
+		if nullAssigned {
+			patch, patchType = jsonPatch, types.JSONPatchType
+			if string(patch) == "[]" {
+				return false, nil
+			}
+		}
 	}
 
 	logrus.Debugf("DesiredSet - Patch %s %s/%s for %s -- [PATCH:%s, ORIGINAL:%s, MODIFIED:%s, CURRENT:%s]", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID, patch, original, modified, current)
@@ -272,7 +366,9 @@ func (o *desiredSet) compareObjects(gvk schema.GroupVersionKind, reconciler Reco
 		GroupVersionKind: gvk,
 	}]...)
 
-	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, oldObject, newObject, diffPatches); err != nil {
+	_, nullSafe := o.nullSafePatch[gvk]
+
+	if ran, err := applyPatch(gvk, reconciler, patcher, debugID, o.ignorePreviousApplied, nullSafe, oldObject, newObject, diffPatches); err != nil {
 		return err
 	} else if !ran {
 		logrus.Debugf("DesiredSet - No change(2) %s %s/%s for %s", gvk, oldMetadata.GetNamespace(), oldMetadata.GetName(), debugID)
