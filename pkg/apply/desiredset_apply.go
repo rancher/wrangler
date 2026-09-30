@@ -105,7 +105,10 @@ func (o *desiredSet) apply() error {
 		return o.err(err)
 	}
 
-	objs := o.collect(objList)
+	objs, err := o.collect(objList)
+	if err != nil {
+		return o.err(err)
+	}
 
 	debugID := o.debugID()
 	sel, err := GetSelector(labelSet)
@@ -142,12 +145,14 @@ func (o *desiredSet) debugID() string {
 	})
 }
 
-func (o *desiredSet) collect(objList []runtime.Object) objectset.ObjectByGVK {
+func (o *desiredSet) collect(objList []runtime.Object) (objectset.ObjectByGVK, error) {
 	result := objectset.ObjectByGVK{}
 	for _, obj := range objList {
-		_, _ = result.Add(obj)
+		if _, err := result.Add(obj); err != nil {
+			return nil, err
+		}
 	}
-	return result
+	return result, nil
 }
 
 func (o *desiredSet) runInjectors(objList []runtime.Object) ([]runtime.Object, error) {
