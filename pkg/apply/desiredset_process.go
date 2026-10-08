@@ -272,7 +272,7 @@ func (o *desiredSet) process(debugID string, set labels.Selector, gvk schema.Gro
 			if err != nil {
 				return nil, err
 			}
-			if string(data) != "{}" {
+			if string(data) != "{}" && string(data) != "[]" {
 				o.plan.Update.Add(gvk, namespace, name, string(data))
 			}
 			return nil, nil
