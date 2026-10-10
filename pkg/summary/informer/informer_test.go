@@ -2,14 +2,21 @@ package informer
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/rancher/wrangler/v3/pkg/summary/client"
+
+	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -244,4 +251,33 @@ func TestNewFilteredSummaryInformerWithOptions_WatchListSupport(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSummaryInformer_typeDescription(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+
+	scheme := runtime.NewScheme()
+	assert.NoError(t, corev1.AddToScheme(scheme))
+	gvr := corev1.SchemeGroupVersion.WithResource("pods")
+
+	dynamicClient := fake.NewSimpleDynamicClient(scheme)
+	dynamicClient.PrependWatchReactor("*", func(k8stesting.Action) (bool, watch.Interface, error) {
+		return true, nil, fmt.Errorf("fake error!")
+	})
+	informer := NewFilteredSummaryInformer(client.NewForExtendedDynamicClient(dynamicClient), gvr, "", 0, cache.Indexers{}, nil)
+
+	var gotError bool
+	assert.NoError(t, informer.Informer().SetWatchErrorHandler(func(r *cache.Reflector, err error) {
+		// TypeDescription is used by the DefaultWatchErrorHandler
+		assert.Contains(t, r.TypeDescription(), "*summary.SummarizedObject(/v1, Resource=pods)")
+		gotError = true
+		cancel()
+	}))
+
+	go informer.Informer().RunWithContext(ctx)
+	<-ctx.Done()
+
+	assert.True(t, gotError)
+
 }
