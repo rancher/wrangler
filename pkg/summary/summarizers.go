@@ -163,6 +163,7 @@ func init() {
 		checkApplyOwned,
 		checkCattleTypes,
 		checkGeneration,
+		checkCertificate,
 	}
 
 	initializeCheckErrors()
