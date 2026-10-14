@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 )
 
-var certKindWhitelist = map[string]bool{"Certificate": true, "CertificateRequest": true, "Issuer": true}
+var certKindWhitelist = map[string]bool{"Certificate": true, "CertificateRequest": true}
 
 func checkCertificate(obj data.Object, conditions []Condition, summary Summary) Summary {
 	if !strings.Contains(obj.String("apiVersion"), "cert-manager.io/") {
