@@ -7,6 +7,7 @@ import (
 
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var certKindWhitelist = map[string]bool{"Certificate": true, "CertificateRequest": true}
@@ -18,19 +19,15 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 	if !certKindWhitelist[obj.String("kind")] {
 		return summary
 	}
-	statusVal, ok := obj["status"]
+	status := getStatusData(obj)
+	failedIssuanceAttemptsValue, ok := status["failedIssuanceAttempts"]
 	if ok {
-		status, ok := statusVal.(data.Object)
-		if ok {
-			failedIssuanceAttemptsValue, ok := status["failedIssuanceAttempts"]
-			if ok {
-				failedIssuanceAttempts, err := convert.ToNumber(failedIssuanceAttemptsValue)
-				if err == nil && failedIssuanceAttempts > 0 {
-					summary.State = "error"
-					summary.Error = true
-					summary.Message = append(summary.Message, "Too many failed issuance-attempts")
-				}
-			}
+		failedIssuanceAttempts, err := convert.ToNumber(failedIssuanceAttemptsValue)
+		if err == nil && failedIssuanceAttempts > 0 {
+			summary.State = "error"
+			summary.Error = true
+			summary.Message = []string{"Too many failed issuance-attempts"}
+			return summary
 		}
 	}
 	if len(conditions) == 0 {
@@ -43,7 +40,8 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 			message := condition.Message()
 			if strings.Contains(strings.ToLower(message), "issuing certificate") {
 				summary.State = "in-progress"
-				break
+				summary.Message = append(summary.Message, message)
+				return summary
 			}
 		}
 
@@ -54,12 +52,14 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 					summary.State = "expired"
 					summary.Error = true
 					summary.Message = append(summary.Message, "certificate has expired")
+					return summary
 				}
 			}
-			if !summary.Error && summary.State == "" {
+			if summary.State == "" {
 				if renewalTimestamp, ok := statusObj["renewalTime"]; ok {
 					if renewalTime, err := toTime(renewalTimestamp); err == nil && !renewalTime.IsZero() {
 						summary.State = "expiring"
+						return summary
 					}
 				}
 			}
@@ -74,18 +74,18 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 				continue
 			}
 
-			switch condition.Status() {
-			case "True":
+			switch metav1.ConditionStatus(condition.Status()) {
+			case metav1.ConditionTrue:
 				if summary.State == "" {
 					summary.State = "active"
 				}
-			case "False":
+			case metav1.ConditionFalse:
 				summary.State = "error"
 				summary.Error = true
 				if message := condition.Message(); message != "" {
 					summary.Message = append(summary.Message, message)
 				}
-			case "Unknown":
+			case metav1.ConditionUnknown:
 				if summary.State == "" {
 					summary.State = "pending"
 				}
