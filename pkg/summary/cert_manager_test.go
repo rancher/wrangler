@@ -27,22 +27,18 @@ func TestCheckCertificate(t *testing.T) {
 			inputStatus: map[string]interface{}{
 				"conditions": []Condition{},
 			},
-			expected: Summary{
-				State:   "error",
-				Error:   true,
-				Message: []string{"No conditions given"},
-			},
+			expected: Summary{},
 		},
 		{
 			name:     "failed issuance-attempts > 0",
 			certName: "pat",
 			inputStatus: map[string]interface{}{
+				"failedIssuanceAttempts": 1,
 				"conditions": []Condition{
 					{
 						Object: map[string]interface{}{
-							"failedIssuanceAttempts": 1,
-							"type":                   "Ready",
-							"status":                 "True",
+							"type":   "Ready",
+							"status": "True",
 						},
 					},
 				},

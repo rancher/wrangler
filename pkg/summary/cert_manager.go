@@ -18,24 +18,24 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 	if !certKindWhitelist[obj.String("kind")] {
 		return summary
 	}
-	if len(conditions) == 0 {
-		summary.State = "error"
-		summary.Error = true
-		summary.Message = append(summary.Message, "No conditions given")
-		return summary
+	statusVal, ok := obj["status"]
+	if ok {
+		status, ok := statusVal.(data.Object)
+		if ok {
+			failedIssuanceAttemptsValue, ok := status["failedIssuanceAttempts"]
+			if ok {
+				failedIssuanceAttempts, err := convert.ToNumber(failedIssuanceAttemptsValue)
+				if err == nil && failedIssuanceAttempts > 0 {
+					summary.State = "error"
+					summary.Error = true
+					summary.Message = append(summary.Message, "Too many failed issuance-attempts")
+				}
+			}
+		}
 	}
-
-	for _, condition := range conditions {
-		failedIssuanceAttemptsValue, ok := condition.Object["failedIssuanceAttempts"]
-		if !ok {
-			continue
-		}
-		failedIssuanceAttempts, err := convert.ToNumber(failedIssuanceAttemptsValue)
-		if err == nil && failedIssuanceAttempts > 0 {
-			summary.State = "error"
-			summary.Error = true
-			summary.Message = append(summary.Message, "Too many failed issuance-attempts")
-		}
+	if len(conditions) == 0 {
+		// wait for later runs when conditions have been added
+		return summary
 	}
 
 	if !summary.Error {
