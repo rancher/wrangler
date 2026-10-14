@@ -137,25 +137,73 @@ func TestCheckCertificate(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			obj := data.Object{
-				"apiVersion": "cert-manager.io/v1",
-				"kind":       "Certificate",
-				"metadata": map[string]interface{}{
-					"name":      c.name,
-					"namespace": "default",
-				},
-				"status": c.inputStatus,
+			for _, kind := range []string{"Certificate", "CertificateRequest"} {
+				obj := data.Object{
+					"apiVersion": "cert-manager.io/v1",
+					"kind":       kind,
+					"metadata": map[string]interface{}{
+						"name":      c.name,
+						"namespace": "default",
+					},
+					"status": c.inputStatus,
+				}
+				status, ok := obj["status"].(data.Object)
+				if !ok {
+					t.Fatalf("status was not a data.Object: %#v", obj["status"])
+				}
+				conditions, ok := status["conditions"].([]Condition)
+				if !ok {
+					t.Fatalf("conditions were not []Condition: %#v", status["conditions"])
+				}
+				actual := checkCertificate(obj, conditions, Summary{})
+				assert.Equal(t, c.expected, actual)
 			}
-			status, ok := obj["status"].(data.Object)
-			if !ok {
-				t.Fatalf("status was not a data.Object: %#v", obj["status"])
+		})
+	}
+}
+
+// Verify non-supported GVKs don't go through summary analysis
+func TestCheckNonCertificate(t *testing.T) {
+	type testCase struct {
+		name        string
+		certName    string
+		inputStatus data.Object
+		expected    Summary
+	}
+	readyCondition := NewCondition("Ready", "True", "", "")
+	cases := []testCase{
+		{
+			name:     "no conditions",
+			certName: "joe",
+			inputStatus: map[string]interface{}{
+				"conditions": []Condition{readyCondition},
+			},
+			expected: Summary{},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			for _, kind := range []string{"Issuer", "SuedeMohairJacket"} {
+				obj := data.Object{
+					"apiVersion": "cert-manager.io/v1",
+					"kind":       kind,
+					"metadata": map[string]interface{}{
+						"name":      c.name,
+						"namespace": "default",
+					},
+					"status": c.inputStatus,
+				}
+				status, ok := obj["status"].(data.Object)
+				if !ok {
+					t.Fatalf("status was not a data.Object: %#v", obj["status"])
+				}
+				conditions, ok := status["conditions"].([]Condition)
+				if !ok {
+					t.Fatalf("conditions were not []Condition: %#v", status["conditions"])
+				}
+				actual := checkCertificate(obj, conditions, Summary{})
+				assert.Equal(t, c.expected, actual)
 			}
-			conditions, ok := status["conditions"].([]Condition)
-			if !ok {
-				t.Fatalf("conditions were not []Condition: %#v", status["conditions"])
-			}
-			actual := checkCertificate(obj, conditions, Summary{})
-			assert.Equal(t, c.expected, actual)
 		})
 	}
 }
