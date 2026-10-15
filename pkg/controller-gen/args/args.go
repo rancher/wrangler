@@ -21,7 +21,11 @@ type Options struct {
 	ImportPackage string
 	// OutputPackage is the directory path where generated code output will be located
 	OutputPackage string
-	Groups        map[string]Group
+	// ModulePath is the GOPATH style repo root,
+	// used when the repos module path is longer than 3 segments (e.g. "source.com/org/sub/repo").
+	// If empty, the first 3 segments of OutputPackage are used.
+	ModulePath string
+	Groups     map[string]Group
 	// Boilerplate is the filepath to a boilerplate file whose content will
 	// be added to every generated files.
 	Boilerplate string

@@ -147,26 +147,43 @@ func Run(opts cgargs.Options) {
 	}
 }
 
-func sourcePackagePath(customArgs *cgargs.CustomArgs) string {
-	return filepath.Join(customArgs.OutputBase, customArgs.Package)
+func sourcePackagePath(customArgs *cgargs.CustomArgs, pkgName string) string {
+	if customArgs.Options.ModulePath != "" {
+		return filepath.Join(customArgs.OutputBase, customArgs.Options.ModulePath)
+	}
+	pkgSplit := strings.Split(pkgName, string(os.PathSeparator))
+	return filepath.Join(customArgs.OutputBase, strings.Join(pkgSplit[:3], string(os.PathSeparator)))
 }
 
 // until k8s code-gen supports gopath
 func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
-	pkg := sourcePackagePath(customArgs)
-
-	if _, err := os.Stat(pkg); os.IsNotExist(err) {
-		return nil
+	pathsToCopy := map[string]bool{}
+	for _, types := range customArgs.TypesByGroup {
+		for _, names := range types {
+			pkg := sourcePackagePath(customArgs, names.Package)
+			pathsToCopy[pkg] = true
+		}
 	}
 
-	return filepath.Walk(pkg, func(path string, info os.FileInfo, err error) error {
-		newPath := strings.Replace(path, pkg, ".", 1)
-		if info.IsDir() {
-			return os.MkdirAll(newPath, info.Mode())
+	pkg := sourcePackagePath(customArgs, customArgs.Package)
+	pathsToCopy[pkg] = true
+
+	for pkg := range pathsToCopy {
+		if _, err := os.Stat(pkg); os.IsNotExist(err) {
+			continue
 		}
 
-		return copyFile(path, newPath)
-	})
+		return filepath.Walk(pkg, func(path string, info os.FileInfo, err error) error {
+			newPath := strings.Replace(path, pkg, ".", 1)
+			if info.IsDir() {
+				return os.MkdirAll(newPath, info.Mode())
+			}
+
+			return copyFile(path, newPath)
+		})
+	}
+
+	return nil
 }
 
 func copyFile(src, dst string) error {
