@@ -148,14 +148,15 @@ func Run(opts cgargs.Options) {
 }
 
 func sourcePackagePath(customArgs *cgargs.CustomArgs, pkgName string) string {
+	if customArgs.Options.ModulePath != "" {
+		return filepath.Join(customArgs.OutputBase, customArgs.Options.ModulePath)
+	}
 	pkgSplit := strings.Split(pkgName, string(os.PathSeparator))
-	pkg := filepath.Join(customArgs.OutputBase, strings.Join(pkgSplit[:3], string(os.PathSeparator)))
-	return pkg
+	return filepath.Join(customArgs.OutputBase, strings.Join(pkgSplit[:3], string(os.PathSeparator)))
 }
 
 // until k8s code-gen supports gopath
 func copyGoPathToModules(customArgs *cgargs.CustomArgs) error {
-
 	pathsToCopy := map[string]bool{}
 	for _, types := range customArgs.TypesByGroup {
 		for _, names := range types {
