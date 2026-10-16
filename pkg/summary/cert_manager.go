@@ -10,15 +10,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var certKindWhitelist = map[string]bool{"Certificate": true, "CertificateRequest": true}
-
 func checkCertificate(obj data.Object, conditions []Condition, summary Summary) Summary {
 	if !strings.Contains(obj.String("apiVersion"), "cert-manager.io/") {
 		return summary
 	}
-	if !certKindWhitelist[obj.String("kind")] {
+	switch obj.String("kind") {
+	case "CertificateRequest":
+		return checkCertificateRequest(obj, conditions, summary)
+	case "Certificate":
+		return checkCertificateResource(obj, conditions, summary)
+	case "Issuer":
+		return checkIssuer(obj, conditions, summary)
+	case "ClusterIssuer":
+		return checkIssuer(obj, conditions, summary)
+	default:
 		return summary
 	}
+}
+
+func checkCertificateResource(obj data.Object, conditions []Condition, summary Summary) Summary {
 	status := getStatusData(obj)
 	failedIssuanceAttemptsValue, ok := status["failedIssuanceAttempts"]
 	if ok {
@@ -30,34 +40,20 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 			return summary
 		}
 	}
-	if len(conditions) == 0 {
-		// wait for later runs when conditions have been added
-		return summary
-	}
-
-	if !summary.Error {
-		for _, condition := range conditions {
-			message := condition.Message()
-			if strings.Contains(strings.ToLower(message), "issuing certificate") {
-				summary.State = "in-progress"
-				summary.Message = append(summary.Message, message)
+	statusObj := getStatusData(obj)
+	if len(statusObj) != 0 {
+		if notAfterTimestamp, ok := statusObj["notAfter"]; ok {
+			if notAfterTime, err := toTime(notAfterTimestamp); err == nil && time.Now().After(notAfterTime) {
+				summary.State = "expired"
+				summary.Error = true
+				summary.Message = append(summary.Message, "certificate has expired")
 				return summary
 			}
 		}
-
-		statusObj := getStatusData(obj)
-		if len(statusObj) != 0 {
-			if notAfterTimestamp, ok := statusObj["notAfter"]; ok {
-				if notAfterTime, err := toTime(notAfterTimestamp); err == nil && time.Now().After(notAfterTime) {
-					summary.State = "expired"
-					summary.Error = true
-					summary.Message = append(summary.Message, "certificate has expired")
-					return summary
-				}
-			}
-			if summary.State == "" {
-				if renewalTimestamp, ok := statusObj["renewalTime"]; ok {
-					if renewalTime, err := toTime(renewalTimestamp); err == nil && !renewalTime.IsZero() {
+		if summary.State == "" {
+			if renewalTimestamp, ok := statusObj["renewalTime"]; ok {
+				if renewalTime, err := toTime(renewalTimestamp); err == nil {
+					if renewalTime.Compare(time.Now()) > 0 {
 						summary.State = "expiring"
 						return summary
 					}
@@ -65,44 +61,81 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 			}
 		}
 	}
+	if len(conditions) == 0 || summary.Error {
+		// wait for later runs when conditions have been added
+		return summary
+	}
 
-	if !summary.Error {
-		foundNonReady := false
-		for _, condition := range conditions {
-			if condition.Type() != "Ready" {
-				foundNonReady = true
-				continue
-			}
-
-			switch metav1.ConditionStatus(condition.Status()) {
-			case metav1.ConditionTrue:
-				if summary.State == "" {
-					summary.State = "active"
-				}
-			case metav1.ConditionFalse:
-				summary.State = "error"
-				summary.Error = true
-				if message := condition.Message(); message != "" {
-					summary.Message = append(summary.Message, message)
-				}
-			case metav1.ConditionUnknown:
-				if summary.State == "" {
-					summary.State = "pending"
-				}
-			}
-			if summary.Error {
-				break
-			}
-		}
-		if !foundNonReady && summary.State == "" {
-			summary.State = "pending"
+	for _, condition := range conditions {
+		message := condition.Message()
+		if strings.Contains(strings.ToLower(message), "issuing certificate") {
+			summary.State = "in-progress"
+			summary.Message = append(summary.Message, message)
+			return summary
 		}
 	}
 
-	summary.Message = dedupMessage(summary.Message)
-	if summary.Message == nil {
-		summary.Message = []string{}
+	processReadyCondition(conditions, &summary, "pending")
+	return summary
+}
+
+func checkCertificateRequest(obj data.Object, conditions []Condition, summary Summary) Summary {
+	if len(conditions) == 0 {
+		// wait for later runs when conditions have been added
+		return summary
 	}
+	if summary.Error {
+		return summary
+	}
+
+	for _, condition := range conditions {
+		if condition.Bool("denied") {
+			summary.State = "denied"
+			summary.Error = true
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return summary
+		}
+	}
+	for _, condition := range conditions {
+		if condition.Bool("invalidRequest") {
+			summary.State = "invalidRequest"
+			summary.Error = true
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return summary
+		}
+	}
+
+	processReadyCondition(conditions, &summary, "in-progress")
+	// Any other certs are deemed to be in progress
+	if summary.State == "" {
+		summary.State = "in-progress"
+	}
+	return summary
+}
+
+func checkIssuer(obj data.Object, conditions []Condition, summary Summary) Summary {
+	if len(conditions) == 0 {
+		return summary
+	}
+	if summary.Error {
+		return summary
+	}
+
+	for _, condition := range conditions {
+		if !condition.Bool("Ready") {
+			summary.State = "error"
+			summary.Error = true
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return summary
+		}
+	}
+	processReadyCondition(conditions, &summary, "pending")
 	return summary
 }
 
@@ -115,6 +148,46 @@ func getStatusData(obj data.Object) data.Object {
 	default:
 		return data.Object{}
 	}
+}
+
+func processReadyCondition(conditions []Condition, summary *Summary, defaultState string) {
+	foundReadyTrue := false
+	foundReadyOther := false
+	for _, condition := range conditions {
+		if !condition.Bool("Ready") {
+			summary.State = "error"
+			summary.Error = true
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return
+		}
+		switch metav1.ConditionStatus(condition.Status()) {
+		case metav1.ConditionTrue:
+			foundReadyTrue = true
+		case metav1.ConditionFalse:
+			summary.State = "error"
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return
+		case metav1.ConditionUnknown:
+			if summary.State == "" {
+				summary.State = "pending"
+			}
+			foundReadyOther = true
+		}
+	}
+	if summary.State == "" {
+		if !foundReadyTrue {
+			// If we found an error we returned inside the loop
+			summary.State = defaultState
+		}
+		if !foundReadyOther {
+			summary.State = "active"
+		}
+	}
+	return summary
 }
 
 func toTime(value interface{}) (time.Time, error) {
