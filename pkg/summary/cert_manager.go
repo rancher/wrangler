@@ -29,8 +29,8 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 }
 
 func checkCertificateResource(obj data.Object, conditions []Condition, summary Summary) Summary {
-	status := getStatusData(obj)
-	failedIssuanceAttemptsValue, ok := status["failedIssuanceAttempts"]
+	statusObj := getStatusData(obj)
+	failedIssuanceAttemptsValue, ok := statusObj["failedIssuanceAttempts"]
 	if ok {
 		failedIssuanceAttempts, err := convert.ToNumber(failedIssuanceAttemptsValue)
 		if err == nil && failedIssuanceAttempts > 0 {
@@ -40,7 +40,6 @@ func checkCertificateResource(obj data.Object, conditions []Condition, summary S
 			return summary
 		}
 	}
-	statusObj := getStatusData(obj)
 	if len(statusObj) != 0 {
 		if notAfterTimestamp, ok := statusObj["notAfter"]; ok {
 			if notAfterTime, err := toTime(notAfterTimestamp); err == nil && time.Now().After(notAfterTime) {
@@ -154,7 +153,7 @@ func processReadyCondition(conditions []Condition, summary *Summary, defaultStat
 	foundReadyTrue := false
 	foundReadyOther := false
 	for _, condition := range conditions {
-		if !condition.Bool("Ready") {
+		if condition.Type() != "Ready" {
 			summary.State = "error"
 			summary.Error = true
 			if message := condition.Message(); message != "" {
@@ -167,6 +166,7 @@ func processReadyCondition(conditions []Condition, summary *Summary, defaultStat
 			foundReadyTrue = true
 		case metav1.ConditionFalse:
 			summary.State = "error"
+			summary.Error = true
 			if message := condition.Message(); message != "" {
 				summary.Message = append(summary.Message, message)
 			}
@@ -180,14 +180,15 @@ func processReadyCondition(conditions []Condition, summary *Summary, defaultStat
 	}
 	if summary.State == "" {
 		if !foundReadyTrue {
-			// If we found an error we returned inside the loop
+			// If we found an error, we returned inside the loop
 			summary.State = defaultState
+			summary.Error = true
 		}
 		if !foundReadyOther {
 			summary.State = "active"
 		}
 	}
-	return summary
+	return
 }
 
 func toTime(value interface{}) (time.Time, error) {
