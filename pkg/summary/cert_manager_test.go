@@ -1,7 +1,6 @@
 package summary
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -99,7 +98,7 @@ func TestCheckCertificate(t *testing.T) {
 			expected: Summary{
 				State:   "active",
 				Error:   false,
-				Message: []string{},
+				Message: []string(nil),
 			},
 		},
 		{
@@ -107,13 +106,13 @@ func TestCheckCertificate(t *testing.T) {
 			certName: "dave_m",
 			inputStatus: map[string]interface{}{
 				"conditions": []Condition{
-					NewCondition("Ready", "False", "", ""),
+					NewCondition("Ready", "False", "", "oops I did it again"),
 				},
 			},
 			expected: Summary{
 				State:   "error",
 				Error:   true,
-				Message: []string{},
+				Message: []string{"oops I did it again"},
 			},
 		},
 		{
@@ -127,7 +126,7 @@ func TestCheckCertificate(t *testing.T) {
 			expected: Summary{
 				State:   "pending",
 				Error:   false,
-				Message: []string{},
+				Message: []string(nil),
 			},
 		},
 	}
@@ -151,9 +150,6 @@ func TestCheckCertificate(t *testing.T) {
 			conditions, ok := status["conditions"].([]Condition)
 			if !ok {
 				t.Fatalf("conditions were not []Condition: %#v", status["conditions"])
-			}
-			if c.name == "failed issuance-attempts > 0" {
-				fmt.Println("QQQ: stop here")
 			}
 			actual := checkCertificate(obj, conditions, Summary{})
 			assert.Equal(t, c.expected, actual)
@@ -190,7 +186,7 @@ func TestCheckCertificateRequest(t *testing.T) {
 			expected: Summary{
 				State:   "active",
 				Error:   false,
-				Message: []string{},
+				Message: []string(nil),
 			},
 		},
 		{
@@ -198,13 +194,13 @@ func TestCheckCertificateRequest(t *testing.T) {
 			certName: "dave_m",
 			inputStatus: map[string]interface{}{
 				"conditions": []Condition{
-					NewCondition("Ready", "False", "", ""),
+					NewCondition("Ready", "False", "", "yipes"),
 				},
 			},
 			expected: Summary{
 				State:   "error",
 				Error:   true,
-				Message: []string{},
+				Message: []string{"yipes"},
 			},
 		},
 		{
@@ -212,13 +208,13 @@ func TestCheckCertificateRequest(t *testing.T) {
 			certName: "bob_m",
 			inputStatus: map[string]interface{}{
 				"conditions": []Condition{
-					NewCondition("Ready", "Unknown", "", ""),
+					NewCondition("Ready", "Unknown", "", "waiting for an apple"),
 				},
 			},
 			expected: Summary{
 				State:   "pending",
 				Error:   false,
-				Message: []string{},
+				Message: []string{"waiting for an apple"},
 			},
 		},
 	}
