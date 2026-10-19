@@ -157,32 +157,26 @@ func TestCheckCertificate(t *testing.T) {
 	}
 }
 
-// CertificateRequests are similar to Certs but don't have
-// status.failedIssuanceAttempts nor expiration times
 func TestCheckCertificateRequest(t *testing.T) {
 	type testCase struct {
-		name        string
-		certName    string
-		inputStatus data.Object
-		expected    Summary
+		name            string
+		inputStatus     data.Object
+		inputConditions []Condition
+		expected        Summary
 	}
 	readyCondition := NewCondition("Ready", "True", "", "")
 
 	cases := []testCase{
 		{
-			name:     "no conditions",
-			certName: "joe",
-			inputStatus: map[string]interface{}{
-				"conditions": []Condition{},
-			},
-			expected: Summary{},
+			name:            "no conditions",
+			inputStatus:     map[string]interface{}{},
+			inputConditions: []Condition{},
+			expected:        Summary{},
 		},
 		{
-			name:     "is ready",
-			certName: "fred",
-			inputStatus: map[string]interface{}{
-				"conditions": []Condition{readyCondition},
-			},
+			name:            "ready true is active",
+			inputStatus:     map[string]interface{}{},
+			inputConditions: []Condition{readyCondition},
 			expected: Summary{
 				State:   "active",
 				Error:   false,
@@ -190,31 +184,87 @@ func TestCheckCertificateRequest(t *testing.T) {
 			},
 		},
 		{
-			name:     "is an error",
-			certName: "dave_m",
-			inputStatus: map[string]interface{}{
-				"conditions": []Condition{
-					NewCondition("Ready", "False", "", "yipes"),
-				},
+			name:        "denied true is denied",
+			inputStatus: map[string]interface{}{},
+			inputConditions: []Condition{
+				NewCondition("Denied", "True", "", "request denied"),
 			},
 			expected: Summary{
-				State:   "error",
+				State:   "denied",
 				Error:   true,
-				Message: []string{"yipes"},
+				Message: []string{"request denied"},
 			},
 		},
 		{
-			name:     "is pending",
-			certName: "bob_m",
-			inputStatus: map[string]interface{}{
-				"conditions": []Condition{
-					NewCondition("Ready", "Unknown", "", "waiting for an apple"),
-				},
+			name:        "denied/false is pending",
+			inputStatus: map[string]interface{}{},
+			inputConditions: []Condition{
+				NewCondition("Denied", "False", "", "can't even successfully deny a request"),
 			},
 			expected: Summary{
 				State:   "pending",
 				Error:   false,
-				Message: []string{"waiting for an apple"},
+				Message: []string(nil),
+			},
+		},
+		{
+			name:        "invalid request is error",
+			inputStatus: map[string]interface{}{},
+			inputConditions: []Condition{
+				NewCondition("InvalidRequest", "True", "", "bad request"),
+			},
+			expected: Summary{
+				State:   "error",
+				Error:   true,
+				Message: []string{"bad request"},
+			},
+		},
+		{
+			name:        "ready failed reason is error",
+			inputStatus: map[string]interface{}{},
+			inputConditions: []Condition{
+				NewCondition("Ready", "False", "Failed", "issuance failed"),
+			},
+			expected: Summary{
+				State:   "error",
+				Error:   true,
+				Message: []string{"issuance failed"},
+			},
+		},
+		{
+			name:        "approved is in progress",
+			inputStatus: map[string]interface{}{},
+			inputConditions: []Condition{
+				NewCondition("Approved", "True", "", "approved"),
+			},
+			expected: Summary{
+				State:   "in-progress",
+				Error:   false,
+				Message: []string(nil),
+			},
+		},
+		{
+			name:        "anything else is pending",
+			inputStatus: map[string]interface{}{},
+			inputConditions: []Condition{
+				NewCondition("0-wheel wheelbarrow", "", "", ""),
+			},
+			expected: Summary{
+				State:   "pending",
+				Error:   false,
+				Message: []string(nil),
+			},
+		},
+		{
+			name:        "not approved is pending",
+			inputStatus: map[string]interface{}{},
+			inputConditions: []Condition{
+				NewCondition("Approved", "False", "", "waiting for approval"),
+			},
+			expected: Summary{
+				State:   "pending",
+				Error:   false,
+				Message: []string{"waiting for approval"},
 			},
 		},
 	}
@@ -228,7 +278,11 @@ func TestCheckCertificateRequest(t *testing.T) {
 					"name":      c.name,
 					"namespace": "default",
 				},
-				"status": c.inputStatus,
+				"status": func() data.Object {
+					status := c.inputStatus
+					status["conditions"] = c.inputConditions
+					return status
+				}(),
 			}
 			status, ok := obj["status"].(data.Object)
 			if !ok {
@@ -244,28 +298,60 @@ func TestCheckCertificateRequest(t *testing.T) {
 	}
 }
 
-// Verify non-supported GVKs don't go through summary analysis
-func TestCheckNonCertificate(t *testing.T) {
+func TestCheckIssuerKind(t *testing.T) {
 	type testCase struct {
-		name        string
-		certName    string
-		inputStatus data.Object
-		expected    Summary
+		name            string
+		kind            string
+		inputConditions []Condition
+		expected        Summary
 	}
 	readyCondition := NewCondition("Ready", "True", "", "")
 	cases := []testCase{
 		{
-			name:     "no conditions",
-			certName: "joe",
-			inputStatus: map[string]interface{}{
-				"conditions": []Condition{readyCondition},
+			name:            "no conditions",
+			inputConditions: []Condition{},
+			expected:        Summary{},
+		},
+		{
+			name:            "ready false is error",
+			inputConditions: []Condition{NewCondition("Ready", "False", "", "issuer failed")},
+			expected: Summary{
+				State:   "error",
+				Error:   true,
+				Message: []string{"issuer failed"},
 			},
-			expected: Summary{},
+		},
+		{
+			name:            "ready true is active",
+			inputConditions: []Condition{readyCondition},
+			expected: Summary{
+				State:   "active",
+				Error:   false,
+				Message: []string(nil),
+			},
+		},
+		{
+			name:            "anything else for a ready type is pending",
+			inputConditions: []Condition{NewCondition("Ready", "Unknown", "", "waiting for a miracle")},
+			expected: Summary{
+				State:   "pending",
+				Error:   false,
+				Message: []string(nil),
+			},
+		},
+		{
+			name:            "other types end up as errors",
+			inputConditions: []Condition{NewCondition("NanoNano", "", "", "got a problem here")},
+			expected: Summary{
+				State:   "NanoNano",
+				Error:   true,
+				Message: []string{"got a problem here"},
+			},
 		},
 	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			for _, kind := range []string{"Issuer", "SuedeMohairJacket"} {
+	for _, kind := range []string{"Issuer", "ClusterIssuer"} {
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
 				obj := data.Object{
 					"apiVersion": "cert-manager.io/v1",
 					"kind":       kind,
@@ -273,7 +359,9 @@ func TestCheckNonCertificate(t *testing.T) {
 						"name":      c.name,
 						"namespace": "default",
 					},
-					"status": c.inputStatus,
+					"status": data.Object{
+						"conditions": c.inputConditions,
+					},
 				}
 				status, ok := obj["status"].(data.Object)
 				if !ok {
@@ -285,7 +373,32 @@ func TestCheckNonCertificate(t *testing.T) {
 				}
 				actual := checkCertificate(obj, conditions, Summary{})
 				assert.Equal(t, c.expected, actual)
-			}
-		})
+			})
+		}
 	}
+}
+
+// Verify non-supported GVKs don't go through summary analysis
+func TestCheckNonCertificate(t *testing.T) {
+	obj := data.Object{
+		"apiVersion": "cert-manager.io/v1",
+		"kind":       "SuedeMohairJacket",
+		"metadata": map[string]interface{}{
+			"name":      "joe",
+			"namespace": "default",
+		},
+		"status": data.Object{
+			"conditions": []Condition{NewCondition("Ready", "True", "", "")},
+		},
+	}
+	status, ok := obj["status"].(data.Object)
+	if !ok {
+		t.Fatalf("status was not a data.Object: %#v", obj["status"])
+	}
+	conditions, ok := status["conditions"].([]Condition)
+	if !ok {
+		t.Fatalf("conditions were not []Condition: %#v", status["conditions"])
+	}
+	actual := checkCertificate(obj, conditions, Summary{})
+	assert.Equal(t, Summary{}, actual)
 }
