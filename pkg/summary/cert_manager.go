@@ -88,7 +88,7 @@ func checkCertificateRequest(obj data.Object, conditions []Condition, summary Su
 	}
 
 	for _, condition := range conditions {
-		if condition.Bool("denied") {
+		if condition.Type() == "Denied" && metav1.ConditionStatus(condition.Status()) == metav1.ConditionTrue {
 			summary.State = "denied"
 			summary.Error = true
 			if message := condition.Message(); message != "" {
@@ -98,8 +98,8 @@ func checkCertificateRequest(obj data.Object, conditions []Condition, summary Su
 		}
 	}
 	for _, condition := range conditions {
-		if condition.Bool("invalidRequest") {
-			summary.State = "invalidRequest"
+		if condition.Type() == "InvalidRequest" && metav1.ConditionStatus(condition.Status()) == metav1.ConditionTrue {
+			summary.State = "error"
 			summary.Error = true
 			if message := condition.Message(); message != "" {
 				summary.Message = append(summary.Message, message)
@@ -107,12 +107,39 @@ func checkCertificateRequest(obj data.Object, conditions []Condition, summary Su
 			return summary
 		}
 	}
-
-	processReadyCondition(conditions, &summary, "in-progress")
-	// Any other certs are deemed to be in progress
-	if summary.State == "" {
-		summary.State = "in-progress"
+	for _, condition := range conditions {
+		if condition.Type() != "Ready" {
+			continue
+		}
+		switch metav1.ConditionStatus(condition.Status()) {
+		case metav1.ConditionTrue:
+			summary.State = "active"
+			return summary
+		case metav1.ConditionFalse:
+			if condition.Reason() == "Failed" {
+				summary.State = "error"
+				summary.Error = true
+				if message := condition.Message(); message != "" {
+					summary.Message = append(summary.Message, message)
+				}
+				return summary
+			}
+		}
 	}
+	for _, condition := range conditions {
+		if condition.Type() == "Approved" {
+			if metav1.ConditionStatus(condition.Status()) == metav1.ConditionTrue {
+				summary.State = "in-progress"
+				return summary
+			}
+			summary.State = "pending"
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return summary
+		}
+	}
+	summary.State = "pending"
 	return summary
 }
 
@@ -125,8 +152,8 @@ func checkIssuer(obj data.Object, conditions []Condition, summary Summary) Summa
 	}
 
 	for _, condition := range conditions {
-		if !condition.Bool("Ready") {
-			summary.State = "error"
+		if tp := condition.Type(); tp != "Ready" {
+			summary.State = tp
 			summary.Error = true
 			if message := condition.Message(); message != "" {
 				summary.Message = append(summary.Message, message)
@@ -134,7 +161,24 @@ func checkIssuer(obj data.Object, conditions []Condition, summary Summary) Summa
 			return summary
 		}
 	}
-	processReadyCondition(conditions, &summary, "pending")
+	for _, condition := range conditions {
+		switch metav1.ConditionStatus(condition.Status()) {
+		case metav1.ConditionFalse:
+			summary.State = "error"
+			summary.Error = true
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return summary
+		case metav1.ConditionTrue:
+			summary.State = "active"
+			return summary
+		case metav1.ConditionUnknown:
+			summary.State = "pending"
+			return summary
+		}
+	}
+	summary.State = "pending"
 	return summary
 }
 
