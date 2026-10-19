@@ -30,15 +30,12 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 
 func checkCertificateResource(obj data.Object, conditions []Condition, summary Summary) Summary {
 	statusObj := getStatusData(obj)
-	failedIssuanceAttemptsValue, ok := statusObj["failedIssuanceAttempts"]
-	if ok {
-		failedIssuanceAttempts, err := convert.ToNumber(failedIssuanceAttemptsValue)
-		if err == nil && failedIssuanceAttempts > 0 {
-			summary.State = "error"
-			summary.Error = true
-			summary.Message = []string{"Too many failed issuance-attempts"}
-			return summary
-		}
+	failedIssuanceAttempts, err := convert.ToNumber(data.GetValueN(statusObj, "failedIssuanceAttempts"))
+	if err == nil && failedIssuanceAttempts > 0 {
+		summary.State = "error"
+		summary.Error = true
+		summary.Message = []string{"Too many failed issuance-attempts"}
+		return summary
 	}
 	if len(statusObj) != 0 {
 		if notAfterTimestamp, ok := statusObj["notAfter"]; ok {
