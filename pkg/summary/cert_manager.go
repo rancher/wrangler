@@ -52,7 +52,7 @@ func checkCertificateResource(obj data.Object, conditions []Condition, summary S
 		if summary.State == "" {
 			if renewalTimestamp, ok := statusObj["renewalTime"]; ok {
 				if renewalTime, err := toTime(renewalTimestamp); err == nil {
-					if renewalTime.Compare(time.Now()) > 0 {
+					if time.Now().After(renewalTime) {
 						summary.State = "expiring"
 						return summary
 					}

@@ -80,7 +80,8 @@ func TestCheckCertificate(t *testing.T) {
 			name:     "will expire soon",
 			certName: "tony",
 			inputStatus: map[string]interface{}{
-				"renewalTime": tomorrow,
+				"renewalTime": yesterday,
+				"notAfter":    tomorrow,
 				"conditions":  []Condition{readyCondition},
 			},
 			expected: Summary{
