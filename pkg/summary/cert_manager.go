@@ -2,6 +2,7 @@ package summary
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -28,31 +29,36 @@ func checkCertificate(obj data.Object, conditions []Condition, summary Summary) 
 	}
 }
 
+func pluralize(word string, count int64) string {
+	if count == 1 {
+		return fmt.Sprintf("1 %s", word)
+	}
+	return fmt.Sprintf("%d %ss", count, word)
+}
+
 func checkCertificateResource(obj data.Object, conditions []Condition, summary Summary) Summary {
 	statusObj := getStatusData(obj)
 	failedIssuanceAttempts, err := convert.ToNumber(data.GetValueN(statusObj, "failedIssuanceAttempts"))
 	if err == nil && failedIssuanceAttempts > 0 {
 		summary.State = "error"
 		summary.Error = true
-		summary.Message = []string{"Too many failed issuance-attempts"}
+		summary.Message = []string{pluralize("failed issuance attempt", failedIssuanceAttempts)}
 		return summary
 	}
 	if len(statusObj) != 0 {
 		if notAfterTimestamp, ok := statusObj["notAfter"]; ok {
-			if notAfterTime, err := toTime(notAfterTimestamp); err == nil && time.Now().After(notAfterTime) {
-				summary.State = "expired"
-				summary.Error = true
-				summary.Message = append(summary.Message, "certificate has expired")
-				return summary
-			}
-		}
-		if summary.State == "" {
-			if renewalTimestamp, ok := statusObj["renewalTime"]; ok {
-				if renewalTime, err := toTime(renewalTimestamp); err == nil {
-					if time.Now().After(renewalTime) {
-						summary.State = "expiring"
-						return summary
-					}
+			if notAfterTime, err := toTime(notAfterTimestamp); err == nil {
+				timeLeft := notAfterTime.Sub(time.Now())
+				if timeLeft < 0 {
+					summary.State = "expired"
+					summary.Error = true
+					summary.Message = append(summary.Message, "certificate has expired")
+					return summary
+				}
+				if summary.State == "" && isExpiring(timeLeft, notAfterTime, statusObj) {
+					summary.State = "expiring"
+					summary.Error = false
+					return summary
 				}
 			}
 		}
@@ -188,6 +194,33 @@ func getStatusData(obj data.Object) data.Object {
 	default:
 		return data.Object{}
 	}
+}
+
+const CertRenewalPeriod = time.Duration(7 * 24 * time.Hour)
+const CertRenewalFraction = 10
+
+/* isExpiring - returns whether the cert is about to expire.
+ * If we know the full lifetime of the cert, we decide it's about to expire if the
+ * remaining time left is either less than 1/10th of the lifetime or less than 7 days,
+ * whichever is less.
+ * If we don't know the full lifetime of the cert, we decide it's about to expire if
+ * the remaining time left is less than 7 days.
+ */
+func isExpiring(timeLeft time.Duration, notAfterTime time.Time, statusObj data.Object) bool {
+	if notBeforeTimestamp, ok := statusObj["notBefore"]; ok {
+		if notBeforeTime, err := toTime(notBeforeTimestamp); err == nil {
+			certLifespan := notAfterTime.Sub(notBeforeTime)
+			dangerZoneTimeLeft := certLifespan / CertRenewalFraction
+			if dangerZoneTimeLeft > CertRenewalPeriod {
+				dangerZoneTimeLeft = CertRenewalPeriod
+			}
+			if timeLeft <= dangerZoneTimeLeft {
+				return true
+			}
+		}
+		return false
+	}
+	return timeLeft <= CertRenewalPeriod
 }
 
 func processReadyCondition(conditions []Condition, summary *Summary, defaultState string) {
