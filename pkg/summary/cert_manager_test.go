@@ -46,7 +46,27 @@ func TestCheckCertificate(t *testing.T) {
 			expected: Summary{
 				State:   "error",
 				Error:   true,
-				Message: []string{"Too many failed issuance-attempts"},
+				Message: []string{"1 failed issuance attempt"},
+			},
+		},
+		{
+			name:     "failed issuance-attempts > 1",
+			certName: "pat",
+			inputStatus: map[string]interface{}{
+				"failedIssuanceAttempts": 77,
+				"conditions": []Condition{
+					{
+						Object: map[string]interface{}{
+							"type":   "Ready",
+							"status": "True",
+						},
+					},
+				},
+			},
+			expected: Summary{
+				State:   "error",
+				Error:   true,
+				Message: []string{"77 failed issuance attempts"},
 			},
 		},
 		{
@@ -77,15 +97,28 @@ func TestCheckCertificate(t *testing.T) {
 			},
 		},
 		{
-			name:     "will expire soon",
+			name:     "will expire in less than 7 days",
 			certName: "tony",
 			inputStatus: map[string]interface{}{
-				"renewalTime": yesterday,
-				"notAfter":    tomorrow,
-				"conditions":  []Condition{readyCondition},
+				"notAfter":   tomorrow,
+				"conditions": []Condition{readyCondition},
 			},
 			expected: Summary{
 				State:   "expiring",
+				Error:   false,
+				Message: nil,
+			},
+		},
+		{
+			name:     "active as the cert will be good for > 10% of its age",
+			certName: "tony",
+			inputStatus: map[string]interface{}{
+				"notBefore":  yesterday,
+				"notAfter":   tomorrow,
+				"conditions": []Condition{readyCondition},
+			},
+			expected: Summary{
+				State:   "active",
 				Error:   false,
 				Message: nil,
 			},
