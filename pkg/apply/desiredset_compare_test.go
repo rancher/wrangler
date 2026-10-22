@@ -2,6 +2,9 @@ package apply
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/base64"
+	"io"
 	"testing"
 
 	data2 "github.com/rancher/wrangler/v3/pkg/data"
@@ -18,40 +21,53 @@ import (
 
 func TestCompressAndEncode(t *testing.T) {
 	testCases := []struct {
-		name     string
-		input    []byte
-		expected string
+		name  string
+		input []byte
 	}{
 		{
-			name:     "Empty string",
-			input:    []byte(""),
-			expected: "H4sIAAAAAAAA/wEAAP//AAAAAAAAAAA",
+			name:  "Empty string",
+			input: []byte(""),
 		},
 		{
-			name:     "Short string",
-			input:    []byte("hello world"),
-			expected: "H4sIAAAAAAAA/8pIzcnJVyjPL8pJAQQAAP//hRFKDQsAAAA",
+			name:  "Short string",
+			input: []byte("hello world"),
 		},
 		{
-			name:     "JSON payload",
-			input:    []byte(`{"id": 123, "status": "active", "message": "hello"}`),
-			expected: "H4sIAAAAAAAA/6pWykxRslIwNDLWUVAqLkksKS1WslJQSkwuySxLVdJRUMpNLS5OTE8FCWak5uTkK9UCAgAA//9XG2xwMwAAAA",
+			name:  "JSON payload",
+			input: []byte(`{"id": 123, "status": "active", "message": "hello"}`),
 		},
 		{
-			name:     "Longer repeating string",
-			input:    bytes.Repeat([]byte("test data "), 10),
-			expected: "H4sIAAAAAAAA/ypJLS5RSEksSVSgHQsQAAD//02/IfBkAAAA",
+			name:  "Longer repeating string",
+			input: bytes.Repeat([]byte("test data "), 10),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Compare the result against our hardcoded golden value
-			if got, want := compressAndEncode(tc.input), tc.expected; got != want {
-				t.Errorf("got %q, want %q", got, want)
-			}
+			got := compressAndEncode(tc.input)
+			require.NotEqual(t, got, tc.input, "input and output should not be identical")
+			// go encoding/compression is subject to change, so don't compare bytes
+			// Just verify that compressAndEncode changes the input to something else,
+			// and we can roundtrip it back
+			decoded, err := decodeCompressedAndExpand(got)
+			require.Nil(t, err)
+			assert.Equal(t, tc.input, decoded)
 		})
 	}
+}
+func decodeCompressedAndExpand(s string) ([]byte, error) {
+	data, err := base64.RawStdEncoding.DecodeString(s)
+	if err != nil {
+		return nil, err
+	}
+
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	defer gr.Close()
+
+	return io.ReadAll(gr)
 }
 
 var nullSafeGVK = schema.GroupVersionKind{Group: "rke.cattle.io", Version: "v1", Kind: "RKEControlPlane"}
