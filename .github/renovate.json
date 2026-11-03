@@ -60,6 +60,13 @@
       "enabled": false
     },
     {
+      "description": "Do not bump the Go minor/major version on release branches",
+      "matchDepNames": ["go"],
+      "matchUpdateTypes": ["major", "minor"],
+      "matchBaseBranches": ["/^release\\//"],
+      "enabled": false
+    },
+    {
       "description": "Pin Go minor on main to the Go version of the highest supported k8s (k8s 0.37 -> go 1.26); patch bumps still allowed",
       "matchDepNames": ["go", "golang", "registry.suse.com/bci/golang"],
       "matchBaseBranches": ["main"],
