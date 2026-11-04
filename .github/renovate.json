@@ -67,6 +67,42 @@
       "enabled": false
     },
     {
+      "description": "Pin Go minor on main to the Go version of the highest supported k8s (k8s 0.37 -> go 1.26); patch bumps still allowed",
+      "matchDepNames": ["go", "golang"],
+      "matchBaseBranches": ["main"],
+      "allowedVersions": "<1.27"
+    },
+    {
+      "description": "Pin Go minor on main to the Go version of the highest supported k8s (k8s 0.37 -> go 1.26); patch bumps still allowed (BCI image tags use docker versioning, so match by regex)",
+      "matchDepNames": ["registry.suse.com/bci/golang"],
+      "matchBaseBranches": ["main"],
+      "allowedVersions": "/^1\\.26(\\.|$)/"
+    },
+    {
+      "description": "Pin Go minor on release/v3.6 to the Go version of the highest supported k8s (k8s 0.35 -> go 1.25); patch bumps still allowed",
+      "matchDepNames": ["go", "golang"],
+      "matchBaseBranches": ["release/v3.6"],
+      "allowedVersions": "<1.26"
+    },
+    {
+      "description": "Pin Go minor on release/v3.6 to the Go version of the highest supported k8s (k8s 0.35 -> go 1.25); patch bumps still allowed (BCI image tags use docker versioning, so match by regex)",
+      "matchDepNames": ["registry.suse.com/bci/golang"],
+      "matchBaseBranches": ["release/v3.6"],
+      "allowedVersions": "/^1\\.25(\\.|$)/"
+    },
+    {
+      "description": "Pin Go minor on release/v3.3 to the Go version of the highest supported k8s (k8s 0.34 -> go 1.24); patch bumps still allowed",
+      "matchDepNames": ["go", "golang"],
+      "matchBaseBranches": ["release/v3.3"],
+      "allowedVersions": "<1.25"
+    },
+    {
+      "description": "Pin Go minor on release/v3.3 to the Go version of the highest supported k8s (k8s 0.34 -> go 1.24); patch bumps still allowed (BCI image tags use docker versioning, so match by regex)",
+      "matchDepNames": ["registry.suse.com/bci/golang"],
+      "matchBaseBranches": ["release/v3.3"],
+      "allowedVersions": "/^1\\.24(\\.|$)/"
+    },
+    {
       "description": "Do not update the rancher/renovate-config digest on release branches - only main's renovate.json is ever used, so keeping release branch copies in sync is unnecessary",
       "matchDepNames": ["rancher/renovate-config"],
       "matchBaseBranches": ["/^release\\//"],
