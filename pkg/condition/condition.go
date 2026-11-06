@@ -132,7 +132,16 @@ func (c Cond) GetMessage(obj interface{}) string {
 
 func touchTS(value reflect.Value) {
 	now := time.Now().UTC().Format(time.RFC3339)
-	getFieldValue(value, "LastUpdateTime").SetString(now)
+	setLastUpdateTime(value, now)
+}
+
+// setLastUpdateTime sets the LastUpdateTime field of a condition. Condition types
+// without a string LastUpdateTime field, such as metav1.Condition, are left as is.
+func setLastUpdateTime(cond reflect.Value, ts string) {
+	field := getFieldValue(cond, "LastUpdateTime")
+	if field.IsValid() && field.Kind() == reflect.String {
+		field.SetString(ts)
+	}
 }
 
 func getStatus(obj interface{}, condName string) string {
@@ -145,7 +154,7 @@ func getStatus(obj interface{}, condName string) string {
 
 func setTS(obj interface{}, condName, ts string) {
 	cond := findOrCreateCond(obj, condName)
-	getFieldValue(cond, "LastUpdateTime").SetString(ts)
+	setLastUpdateTime(cond, ts)
 }
 
 func getTS(obj interface{}, condName string) string {
@@ -153,7 +162,11 @@ func getTS(obj interface{}, condName string) string {
 	if cond == nil {
 		return ""
 	}
-	return getFieldValue(*cond, "LastUpdateTime").String()
+	field := getFieldValue(*cond, "LastUpdateTime")
+	if !field.IsValid() || field.Kind() != reflect.String {
+		return ""
+	}
+	return field.String()
 }
 
 func setStatus(obj interface{}, condName, status string) {
