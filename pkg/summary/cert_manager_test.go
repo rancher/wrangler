@@ -19,6 +19,9 @@ func TestCheckCertificate(t *testing.T) {
 	now := time.Now()
 	yesterday := now.AddDate(0, 0, -1)
 	tomorrow := now.AddDate(0, 0, 1)
+	inAWeek := now.AddDate(0, 0, 7)
+	inSixDays := now.AddDate(0, 0, 6)
+	inThreeMonths := now.AddDate(0, 3, 0)
 
 	cases := []testCase{
 		{
@@ -74,7 +77,8 @@ func TestCheckCertificate(t *testing.T) {
 			certName: "bob",
 			inputStatus: map[string]interface{}{
 				"conditions": []Condition{
-					NewCondition("Ready", "True", "", "We're busy issuing certificates"),
+					NewCondition("Ready", "False", "", "not ready yet"),
+					NewCondition("Issuing", "True", "", "We're busy issuing certificates"),
 				},
 			},
 			expected: Summary{
@@ -110,12 +114,13 @@ func TestCheckCertificate(t *testing.T) {
 			},
 		},
 		{
-			name:     "active as the cert will be good for > 10% of its age",
+			name:     "active as the cert is not close to expiring",
 			certName: "tony",
 			inputStatus: map[string]interface{}{
-				"notBefore":  yesterday,
-				"notAfter":   tomorrow,
-				"conditions": []Condition{readyCondition},
+				"notBefore":   yesterday,
+				"notAfter":    inThreeMonths,
+				"renewalTime": inThreeMonths,
+				"conditions":  []Condition{readyCondition},
 			},
 			expected: Summary{
 				State:   "active",
@@ -148,6 +153,72 @@ func TestCheckCertificate(t *testing.T) {
 				Error:   true,
 				Message: []string{"oops I did it again"},
 			},
+		},
+		{
+			name:     "expiring: notAfter within 30 days even though renewalTime is still in the future",
+			certName: "a-week",
+			inputStatus: map[string]interface{}{
+				"notBefore":   now,
+				"notAfter":    inAWeek,
+				"renewalTime": inSixDays,
+				"conditions":  []Condition{readyCondition},
+			},
+			expected: Summary{State: "expiring"},
+		},
+		{
+			name:     "expiring: renewalTime has passed",
+			certName: "renewing",
+			inputStatus: map[string]interface{}{
+				"notAfter":    inThreeMonths,
+				"renewalTime": yesterday,
+				"conditions":  []Condition{readyCondition},
+			},
+			expected: Summary{State: "expiring"},
+		},
+		{
+			name:     "expired beats failed issuance attempts",
+			certName: "expired-and-failing",
+			inputStatus: map[string]interface{}{
+				"notAfter":               yesterday,
+				"failedIssuanceAttempts": 2,
+				"conditions":             []Condition{readyCondition},
+			},
+			expected: Summary{
+				State:   "expired",
+				Error:   true,
+				Message: []string{"certificate has expired"},
+			},
+		},
+		{
+			name:     "expiring beats in-progress",
+			certName: "expiring-and-issuing",
+			inputStatus: map[string]interface{}{
+				"notAfter": inAWeek,
+				"conditions": []Condition{
+					NewCondition("Ready", "True", "", ""),
+					NewCondition("Issuing", "True", "", "renewing"),
+				},
+			},
+			expected: Summary{State: "expiring"},
+		},
+		{
+			name:     "issuing=false is not in-progress",
+			certName: "not-issuing",
+			inputStatus: map[string]interface{}{
+				"conditions": []Condition{
+					NewCondition("Ready", "True", "", ""),
+					NewCondition("Issuing", "False", "", ""),
+				},
+			},
+			expected: Summary{State: "active"},
+		},
+		{
+			name:     "no ready condition is pending",
+			certName: "no-ready",
+			inputStatus: map[string]interface{}{
+				"conditions": []Condition{NewCondition("Other", "True", "", "")},
+			},
+			expected: Summary{State: "pending"},
 		},
 		{
 			name:     "is pending",

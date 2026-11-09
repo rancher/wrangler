@@ -36,8 +36,45 @@ func pluralize(word string, count int64) string {
 	return fmt.Sprintf("%d %ss", count, word)
 }
 
+// CertExpiringSoonWindow is how close to its notAfter time a Certificate
+// must be before it is reported as "expiring".
+const CertExpiringSoonWindow = 30 * 24 * time.Hour
+
+// checkCertificateResource summarizes a cert-manager Certificate. The order of
+// the checks is significant and matches the order used by the Rancher UI, so
+// that the state the backend reports (and sorts/filters on) is the state the
+// user sees: expired, expiring, in-progress, error, active, then pending.
 func checkCertificateResource(obj data.Object, conditions []Condition, summary Summary) Summary {
 	statusObj := getStatusData(obj)
+	now := time.Now()
+
+	// Expiry beats everything: a certificate can report Ready while its
+	// stored material is stale.
+	notAfter, hasNotAfter := statusTime(statusObj, "notAfter")
+	if hasNotAfter && notAfter.Before(now) {
+		summary.State = "expired"
+		summary.Error = true
+		summary.Message = append(summary.Message, "certificate has expired")
+		return summary
+	}
+	renewalTime, hasRenewalTime := statusTime(statusObj, "renewalTime")
+	if (hasRenewalTime && renewalTime.Before(now)) || (hasNotAfter && notAfter.Before(now.Add(CertExpiringSoonWindow))) {
+		summary.State = "expiring"
+		summary.Error = false
+		return summary
+	}
+
+	for _, condition := range conditions {
+		if condition.Type() == "Issuing" && metav1.ConditionStatus(condition.Status()) == metav1.ConditionTrue {
+			summary.State = "in-progress"
+			summary.Error = false
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return summary
+		}
+	}
+
 	failedIssuanceAttempts, err := convert.ToNumber(data.GetValueN(statusObj, "failedIssuanceAttempts"))
 	if err == nil && failedIssuanceAttempts > 0 {
 		summary.State = "error"
@@ -45,39 +82,33 @@ func checkCertificateResource(obj data.Object, conditions []Condition, summary S
 		summary.Message = []string{pluralize("failed issuance attempt", failedIssuanceAttempts)}
 		return summary
 	}
-	if len(statusObj) != 0 {
-		if notAfterTimestamp, ok := statusObj["notAfter"]; ok {
-			if notAfterTime, err := toTime(notAfterTimestamp); err == nil {
-				timeLeft := notAfterTime.Sub(time.Now())
-				if timeLeft < 0 {
-					summary.State = "expired"
-					summary.Error = true
-					summary.Message = append(summary.Message, "certificate has expired")
-					return summary
-				}
-				if summary.State == "" && isExpiring(timeLeft, notAfterTime, statusObj) {
-					summary.State = "expiring"
-					summary.Error = false
-					return summary
-				}
-			}
-		}
-	}
-	if len(conditions) == 0 || summary.Error {
-		// wait for later runs when conditions have been added
+
+	if len(conditions) == 0 {
+		// Leave it to the other summarizers, and to later runs once
+		// conditions have been added.
 		return summary
 	}
 
 	for _, condition := range conditions {
-		message := condition.Message()
-		if strings.Contains(strings.ToLower(message), "issuing certificate") {
-			summary.State = "in-progress"
-			summary.Message = append(summary.Message, message)
+		if condition.Type() != "Ready" {
+			continue
+		}
+		switch metav1.ConditionStatus(condition.Status()) {
+		case metav1.ConditionFalse:
+			summary.State = "error"
+			summary.Error = true
+			if message := condition.Message(); message != "" {
+				summary.Message = append(summary.Message, message)
+			}
+			return summary
+		case metav1.ConditionTrue:
+			summary.State = "active"
+			summary.Error = false
 			return summary
 		}
 	}
-
-	processReadyCondition(conditions, &summary, "pending")
+	summary.State = "pending"
+	summary.Error = false
 	return summary
 }
 
@@ -196,73 +227,14 @@ func getStatusData(obj data.Object) data.Object {
 	}
 }
 
-const CertRenewalPeriod = time.Duration(7 * 24 * time.Hour)
-const CertRenewalFraction = 10
-
-/* isExpiring - returns whether the cert is about to expire.
- * If we know the full lifetime of the cert, we decide it's about to expire if the
- * remaining time left is either less than 1/10th of the lifetime or less than 7 days,
- * whichever is less.
- * If we don't know the full lifetime of the cert, we decide it's about to expire if
- * the remaining time left is less than 7 days.
- */
-func isExpiring(timeLeft time.Duration, notAfterTime time.Time, statusObj data.Object) bool {
-	if notBeforeTimestamp, ok := statusObj["notBefore"]; ok {
-		if notBeforeTime, err := toTime(notBeforeTimestamp); err == nil {
-			certLifespan := notAfterTime.Sub(notBeforeTime)
-			dangerZoneTimeLeft := certLifespan / CertRenewalFraction
-			if dangerZoneTimeLeft > CertRenewalPeriod {
-				dangerZoneTimeLeft = CertRenewalPeriod
-			}
-			if timeLeft <= dangerZoneTimeLeft {
-				return true
-			}
-		}
-		return false
+// statusTime returns the time stored at status[field], if there is a valid one.
+func statusTime(statusObj data.Object, field string) (time.Time, bool) {
+	value, ok := statusObj[field]
+	if !ok {
+		return time.Time{}, false
 	}
-	return timeLeft <= CertRenewalPeriod
-}
-
-func processReadyCondition(conditions []Condition, summary *Summary, defaultState string) {
-	foundReadyTrue := false
-	foundReadyOther := false
-	for _, condition := range conditions {
-		if condition.Type() != "Ready" {
-			summary.State = "error"
-			summary.Error = true
-			if message := condition.Message(); message != "" {
-				summary.Message = append(summary.Message, message)
-			}
-			return
-		}
-		switch metav1.ConditionStatus(condition.Status()) {
-		case metav1.ConditionTrue:
-			foundReadyTrue = true
-		case metav1.ConditionFalse:
-			summary.State = "error"
-			summary.Error = true
-			if message := condition.Message(); message != "" {
-				summary.Message = append(summary.Message, message)
-			}
-			return
-		case metav1.ConditionUnknown:
-			if summary.State == "" {
-				summary.State = "pending"
-			}
-			foundReadyOther = true
-		}
-	}
-	if summary.State == "" {
-		if !foundReadyTrue {
-			// If we found an error, we returned inside the loop
-			summary.State = defaultState
-			summary.Error = true
-		}
-		if !foundReadyOther {
-			summary.State = "active"
-		}
-	}
-	return
+	t, err := toTime(value)
+	return t, err == nil
 }
 
 func toTime(value interface{}) (time.Time, error) {
