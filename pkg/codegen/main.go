@@ -71,6 +71,7 @@ func main() {
 				OutputControllerPackageName: "storage",
 				Types: []interface{}{
 					storagev1.StorageClass{},
+					storagev1.VolumeAttachment{},
 				},
 			},
 			apiextv1.GroupName: {
