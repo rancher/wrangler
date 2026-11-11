@@ -1,6 +1,6 @@
 package crd
 
-//go:generate mockgen --build_flags=--mod=mod -package crd -destination ./mockCRDClient_test.go "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1" CustomResourceDefinitionInterface
+//go:generate go tool -modfile ../../gotools/mockgen/go.mod mockgen --build_flags=--mod=mod -package crd -destination ./mockCRDClient_test.go "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1" CustomResourceDefinitionInterface
 
 import (
 	"context"
