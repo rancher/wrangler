@@ -1,7 +1,7 @@
 // Mocks for this test are generated with the following command.
 //go:generate sh -c "rm -f *Mocks_test.go"
-//go:generate mockgen --build_flags=--mod=mod -package generic -destination ./controllerFactoryMocks_test.go github.com/rancher/lasso/pkg/controller SharedControllerFactory,SharedController
-//go:generate mockgen -package generic -destination ./clientMocks_test.go -source ./embeddedClient.go
+//go:generate go tool -modfile ../../gotools/mockgen/go.mod mockgen --build_flags=--mod=mod -package generic -destination ./controllerFactoryMocks_test.go github.com/rancher/lasso/pkg/controller SharedControllerFactory,SharedController
+//go:generate go tool -modfile ../../gotools/mockgen/go.mod mockgen -package generic -destination ./clientMocks_test.go -source ./embeddedClient.go
 
 package generic
 
