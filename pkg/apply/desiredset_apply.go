@@ -1,10 +1,13 @@
 package apply
 
 import (
+	"crypto/fips140"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"sync"
 	"time"
 
@@ -272,10 +275,18 @@ func setLabels(meta metav1.Object, labels map[string]string) {
 	meta.SetLabels(objLabels)
 }
 
+var fipsEnabled = fips140.Enabled
+
+// objectSetHash is SHA-1 outside FIPS mode so existing labels still match.
 func objectSetHash(labels map[string]string) string {
-	dig := sha1.New()
+	var dig hash.Hash
+	if fipsEnabled() {
+		dig = sha256.New()
+	} else {
+		dig = sha1.New()
+	}
 	for _, key := range hashOrder {
 		dig.Write([]byte(labels[key]))
 	}
-	return hex.EncodeToString(dig.Sum(nil))
+	return hex.EncodeToString(dig.Sum(nil))[:40]
 }
