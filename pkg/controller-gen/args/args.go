@@ -29,6 +29,21 @@ type Options struct {
 	// Boilerplate is the filepath to a boilerplate file whose content will
 	// be added to every generated files.
 	Boilerplate string
+	// ExternalApplyConfigurations appends to https://pkg.go.dev/k8s.io/code-generator@v0.37.2/cmd/applyconfiguration-gen/args
+	// additional reference documentation from controller-gen generators
+	// https://book.kubebuilder.io/reference/controller-gen.html#generators
+	// by default args.New() prepopulates common ExternalApplyConfigurations
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "Condition"}:                "k8s.io/client-go/applyconfigurations/meta/v1",
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "DeleteOptions"}:            "k8s.io/client-go/applyconfigurations/meta/v1",
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "LabelSelector"}:            "k8s.io/client-go/applyconfigurations/meta/v1",
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "LabelSelectorRequirement"}: "k8s.io/client-go/applyconfigurations/meta/v1",
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ManagedFieldsEntry"}:       "k8s.io/client-go/applyconfigurations/meta/v1",
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "ObjectMeta"}:               "k8s.io/client-go/applyconfigurations/meta/v1",
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "OwnerReference"}:           "k8s.io/client-go/applyconfigurations/meta/v1",
+	//		{Package: "k8s.io/apimachinery/pkg/apis/meta/v1", Name: "TypeMeta"}:                 "k8s.io/client-go/applyconfigurations/meta/v1",
+	//	},
+	// Use this to add more mappings to the append / replace existing mapping
+	ExternalApplyConfigurations map[types.Name]string
 }
 
 type Type struct {
