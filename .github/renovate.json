@@ -71,6 +71,14 @@
       "enabled": false
     },
     {
+      "description": "Do not bump the go directive (any update type) in go.mod files on release branches. The directive is a minimum for consumers such as rancher; raising it forces them onto a newer toolchain and breaks CI that resolves an older patch (GOTOOLCHAIN=local). Raise it manually if a dependency or vulnerability requires it. CI toolchain and BCI image bumps are separate deps and stay enabled.",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["golang"],
+      "matchBaseBranches": ["/^release\\//"],
+      "enabled": false
+    },
+    {
       "description": "Pin Go minor on main to the Go version of the highest supported k8s (k8s 0.37 -> go 1.26); patch bumps still allowed",
       "matchDepNames": ["go", "golang"],
       "matchBaseBranches": ["main"],
