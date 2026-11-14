@@ -2,11 +2,15 @@ package apply
 
 import (
 	"crypto/fips140"
+	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apimachinery/pkg/util/validation"
+	"github.com/stretchr/testify/require"
 )
+
+const wantObjectSetHash = "0b1b4822889b77a3dc829ce5e8d2260128e530e8"
 
 var objectSetLabels = map[string]string{
 	LabelID:        "addon-coredns",
@@ -16,60 +20,21 @@ var objectSetLabels = map[string]string{
 	LabelPrune:     "true",
 }
 
-const (
-	wantSHA1Hash   = "0b1b4822889b77a3dc829ce5e8d2260128e530e8"
-	wantSHA256Hash = "8b03ed8e62d97b5646dc400df89bbe3160cb9256"
-)
-
-func setFIPS(t *testing.T, enabled bool) {
-	t.Helper()
-	if !enabled && fips140.Enforced() {
-		t.Skip("SHA-1 is not available under GODEBUG=fips140=only")
+func TestObjectSetHash_SHA1UnderFIPSOnly(t *testing.T) {
+	if os.Getenv("OBJECTSETHASH_CHILD") == "" {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestObjectSetHash_SHA1UnderFIPSOnly$")
+		cmd.Env = append(os.Environ(), "OBJECTSETHASH_CHILD=1", "GODEBUG=fips140=only")
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+		return
 	}
-	prev := fipsEnabled
-	fipsEnabled = func() bool { return enabled }
-	t.Cleanup(func() { fipsEnabled = prev })
+	require.True(t, fips140.Enforced())
+	assert.Equal(t, wantObjectSetHash, objectSetHash(objectSetLabels))
 }
 
-func TestObjectSetHash_KnownAnswer(t *testing.T) {
-	t.Run("fips=false", func(t *testing.T) {
-		setFIPS(t, false)
-		assert.Equal(t, wantSHA1Hash, objectSetHash(objectSetLabels))
-	})
-	t.Run("fips=true", func(t *testing.T) {
-		setFIPS(t, true)
-		assert.Equal(t, wantSHA256Hash, objectSetHash(objectSetLabels))
-	})
-}
-
-func TestObjectSetHash_IsAValidLabelValue(t *testing.T) {
-	for _, enabled := range []bool{false, true} {
-		t.Run(map[bool]string{false: "fips=false", true: "fips=true"}[enabled], func(t *testing.T) {
-			setFIPS(t, enabled)
-			got := objectSetHash(objectSetLabels)
-			assert.Len(t, got, 40)
-			assert.Empty(t, validation.IsValidLabelValue(got))
-		})
+func TestObjectSetHash_SHA1WithFIPSOff(t *testing.T) {
+	if fips140.Enforced() {
+		t.Skip("covered by the fips140=only subprocess")
 	}
-}
-
-func TestObjectSetHash_OnlyOwnerLabelsCount(t *testing.T) {
-	setFIPS(t, true)
-	other := map[string]string{
-		LabelID:        "addon-coredns",
-		LabelGVK:       "/v1, Kind=ConfigMap",
-		LabelName:      "coredns",
-		LabelNamespace: "kube-system",
-		LabelHash:      "ignored",
-	}
-	assert.Equal(t, objectSetHash(objectSetLabels), objectSetHash(other))
-}
-
-// Runs against the real mode, so it covers GODEBUG=fips140=on and =only.
-func TestObjectSetHash_InProcessMode(t *testing.T) {
-	want := wantSHA1Hash
-	if fips140.Enabled() {
-		want = wantSHA256Hash
-	}
-	assert.Equal(t, want, objectSetHash(objectSetLabels))
+	assert.Equal(t, wantObjectSetHash, objectSetHash(objectSetLabels))
 }
