@@ -249,6 +249,10 @@ func generateApplyConfiguration(groups map[string]bool, customArgs *cgargs.Custo
 	applyconfigurationArgs.OutputDir = filepath.Join(customArgs.OutputBase, customArgs.Package, "applyconfiguration")
 	applyconfigurationArgs.OutputPkg = filepath.Join(customArgs.Package, "applyconfiguration")
 	applyconfigurationArgs.GoHeaderFile = customArgs.Options.Boilerplate
+	// append / replace to default external apply configurations
+	for objectType, objectConfiguration := range customArgs.Options.ExternalApplyConfigurations {
+		applyconfigurationArgs.ExternalApplyConfigurations[objectType] = objectConfiguration
+	}
 
 	if path, err := generateOpenAPISchemaFile(customArgs); err != nil {
 		logrus.Warnf("%v: fake ClientSet will not be usable - see https://github.com/kubernetes/kubernetes/issues/126850", err)
