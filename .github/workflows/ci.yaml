@@ -27,27 +27,15 @@ jobs:
   golangci:
     name: golangci-lint
     runs-on: ubuntu-latest
-    env:
-      SETUP_GO_VERSION: '^1.26'
-      GOLANG_CI_LINT_VERSION: v2.15.0
+    container: ghcr.io/rancher/ci-image/go1.26:1.26.11
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
 
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: ${{ env.SETUP_GO_VERSION }}
-
-      - name: Generate Golang
-        run: |
-          export PATH=$PATH:/home/runner/go/bin/
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: ${{ env.GOLANG_CI_LINT_VERSION }}
-
+        run: golangci-lint run ./...
