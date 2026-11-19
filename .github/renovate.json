@@ -51,10 +51,9 @@
       "separateMajorMinor": false
     },
     {
-      "description": "Group Go dev tooling (Go version, golangci-lint) into a single PR per branch",
+      "description": "Group Go dev tooling (Go version) into a single PR per branch",
       "matchPackageNames": [
-        "go",
-        "golangci/golangci-lint"
+        "go"
       ],
       "groupName": "Go dev tools",
       "separateMajorMinor": false

@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
 
@@ -341,7 +340,7 @@ func appliedFromAnnotation(str string) []byte {
 		return nil
 	}
 
-	b, err = ioutil.ReadAll(r)
+	b, err = io.ReadAll(r)
 	if err != nil {
 		return nil
 	}
