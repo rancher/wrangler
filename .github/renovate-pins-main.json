@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "description": "Pin Go minor on main to the Go version of the highest supported k8s (k8s 0.37 -> go 1.26); patch bumps still allowed",
+      "matchDepNames": [
+        "go",
+        "golang"
+      ],
+      "allowedVersions": "<1.27"
+    },
+    {
+      "description": "Pin Go minor on main to the Go version of the highest supported k8s (k8s 0.37 -> go 1.26); patch bumps still allowed (BCI image tags use docker versioning, so match by regex)",
+      "matchDepNames": [
+        "registry.suse.com/bci/golang"
+      ],
+      "allowedVersions": "/^1\\.26(\\.|$)/"
+    }
+  ]
+}
