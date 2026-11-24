@@ -1,6 +1,6 @@
 module github.com/rancher/wrangler/v3
 
-go 1.26.0
+go 1.27.0
 
 require (
 	github.com/evanphx/json-patch v5.9.11+incompatible
