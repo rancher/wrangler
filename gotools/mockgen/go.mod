@@ -1,6 +1,6 @@
 module github.com/rancher/wrangler/gotools/mockgen
 
-go 1.27.0
+go 1.27.4
 
 tool go.uber.org/mock/mockgen
 
