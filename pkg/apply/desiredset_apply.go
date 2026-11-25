@@ -1,6 +1,7 @@
 package apply
 
 import (
+	"crypto/fips140"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -273,9 +274,13 @@ func setLabels(meta metav1.Object, labels map[string]string) {
 }
 
 func objectSetHash(labels map[string]string) string {
-	dig := sha1.New()
-	for _, key := range hashOrder {
-		dig.Write([]byte(labels[key]))
-	}
-	return hex.EncodeToString(dig.Sum(nil))
+	var sum []byte
+	fips140.WithoutEnforcement(func() {
+		dig := sha1.New()
+		for _, key := range hashOrder {
+			dig.Write([]byte(labels[key]))
+		}
+		sum = dig.Sum(nil)
+	})
+	return hex.EncodeToString(sum)
 }
