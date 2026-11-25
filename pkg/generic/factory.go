@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/v3/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/rest"
 )
 
@@ -66,7 +65,9 @@ func (c *Factory) SetThreadiness(gvk schema.GroupVersionKind, threadiness int) {
 
 func (c *Factory) ControllerFactory() controller.SharedControllerFactory {
 	err := c.setControllerFactoryWithLock()
-	utilruntime.Must(err)
+	if err != nil {
+		logrus.Fatalf("Failed to set controller factory: %v", err)
+	}
 	return c.controllerFactory
 }
 
